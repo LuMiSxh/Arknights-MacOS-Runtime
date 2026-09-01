@@ -120,6 +120,25 @@ export ac_cv_lib_soname_freetype="libfreetype.6.dylib"
 export ac_cv_lib_soname_gnutls="libgnutls.30.dylib"
 export ac_cv_lib_soname_MoltenVK="libMoltenVK.dylib"
 
+llvm_path=""
+if [[ "$stage" == cursor || "$stage" == combined ]]; then
+	llvm_attribute="$nixpkgs#legacyPackages.x86_64-darwin.llvmPackages_15.llvm"
+	llvm_dev="$(nix build --no-link --print-out-paths "$llvm_attribute.dev")"
+	llvm_lib="$(nix build --no-link --print-out-paths "$llvm_attribute.lib")"
+	[[ -d "$llvm_dev/include" ]] || {
+		echo "error: LLVM development output has no include directory: $llvm_dev" >&2
+		exit 1
+	}
+	[[ -d "$llvm_lib/lib" ]] || {
+		echo "error: LLVM library output has no lib directory: $llvm_lib" >&2
+		exit 1
+	}
+	llvm_path="$stage_root/llvm-native"
+	mkdir -p "$llvm_path"
+	ln -s "$llvm_dev/include" "$llvm_path/include"
+	ln -s "$llvm_lib/lib" "$llvm_path/lib"
+fi
+
 wine_build="$stage_root/wine-build"
 mkdir -p "$wine_build"
 (
@@ -190,7 +209,6 @@ if [[ "$stage" == cursor || "$stage" == combined ]]; then
 	require_command ninja
 	dxmt_source="$source_root/dxmt-$stage"
 	git -C "$dxmt_source" submodule update --init --recursive
-	llvm_path="$(nix build --no-link --print-out-paths "$nixpkgs#legacyPackages.x86_64-darwin.llvmPackages_15.llvm")"
 	dxmt_install="$stage_root/dxmt-install"
 	(
 		unset CFLAGS CXXFLAGS CPPFLAGS CROSSCFLAGS LDFLAGS
