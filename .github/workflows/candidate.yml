@@ -36,7 +36,7 @@ jobs:
         uses: astral-sh/setup-uv@v10.0.1
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v22
+        uses: cachix/install-nix-action@v31
 
       - name: Install build tools
         run: brew install ccache mingw-w64 meson ninja

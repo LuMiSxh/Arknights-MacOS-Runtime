@@ -192,22 +192,25 @@ if [[ "$stage" == cursor || "$stage" == combined ]]; then
 	git -C "$dxmt_source" submodule update --init --recursive
 	llvm_path="$(nix build --no-link --print-out-paths "$nixpkgs#legacyPackages.x86_64-darwin.llvmPackages_15.llvm")"
 	dxmt_install="$stage_root/dxmt-install"
-	meson setup \
-		--cross-file "$dxmt_source/build-win64.txt" \
-		-Dnative_llvm_path="$llvm_path" \
-		-Dwine_build_path="$wine_build" \
-		--buildtype release --prefix "$dxmt_install" --strip \
-		"$stage_root/dxmt-build64" "$dxmt_source"
-	meson compile -C "$stage_root/dxmt-build64"
-	meson install -C "$stage_root/dxmt-build64"
-	meson setup \
-		--cross-file "$dxmt_source/build-win32.txt" \
-		-Dnative_llvm_path="$llvm_path" \
-		-Dwine_build_path="$wine_build" \
-		--buildtype release --prefix "$dxmt_install" --strip \
-		"$stage_root/dxmt-build32" "$dxmt_source"
-	meson compile -C "$stage_root/dxmt-build32"
-	meson install -C "$stage_root/dxmt-build32"
+	(
+		unset CFLAGS CXXFLAGS CPPFLAGS CROSSCFLAGS LDFLAGS
+		meson setup \
+			--cross-file "$dxmt_source/build-win64.txt" \
+			-Dnative_llvm_path="$llvm_path" \
+			-Dwine_build_path="$wine_build" \
+			--buildtype release --prefix "$dxmt_install" --strip \
+			"$stage_root/dxmt-build64" "$dxmt_source"
+		meson compile -C "$stage_root/dxmt-build64"
+		meson install -C "$stage_root/dxmt-build64"
+		meson setup \
+			--cross-file "$dxmt_source/build-win32.txt" \
+			-Dnative_llvm_path="$llvm_path" \
+			-Dwine_build_path="$wine_build" \
+			--buildtype release --prefix "$dxmt_install" --strip \
+			"$stage_root/dxmt-build32" "$dxmt_source"
+		meson compile -C "$stage_root/dxmt-build32"
+		meson install -C "$stage_root/dxmt-build32"
+	)
 
 	for library in d3d10core.dll d3d11.dll dxgi.dll winemetal.dll; do
 		cp "$dxmt_install/x86_64-windows/$library" "$candidate/DXMT/x64/$library"
