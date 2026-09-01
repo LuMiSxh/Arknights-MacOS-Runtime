@@ -1,0 +1,50 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Arknights MacOS Runtime Maintainers <arknights-macos-runtime@users.noreply.github.com>
+Date: Tue, 1 Sep 2026 00:00:00 +0000
+Subject: [PATCH] dxmt: allow a bounded frame-latency experiment
+
+Read ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY once when the first command queue is
+created. Values 1 through 3 select the corresponding frame latency; absent
+or invalid values preserve DXMT's upstream default of 3. The present path
+does not inspect the environment.
+
+This is an Arknights MacOS Client experiment and is intentionally not the
+upstream default.
+---
+ src/dxmt/dxmt_command_queue.cpp | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/src/dxmt/dxmt_command_queue.cpp b/src/dxmt/dxmt_command_queue.cpp
+index 89ffc37..6a85e0d 100644
+--- a/src/dxmt/dxmt_command_queue.cpp
++++ b/src/dxmt/dxmt_command_queue.cpp
+@@ -26,6 +26,20 @@
+ 
+ #define ASYNC_ENCODING 1
+ 
++namespace {
++
++uint32_t configured_max_latency() {
++  static const uint32_t value = [] {
++    const auto configured = dxmt::env::getEnvVar("ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY");
++    if (configured.size() == 1 && configured.front() >= '1' && configured.front() <= '3')
++      return static_cast<uint32_t>(configured.front() - '0');
++    return uint32_t{3};
++  }();
++  return value;
++}
++
++} // namespace
++
+ namespace dxmt {
+ 
+ void *
+@@ -34,6 +48,7 @@ CommandChunk::allocate_cpu_heap(size_t size, size_t alignment) {
+ }
+ 
+ CommandQueue::CommandQueue(WMT::Device device) :
++    max_latency_(configured_max_latency()),
+     encodeThread([this]() { this->EncodingThread(); }),
+     finishThread([this]() { this->WaitForFinishThread(); }),
+     device(device),
+

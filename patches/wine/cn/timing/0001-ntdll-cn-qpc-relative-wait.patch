@@ -1,0 +1,62 @@
+diff --git a/dlls/ntdll/unix/sync.c b/dlls/ntdll/unix/sync.c
+index 8813d8f8..0d6e4042 100644
+--- a/dlls/ntdll/unix/sync.c
++++ b/dlls/ntdll/unix/sync.c
+@@ -75,6 +75,24 @@
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(sync);
+ 
++/* The QPC relative-wait variant is an experimental CN compatibility route.
++ * Keep the upstream wall-clock implementation selected unless explicitly
++ * enabled by the runtime launcher. */
++static BOOL arknights_runtime_cn_compat_enabled(void)
++{
++    static LONG state = -1;
++    LONG value = state;
++    const char *flag;
++
++    if (value == -1)
++    {
++        flag = getenv("ARKNIGHTS_RUNTIME_CN_COMPAT");
++        value = flag && !strcmp(flag, "1");
++        InterlockedCompareExchange(&state, value, -1);
++    }
++    return value;
++}
++
+ HANDLE keyed_event = 0;
+ int inproc_device_fd = -1;
+ 
+@@ -2585,10 +2603,31 @@ NTSTATUS WINAPI NtDelayExecution( BOOLEAN alertable, const LARGE_INTEGER *timeou
+     {
+         for (;;) select( 0, NULL, NULL, NULL, NULL );
+     }
+-    else
++    else if (arknights_runtime_cn_compat_enabled() && timeout->QuadPart < 0)
+     {
++        timeout_t when = -timeout->QuadPart, diff;
+         LARGE_INTEGER now;
++
++        NtQueryPerformanceCounter( &now, NULL );
++        when += now.QuadPart;
++
++        NtYieldExecution();
++
++        for (;;)
++        {
++            struct timeval tv;
++            NtQueryPerformanceCounter( &now, NULL );
++            diff = (when - now.QuadPart + 9) / 10;
++            if (diff <= 0) break;
++            tv.tv_sec = diff / 1000000;
++            tv.tv_usec = diff % 1000000;
++            if (select( 0, NULL, NULL, NULL, &tv ) != -1) break;
++        }
++    }
++    else
++    {
+         timeout_t when, diff;
++        LARGE_INTEGER now;
+ 
+         if ((when = timeout->QuadPart) < 0)
+         {

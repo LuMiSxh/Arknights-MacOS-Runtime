@@ -1,0 +1,1003 @@
+diff --git a/dlls/winecoreaudio.drv/coreaudio.c b/dlls/winecoreaudio.drv/coreaudio.c
+index e5791534..5d2d0217 100644
+--- a/dlls/winecoreaudio.drv/coreaudio.c
++++ b/dlls/winecoreaudio.drv/coreaudio.c
+@@ -42,6 +42,8 @@
+ #include <fcntl.h>
+ #include <fenv.h>
+ #include <unistd.h>
++#include <pthread.h>
++#include <time.h>
+ 
+ #include <CoreAudio/CoreAudio.h>
+ #include <AudioToolbox/AudioFormat.h>
+@@ -67,6 +69,7 @@
+ #include "devpkey.h"
+ #include "wine/debug.h"
+ #include "wine/unixlib.h"
++#include "wine/list.h"
+ 
+ #include "unixlib.h"
+ #include "coreaudio_cocoa.h"
+@@ -82,10 +85,19 @@ struct coreaudio_stream
+ {
+     os_unfair_lock lock;
+     AudioComponentInstance unit;
++    BOOL unit_initialized, unit_started; /* written at creation, then guarded by follow_lock */
+     AudioConverterRef converter;
+     AudioStreamBasicDescription dev_desc; /* audio unit format, not necessarily the same as fmt */
+     AudioDeviceID dev_id;
+ 
++    struct list entry; /* in follow_streams if the follow worker manages this stream */
++    char *device;
++    BOOL follows_default;
++    BOOL retarget_failed;
++    float *channel_vols; /* session * stream volume per channel; guarded by follow_lock */
++    float master_vol;    /* guarded by follow_lock */
++    BOOL vols_set;       /* guarded by follow_lock */
++
+     EDataFlow flow;
+     DWORD flags;
+     AUDCLNT_SHAREMODE share;
+@@ -200,11 +212,35 @@ static BOOL device_has_channels(AudioDeviceID device, EDataFlow flow)
+     return ret;
+ }
+ 
++/* The runtime keeps the upstream device list unless the launcher explicitly
++ * opts into following macOS's default output.  Read the process environment
++ * at the call site so a missing or malformed value cannot enable the patch. */
++static pthread_once_t audio_follow_env_once = PTHREAD_ONCE_INIT;
++static BOOL audio_follow_default_output;
++
++static void init_audio_follow_default_output(void)
++{
++    const char *value = getenv("ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT");
++
++    audio_follow_default_output = value && value[0] == '1' && value[1] == '\0';
++}
++
++static BOOL audio_follow_default_output_enabled(void)
++{
++    pthread_once(&audio_follow_env_once, init_audio_follow_default_output);
++    return audio_follow_default_output;
++}
++
+ static NTSTATUS unix_get_endpoint_ids(void *args)
+ {
++    /* short enough for winmm's MAXPNAMELEN after mmdevapi's "FormFactor (name)" wrapping */
++    static const WCHAR default_render_name[] = {'D','e','f','a','u','l','t',' ','O','u','t','p','u','t',0};
+     struct get_endpoint_ids_params *params = args;
++    const BOOL follow_default = params->flow == eRender && audio_follow_default_output_enabled();
+     unsigned int num_devices, i, needed, offset;
+-    AudioDeviceID *devices, default_id;
++    const WCHAR *default_name;
++    SIZE_T default_name_len;
++    AudioDeviceID *devices, default_id = kAudioObjectUnknown;
+     AudioObjectPropertyAddress addr;
+     struct endpoint *endpoint;
+     UInt32 devsize, size;
+@@ -220,22 +256,23 @@ static NTSTATUS unix_get_endpoint_ids(void *args)
+     params->num = 0;
+     params->default_idx = 0;
+ 
+-    addr.mScope = kAudioObjectPropertyScopeGlobal;
+-    addr.mElement = kAudioObjectPropertyElementMain;
+-    if(params->flow == eRender) addr.mSelector = kAudioHardwarePropertyDefaultOutputDevice;
+-    else if(params->flow == eCapture) addr.mSelector = kAudioHardwarePropertyDefaultInputDevice;
+-    else{
++    if(params->flow != eRender && params->flow != eCapture){
+         params->result = E_INVALIDARG;
+         return STATUS_SUCCESS;
+     }
+ 
+-    size = sizeof(default_id);
+-    sc = AudioObjectGetPropertyData(kAudioObjectSystemObject, &addr, 0, NULL, &size, &default_id);
+-    if(sc != noErr){
+-        WARN("Getting _DefaultInputDevice property failed: %x\n", (int)sc);
+-        default_id = -1;
++    addr.mScope = kAudioObjectPropertyScopeGlobal;
++    addr.mElement = kAudioObjectPropertyElementMain;
++    if(!follow_default){
++        addr.mSelector = params->flow == eRender ? kAudioHardwarePropertyDefaultOutputDevice
++                                                 : kAudioHardwarePropertyDefaultInputDevice;
++        size = sizeof(default_id);
++        sc = AudioObjectGetPropertyData(kAudioObjectSystemObject, &addr, 0, NULL, &size, &default_id);
++        if(sc != noErr){
++            WARN("Getting default device property failed: %x\n", (int)sc);
++            default_id = kAudioObjectUnknown;
++        }
+     }
+-
+     addr.mSelector = kAudioHardwarePropertyDevices;
+     sc = AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &addr, 0, NULL, &devsize);
+     if(sc != noErr){
+@@ -291,9 +328,31 @@ static NTSTATUS unix_get_endpoint_ids(void *args)
+     }
+     free(devices);
+ 
+-    offset = needed = sizeof(*endpoint) * params->num;
++    /* the extra endpoint is the virtual default device, which is always
++     * first and identified by an empty device string; it is only exposed
++     * when at least one real device is present */
++    default_name = default_render_name;
++    default_name_len = ARRAY_SIZE(default_render_name);
++    offset = needed = sizeof(*endpoint) * (params->num + (follow_default && params->num ? 1 : 0));
+     endpoint = params->endpoints;
+ 
++    if(follow_default && params->num){
++        /* name, then an empty device string padded to WCHAR alignment */
++        needed += default_name_len * sizeof(WCHAR) + 2;
++        if(needed <= params->size){
++            endpoint->name = offset;
++            memcpy((char *)params->endpoints + offset, default_name, default_name_len * sizeof(WCHAR));
++            offset += default_name_len * sizeof(WCHAR);
++
++            endpoint->device = offset;
++            ((char *)params->endpoints)[offset] = '\0';
++            ((char *)params->endpoints)[offset + 1] = '\0';
++            offset += 2;
++
++            endpoint++;
++        }
++    }
++
+     for(i = 0; i < params->num; i++){
+         const SIZE_T name_len = CFStringGetLength(info[i].name) + 1;
+         CFIndex device_len;
+@@ -321,9 +380,10 @@ static NTSTATUS unix_get_endpoint_ids(void *args)
+         }
+         CFRelease(info[i].name);
+         CFRelease(info[i].uid);
+-        if(info[i].id == default_id) params->default_idx = i;
++        if(!follow_default && info[i].id == default_id) params->default_idx = i;
+     }
+     free(info);
++    if(follow_default && params->num) params->num++; /* count the virtual default endpoint */
+ 
+     if(needed > params->size){
+         params->size = needed;
+@@ -583,6 +643,39 @@ static HRESULT ca_get_audiodesc(AudioStreamBasicDescription *desc,
+     return S_OK;
+ }
+ 
++static OSStatus ca_set_channel_layout(AudioComponentInstance unit, const WAVEFORMATEX *fmt)
++{
++    AudioChannelLayout layout;
++
++    /* AudioChannelBitmap and dwChannelMask have identical positions */
++    layout.mChannelLayoutTag = kAudioChannelLayoutTag_UseChannelBitmap;
++    layout.mChannelBitmap    = (fmt->wFormatTag == WAVE_FORMAT_EXTENSIBLE)
++                               ? ((WAVEFORMATEXTENSIBLE *)fmt)->dwChannelMask : 0x3;
++    layout.mNumberChannelDescriptions = 0;
++
++    return AudioUnitSetProperty(unit, kAudioUnitProperty_AudioChannelLayout,
++                                kAudioUnitScope_Input, 0, &layout, sizeof(layout));
++}
++
++/* apply the client format to a render unit's input scope */
++static OSStatus ca_set_render_format(AudioComponentInstance unit,
++                                     const AudioStreamBasicDescription *desc,
++                                     const WAVEFORMATEX *fmt)
++{
++    OSStatus sc;
++
++    sc = AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat,
++                              kAudioUnitScope_Input, 0, desc, sizeof(*desc));
++    if(sc != noErr)
++        return sc;
++
++    sc = ca_set_channel_layout(unit, fmt);
++    if(sc != noErr)
++        WARN("Couldn't set channel layout: %x\n", (int)sc);
++
++    return noErr;
++}
++
+ static HRESULT ca_setup_audiounit(EDataFlow dataflow, AudioComponentInstance unit,
+                                   const WAVEFORMATEX *fmt, AudioStreamBasicDescription *dev_desc,
+                                   AudioConverterRef *converter)
+@@ -641,35 +734,40 @@ static HRESULT ca_setup_audiounit(EDataFlow dataflow, AudioComponentInstance uni
+             return osstatus_to_hresult(sc);
+         }
+     }else{
+-        AudioChannelLayout layout;
+-
+         hr = ca_get_audiodesc(dev_desc, fmt);
+         if(FAILED(hr))
+             return hr;
+ 
+         dump_adesc("final", dev_desc);
+-        sc = AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat,
+-                                  kAudioUnitScope_Input, 0, dev_desc, sizeof(*dev_desc));
++        sc = ca_set_render_format(unit, dev_desc, fmt);
+         if(sc != noErr){
+             WARN("Couldn't set format: %x\n", (int)sc);
+             return osstatus_to_hresult(sc);
+         }
+-
+-        /* Set channel layout: AudioChannelBitmap and dwChannelMask conveniently have identical positions */
+-        layout.mChannelLayoutTag = kAudioChannelLayoutTag_UseChannelBitmap;
+-        layout.mChannelBitmap    = (fmt->wFormatTag == WAVE_FORMAT_EXTENSIBLE) ? ((WAVEFORMATEXTENSIBLE *)fmt)->dwChannelMask : 0x3;
+-        layout.mNumberChannelDescriptions = 0;
+-
+-        sc = AudioUnitSetProperty(unit, kAudioUnitProperty_AudioChannelLayout,
+-                                  kAudioUnitScope_Input, 0, &layout, sizeof(layout));
+-        if (sc != noErr)
+-            WARN("Couldn't set channel layout: %d\n", (int)sc);
+     }
+ 
+     return S_OK;
+ }
+ 
+-static AudioDeviceID dev_id_from_device(const char *device)
++static AudioDeviceID get_default_device(EDataFlow flow)
++{
++    AudioDeviceID id = kAudioObjectUnknown;
++    UInt32 size = sizeof(id);
++    AudioObjectPropertyAddress addr =
++    {
++        .mScope = kAudioObjectPropertyScopeGlobal,
++        .mElement = kAudioObjectPropertyElementMain,
++    };
++
++    addr.mSelector = (flow == eRender) ? kAudioHardwarePropertyDefaultOutputDevice
++                                       : kAudioHardwarePropertyDefaultInputDevice;
++    if(AudioObjectGetPropertyData(kAudioObjectSystemObject, &addr, 0, NULL,
++                                   &size, &id) != noErr)
++        return kAudioObjectUnknown;
++    return id;
++}
++
++static AudioDeviceID dev_id_from_device(const char *device, EDataFlow flow)
+ {
+     AudioDeviceID id;
+     CFStringRef uid;
+@@ -682,6 +780,13 @@ static AudioDeviceID dev_id_from_device(const char *device)
+         .mSelector = kAudioHardwarePropertyTranslateUIDToDevice,
+     };
+ 
++    /* The virtual endpoint is only exposed by the opt-in render path. */
++    if(!device || !device[0]){
++        if(flow == eRender && audio_follow_default_output_enabled())
++            return get_default_device(flow);
++        return kAudioObjectUnknown;
++    }
++
+     uid = CFStringCreateWithCStringNoCopy(NULL, device, kCFStringEncodingUTF8, kCFAllocatorNull);
+ 
+     size = sizeof(id);
+@@ -788,12 +893,381 @@ static HRESULT get_device_sample_rate(AudioDeviceID dev_id, EDataFlow flow,
+     return S_OK;
+ }
+ 
++static pthread_mutex_t follow_lock = PTHREAD_MUTEX_INITIALIZER;
++static struct list follow_streams = LIST_INIT(follow_streams); /* guarded by follow_lock */
++static pthread_once_t follow_once = PTHREAD_ONCE_INIT;
++static pthread_mutex_t follow_signal_lock = PTHREAD_MUTEX_INITIALIZER;
++static pthread_cond_t follow_signal_cond = PTHREAD_COND_INITIALIZER;
++static unsigned int follow_generation; /* guarded by follow_signal_lock */
++static BOOL follow_stopping; /* guarded by follow_signal_lock */
++static BOOL follow_ready; /* initialized by follow_once, cleared during detach */
++static BOOL follow_default_listener, follow_devices_listener;
++static BOOL follow_run_loop_changed;
++static CFRunLoopRef follow_previous_run_loop;
++static HANDLE follow_thread;
++static const AudioObjectPropertyAddress follow_run_loop_addr =
++{
++    .mSelector = kAudioHardwarePropertyRunLoop,
++    .mScope = kAudioObjectPropertyScopeGlobal,
++    .mElement = kAudioObjectPropertyElementMain,
++};
++static const AudioObjectPropertyAddress follow_default_addr =
++{
++    .mSelector = kAudioHardwarePropertyDefaultOutputDevice,
++    .mScope = kAudioObjectPropertyScopeGlobal,
++    .mElement = kAudioObjectPropertyElementMain,
++};
++static const AudioObjectPropertyAddress follow_devices_addr =
++{
++    .mSelector = kAudioHardwarePropertyDevices,
++    .mScope = kAudioObjectPropertyScopeGlobal,
++    .mElement = kAudioObjectPropertyElementMain,
++};
++
++static OSStatus start_unit(struct coreaudio_stream *stream)
++{
++    OSStatus sc;
++
++    sc = AudioUnitInitialize(stream->unit);
++    if(sc != noErr){
++        WARN("AudioUnitInitialize failed: %x\n", (int)sc);
++        return sc;
++    }
++    stream->unit_initialized = TRUE;
++
++    sc = AudioOutputUnitStart(stream->unit);
++    if(sc != noErr){
++        WARN("AudioOutputUnitStart failed: %x\n", (int)sc);
++        if(AudioUnitUninitialize(stream->unit) != noErr)
++            WARN("AudioUnitUninitialize after failed start failed\n");
++        stream->unit_initialized = FALSE;
++        return sc;
++    }
++    stream->unit_started = TRUE;
++    return noErr;
++}
++
++/* Caller holds follow_lock. */
++static void apply_stream_volumes(struct coreaudio_stream *stream, AudioDeviceID dev_id)
++{
++    AudioObjectPropertyAddress prop_addr = {
++        kAudioDevicePropertyVolumeScalar,
++        kAudioObjectPropertyScopeGlobal,
++        kAudioObjectPropertyElementMain
++    };
++    Float32 level = stream->master_vol;
++    OSStatus sc;
++    UINT32 i;
++
++    sc = AudioObjectSetPropertyData(dev_id, &prop_addr, 0, NULL, sizeof(float), &level);
++    if (sc == noErr)
++        level = 1.0f;
++    else
++        WARN("Couldn't set master volume, applying it directly to the channels: %x\n", (int)sc);
++
++    for (i = 1; i <= stream->fmt->nChannels; ++i) {
++        const float vol = level * stream->channel_vols[i - 1];
++
++        prop_addr.mElement = i;
++
++        sc = AudioObjectSetPropertyData(dev_id, &prop_addr, 0, NULL, sizeof(float), &vol);
++        if (sc != noErr) {
++            WARN("Couldn't set channel #%u volume: %x\n", i, (int)sc);
++        }
++    }
++}
++
++/* Caller holds follow_lock. Must NOT hold stream->lock across
++ * AudioOutputUnitStop/Start: Stop synchronises with the IO thread, whose
++ * render callback takes stream->lock, so holding it here would deadlock. */
++static BOOL retarget_stream(struct coreaudio_stream *stream, AudioDeviceID new_id)
++{
++    AudioDeviceID old_id;
++    OSStatus sc;
++
++    os_unfair_lock_lock(&stream->lock);
++    old_id = stream->dev_id;
++    os_unfair_lock_unlock(&stream->lock);
++    TRACE("stream %p: output device changed, retargeting %u -> %u\n",
++          stream, (unsigned int)old_id, (unsigned int)new_id);
++
++    if(stream->unit_started){
++        sc = AudioOutputUnitStop(stream->unit);
++        if(sc != noErr){
++            WARN("AudioOutputUnitStop failed: %x\n", (int)sc);
++            stream->retarget_failed = TRUE;
++            return FALSE;
++        }
++        stream->unit_started = FALSE;
++    }
++    if(stream->unit_initialized){
++        sc = AudioUnitUninitialize(stream->unit);
++        if(sc != noErr){
++            WARN("AudioUnitUninitialize failed: %x\n", (int)sc);
++            stream->retarget_failed = TRUE;
++            return FALSE;
++        }
++        stream->unit_initialized = FALSE;
++    }
++
++    sc = AudioUnitSetProperty(stream->unit, kAudioOutputUnitProperty_CurrentDevice,
++                              kAudioUnitScope_Global, 0, &new_id, sizeof(new_id));
++    if(sc != noErr){
++        WARN("Setting CurrentDevice failed: %x\n", (int)sc);
++        /* best effort: try to resume on whatever device the unit still has;
++         * retarget_failed makes the next notification retry this stream */
++        stream->retarget_failed = TRUE;
++        start_unit(stream);
++        return FALSE;
++    }
++
++    /* the unit is now on the new device; keep the latency and set-volume
++     * paths pointed at it even if one of the steps below fails */
++    os_unfair_lock_lock(&stream->lock);
++    stream->dev_id = new_id;
++    os_unfair_lock_unlock(&stream->lock);
++
++    /* Re-apply the client format; AUHAL rebuilds its internal converter for
++     * the new device's native rate. dev_desc is the client format for render
++     * streams and is device-independent (see ca_setup_audiounit). */
++    sc = ca_set_render_format(stream->unit, &stream->dev_desc, stream->fmt);
++    if(sc != noErr){
++        WARN("Re-setting stream format failed: %x\n", (int)sc);
++        stream->retarget_failed = TRUE;
++        /* best effort: the unit still has the previous, identical client
++         * format set, so it can play on the new device until the retry */
++        start_unit(stream);
++        return FALSE;
++    }
++
++    if(start_unit(stream) != noErr){
++        stream->retarget_failed = TRUE;
++        return FALSE;
++    }
++
++    /* the replacement device plays at its own hardware volume; restore the
++     * application's levels */
++    if(stream->vols_set)
++        apply_stream_volumes(stream, new_id);
++
++    stream->retarget_failed = FALSE;
++    return TRUE;
++}
++
++/* pthread primitives rather than NT events on purpose: this is called from
++ * the HAL's notification thread, which has no Wine thread state and thus
++ * cannot make Wine or NT calls. */
++static void follow_signal(void)
++{
++    pthread_mutex_lock(&follow_signal_lock);
++    follow_generation++;
++    pthread_cond_signal(&follow_signal_cond);
++    pthread_mutex_unlock(&follow_signal_lock);
++}
++
++/* Runs on a Wine thread for the lifetime of the process. Retargeting happens
++ * here rather than in the HAL listener because the listener runs on a thread
++ * unknown to Wine, and because AudioUnit (de)initialisation from inside a
++ * property-listener dispatch can deadlock against the HAL. */
++static void follow_worker(void *arg)
++{
++    unsigned int generation = 0;
++    unsigned int retry_delay = 0; /* ms */
++
++    for(;;){
++        struct coreaudio_stream *stream;
++        AudioDeviceID current_id, new_id;
++        struct timespec timeout;
++        BOOL retry = FALSE;
++        UInt32 size;
++        int wait_result;
++        OSStatus sc;
++
++        pthread_mutex_lock(&follow_signal_lock);
++        if(retry_delay){
++            /* relative wait so a wall-clock step can't stretch the delay; an
++             * early wakeup before the timeout restarts the wait, which is
++             * harmless for a backoff */
++            timeout.tv_sec = retry_delay / 1000;
++            timeout.tv_nsec = (retry_delay % 1000) * 1000000;
++            while(generation == follow_generation && !follow_stopping){
++                wait_result = pthread_cond_timedwait_relative_np(&follow_signal_cond, &follow_signal_lock, &timeout);
++                if(wait_result == ETIMEDOUT) break;
++            }
++        }else{
++            while(generation == follow_generation && !follow_stopping)
++                pthread_cond_wait(&follow_signal_cond, &follow_signal_lock);
++        }
++        if(follow_stopping){
++            pthread_mutex_unlock(&follow_signal_lock);
++            return;
++        }
++        generation = follow_generation;
++        pthread_mutex_unlock(&follow_signal_lock);
++
++        pthread_mutex_lock(&follow_lock);
++        LIST_FOR_EACH_ENTRY(stream, &follow_streams, struct coreaudio_stream, entry){
++            size = sizeof(current_id);
++            sc = AudioUnitGetProperty(stream->unit, kAudioOutputUnitProperty_CurrentDevice,
++                                      kAudioUnitScope_Global, 0, &current_id, &size);
++            if(sc != noErr){
++                /* The unit's device identity is no longer trustworthy. Resolve
++                 * the intended target below and perform a controlled retarget;
++                 * CoreAudio may recycle a disconnected device ID. */
++                current_id = kAudioObjectUnknown;
++            }
++
++            if(stream->follows_default)
++                new_id = get_default_device(stream->flow);
++            else
++                new_id = dev_id_from_device(stream->device, stream->flow);
++            if(new_id == kAudioObjectUnknown){
++                /* The device is gone, or resolving it transiently failed.
++                 * Re-check with backoff and expose no possibly recycled ID to
++                 * the volume or latency paths in the meantime. */
++                retry = TRUE;
++                os_unfair_lock_lock(&stream->lock);
++                stream->dev_id = kAudioObjectUnknown;
++                os_unfair_lock_unlock(&stream->lock);
++                continue;
++            }
++            if(current_id == new_id && !stream->retarget_failed){
++                os_unfair_lock_lock(&stream->lock);
++                stream->dev_id = new_id;
++                os_unfair_lock_unlock(&stream->lock);
++                continue;
++            }
++            if(!retarget_stream(stream, new_id)) retry = TRUE;
++        }
++        pthread_mutex_unlock(&follow_lock);
++
++        if(retry)
++            retry_delay = retry_delay ? min(retry_delay * 2, 2000) : 250;
++        else
++            retry_delay = 0;
++    }
++}
++
++/* The HAL calls this on a thread that is unknown to Wine: no Wine facilities
++ * may be used here, not even debug traces (they need the calling thread's
++ * Wine state). Just wake the worker thread. */
++static OSStatus devices_changed(AudioObjectID obj, UInt32 num_addr,
++                                const AudioObjectPropertyAddress addrs[],
++                                void *user)
++{
++    follow_signal();
++    return noErr;
++}
++
++static void shutdown_device_listeners(void);
++
++static void install_device_listeners(void)
++{
++    static const WCHAR name[] = {'c','o','r','e','a','u','d','i','o','_','f','o','l','l','o','w',0};
++    DWORD priority = THREAD_PRIORITY_NORMAL;
++    OSStatus sc;
++    CFRunLoopRef null_loop = NULL;
++    UInt32 size = sizeof(follow_previous_run_loop);
++
++    if(create_unix_thread(&follow_thread, name, follow_worker, NULL)){
++        WARN("Failed to create the follow worker thread\n");
++        return;
++    }
++    /* create_unix_thread makes audio threads time-critical; this one only
++     * does housekeeping. Demote it here, ordered after the creator's own
++     * priority set, which doing it in the worker would race against. */
++    NtSetInformationThread(follow_thread, ThreadBasePriority, &priority, sizeof(priority));
++
++    /* Wine processes do not pump a CFRunLoop on the main thread, where the
++     * HAL delivers property notifications by default. Setting the run loop
++     * property to NULL tells the HAL to use its own notification thread.
++     * Without this the listener never fires under Wine. */
++    sc = AudioObjectGetPropertyData(kAudioObjectSystemObject, &follow_run_loop_addr, 0, NULL,
++                                    &size, &follow_previous_run_loop);
++    if(sc == noErr && follow_previous_run_loop) CFRetain(follow_previous_run_loop);
++    else if(sc != noErr) WARN("Reading HAL run loop failed: %x\n", (int)sc);
++
++    sc = AudioObjectSetPropertyData(kAudioObjectSystemObject, &follow_run_loop_addr, 0, NULL,
++                                    sizeof(null_loop), &null_loop);
++    if(sc != noErr)
++        WARN("Setting HAL run loop to NULL failed: %x\n", (int)sc);
++    else
++        follow_run_loop_changed = TRUE;
++
++    sc = AudioObjectAddPropertyListener(kAudioObjectSystemObject, &follow_default_addr,
++                                        devices_changed, NULL);
++    if(sc != noErr)
++        WARN("Adding default-device listener failed: %x\n", (int)sc);
++    else{
++        follow_default_listener = TRUE;
++        TRACE("Default-output-device listener installed\n");
++    }
++
++    sc = AudioObjectAddPropertyListener(kAudioObjectSystemObject, &follow_devices_addr,
++                                        devices_changed, NULL);
++    if(sc != noErr)
++        WARN("Adding device-list listener failed: %x\n", (int)sc);
++    else{
++        follow_devices_listener = TRUE;
++        TRACE("Device-list listener installed\n");
++    }
++
++    follow_ready = follow_run_loop_changed && follow_default_listener && follow_devices_listener;
++    if(!follow_ready) shutdown_device_listeners();
++}
++
++static void shutdown_device_listeners(void)
++{
++    OSStatus sc;
++
++    pthread_mutex_lock(&follow_lock);
++    follow_ready = FALSE;
++    pthread_mutex_unlock(&follow_lock);
++    if(follow_default_listener){
++        sc = AudioObjectRemovePropertyListener(kAudioObjectSystemObject, &follow_default_addr,
++                                               devices_changed, NULL);
++        if(sc != noErr) WARN("Removing default-device listener failed: %x\n", (int)sc);
++        follow_default_listener = FALSE;
++    }
++    if(follow_devices_listener){
++        sc = AudioObjectRemovePropertyListener(kAudioObjectSystemObject, &follow_devices_addr,
++                                               devices_changed, NULL);
++        if(sc != noErr) WARN("Removing device-list listener failed: %x\n", (int)sc);
++        follow_devices_listener = FALSE;
++    }
++
++    pthread_mutex_lock(&follow_signal_lock);
++    follow_stopping = TRUE;
++    pthread_cond_broadcast(&follow_signal_cond);
++    pthread_mutex_unlock(&follow_signal_lock);
++    if(follow_thread){
++        NtWaitForSingleObject(follow_thread, FALSE, NULL);
++        NtClose(follow_thread);
++        follow_thread = NULL;
++    }
++
++    if(follow_run_loop_changed){
++        sc = AudioObjectSetPropertyData(kAudioObjectSystemObject, &follow_run_loop_addr, 0, NULL,
++                                        sizeof(follow_previous_run_loop), &follow_previous_run_loop);
++        if(sc != noErr) WARN("Restoring HAL run loop failed: %x\n", (int)sc);
++        follow_run_loop_changed = FALSE;
++    }
++    if(follow_previous_run_loop){
++        CFRelease(follow_previous_run_loop);
++        follow_previous_run_loop = NULL;
++    }
++}
++
+ static NTSTATUS unix_create_stream(void *args)
+ {
+     struct create_stream_params *params = args;
++    const BOOL follow_candidate = audio_follow_default_output_enabled() &&
++                                  params->flow == eRender &&
++                                  params->share == AUDCLNT_SHAREMODE_SHARED;
+     unsigned int min_period_frames, max_period_frames;
+     struct coreaudio_stream *stream;
+     AURenderCallbackStruct input;
++    BOOL follow_enrolled = FALSE;
+     OSStatus sc;
+     SIZE_T size;
+ 
+@@ -803,12 +1277,21 @@ static NTSTATUS unix_create_stream(void *args)
+         params->result = E_OUTOFMEMORY;
+         return STATUS_SUCCESS;
+     }
++    list_init(&stream->entry);
+ 
+     stream->fmt = clone_format(params->fmt);
+     if(!stream->fmt){
+         params->result = E_OUTOFMEMORY;
+         goto end;
+     }
++    if(follow_candidate && !(stream->channel_vols = calloc(params->fmt->nChannels, sizeof(float)))){
++        params->result = E_OUTOFMEMORY;
++        goto end;
++    }
++    if(follow_candidate && params->device && !(stream->device = strdup(params->device))){
++        params->result = E_OUTOFMEMORY;
++        goto end;
++    }
+ 
+     stream->period_frames = muldiv(params->period, stream->fmt->nSamplesPerSec, 10000000);
+     if (stream->period_frames == 0)
+@@ -817,7 +1300,7 @@ static NTSTATUS unix_create_stream(void *args)
+         goto end;
+     }
+ 
+-    stream->dev_id = dev_id_from_device(params->device);
++    stream->dev_id = dev_id_from_device(params->device, params->flow);
+     stream->flow = params->flow;
+     stream->flags = params->flags;
+     stream->share = params->share;
+@@ -876,18 +1359,10 @@ static NTSTATUS unix_create_stream(void *args)
+                            "This can be enabled under Security & Privacy in System Preferences.\n");
+     }
+ 
+-    sc = AudioUnitInitialize(stream->unit);
+-    if(sc != noErr){
+-        WARN("Couldn't initialize: %x\n", (int)sc);
+-        params->result = osstatus_to_hresult(sc);
+-        goto end;
+-    }
+-
+     /* we play audio continuously because AudioOutputUnitStart sometimes takes
+      * a while to return */
+-    sc = AudioOutputUnitStart(stream->unit);
++    sc = start_unit(stream);
+     if(sc != noErr){
+-        WARN("Unit failed to start: %x\n", (int)sc);
+         params->result = osstatus_to_hresult(sc);
+         goto end;
+     }
+@@ -909,10 +1384,40 @@ static NTSTATUS unix_create_stream(void *args)
+ end:
+     if(FAILED(params->result)){
+         if(stream->converter) AudioConverterDispose(stream->converter);
++        if(stream->unit_started){
++            AudioOutputUnitStop(stream->unit);
++            stream->unit_started = FALSE;
++        }
++        if(stream->unit_initialized){
++            AudioUnitUninitialize(stream->unit);
++            stream->unit_initialized = FALSE;
++        }
+         if(stream->unit) AudioComponentInstanceDispose(stream->unit);
++        free(stream->channel_vols);
++        free(stream->device);
+         free(stream->fmt);
+         free(stream);
+     } else {
++        if(follow_candidate){
++            stream->follows_default = !stream->device || !stream->device[0];
++            pthread_once(&follow_once, install_device_listeners);
++            pthread_mutex_lock(&follow_lock);
++            if(follow_ready){
++                list_add_tail(&follow_streams, &stream->entry);
++                follow_enrolled = TRUE;
++            }
++            pthread_mutex_unlock(&follow_lock);
++            if(follow_enrolled){
++                /* the default may have changed since the device was resolved,
++                 * before the listener could see this stream */
++                follow_signal();
++            }else{
++                free(stream->channel_vols);
++                stream->channel_vols = NULL;
++                free(stream->device);
++                stream->device = NULL;
++            }
++        }
+         *params->channel_count = params->fmt->nChannels;
+         *params->stream = (stream_handle)(UINT_PTR)stream;
+     }
+@@ -926,6 +1431,12 @@ static NTSTATUS unix_release_stream( void *args )
+     struct coreaudio_stream *stream = handle_get_stream(params->stream);
+     SIZE_T size;
+ 
++    /* unlinking a list_init'd entry that was never enrolled is a no-op, and
++     * checking membership outside the lock would race the worker's neighbours */
++    pthread_mutex_lock(&follow_lock);
++    list_remove(&stream->entry);
++    pthread_mutex_unlock(&follow_lock);
++
+     if(stream->timer_thread){
+         stream->please_quit = TRUE;
+         NtWaitForSingleObject(stream->timer_thread, FALSE, NULL);
+@@ -933,7 +1444,14 @@ static NTSTATUS unix_release_stream( void *args )
+     }
+ 
+     if(stream->unit){
+-        AudioOutputUnitStop(stream->unit);
++        if(stream->unit_started){
++            AudioOutputUnitStop(stream->unit);
++            stream->unit_started = FALSE;
++        }
++        if(stream->unit_initialized){
++            AudioUnitUninitialize(stream->unit);
++            stream->unit_initialized = FALSE;
++        }
+         AudioComponentInstanceDispose(stream->unit);
+     }
+ 
+@@ -951,6 +1469,8 @@ static NTSTATUS unix_release_stream( void *args )
+         NtFreeVirtualMemory(GetCurrentProcess(), (void **)&stream->tmp_buffer,
+                             &size, MEM_RELEASE);
+     }
++    free(stream->channel_vols);
++    free(stream->device);
+     free(stream->fmt);
+     free(stream);
+     params->result = S_OK;
+@@ -1110,7 +1630,7 @@ static NTSTATUS unix_get_mix_format(void *args)
+     UInt32 size;
+     OSStatus sc;
+     int i;
+-    const AudioDeviceID dev_id = dev_id_from_device(params->device);
++    const AudioDeviceID dev_id = dev_id_from_device(params->device, params->flow);
+ 
+     params->fmt->Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
+ 
+@@ -1202,7 +1722,7 @@ static NTSTATUS unix_is_format_supported(void *args)
+     AudioStreamBasicDescription dev_desc;
+     AudioConverterRef converter;
+     AudioComponentInstance unit;
+-    const AudioDeviceID dev_id = dev_id_from_device(params->device);
++    const AudioDeviceID dev_id = dev_id_from_device(params->device, params->flow);
+ 
+     unit = get_audiounit(params->flow, dev_id);
+ 
+@@ -1220,7 +1740,7 @@ static NTSTATUS unix_get_device_period(void *args)
+     unsigned int n_samples_per_sec;
+     AudioDeviceID dev_id;
+ 
+-    dev_id = dev_id_from_device(params->device);
++    dev_id = dev_id_from_device(params->device, params->flow);
+     if (FAILED(params->result = get_device_sample_rate(dev_id, params->flow, &n_samples_per_sec)))
+         return STATUS_SUCCESS;
+ 
+@@ -1362,7 +1882,7 @@ static NTSTATUS unix_get_buffer_size(void *args)
+     return STATUS_SUCCESS;
+ }
+ 
+-static HRESULT ca_get_max_stream_latency(struct coreaudio_stream *stream, UInt32 *max)
++static HRESULT ca_get_max_stream_latency(EDataFlow flow, AudioDeviceID dev_id, UInt32 *max)
+ {
+     AudioObjectPropertyAddress addr;
+     AudioStreamID *ids;
+@@ -1370,11 +1890,11 @@ static HRESULT ca_get_max_stream_latency(struct coreaudio_stream *stream, UInt32
+     OSStatus sc;
+     int nstreams, i;
+ 
+-    addr.mScope = get_scope(stream->flow);
++    addr.mScope = get_scope(flow);
+     addr.mElement = 0;
+     addr.mSelector = kAudioDevicePropertyStreams;
+ 
+-    sc = AudioObjectGetPropertyDataSize(stream->dev_id, &addr, 0, NULL, &size);
++    sc = AudioObjectGetPropertyDataSize(dev_id, &addr, 0, NULL, &size);
+     if(sc != noErr){
+         WARN("Unable to get size for _Streams property: %x\n", (int)sc);
+         return osstatus_to_hresult(sc);
+@@ -1384,7 +1904,7 @@ static HRESULT ca_get_max_stream_latency(struct coreaudio_stream *stream, UInt32
+     if(!ids)
+         return E_OUTOFMEMORY;
+ 
+-    sc = AudioObjectGetPropertyData(stream->dev_id, &addr, 0, NULL, &size, ids);
++    sc = AudioObjectGetPropertyData(dev_id, &addr, 0, NULL, &size, ids);
+     if(sc != noErr){
+         WARN("Unable to get _Streams property: %x\n", (int)sc);
+         free(ids);
+@@ -1420,35 +1940,37 @@ static NTSTATUS unix_get_latency(void *args)
+     struct coreaudio_stream *stream = handle_get_stream(params->stream);
+     UInt32 latency, stream_latency, size;
+     AudioObjectPropertyAddress addr;
++    AudioDeviceID dev_id;
+     OSStatus sc;
+ 
++    /* dev_id can be retargeted concurrently; take a consistent snapshot, and
++     * do not hold the lock across the HAL queries: the render callback takes
++     * it, and the follow worker's AudioOutputUnitStop waits for the callback */
+     os_unfair_lock_lock(&stream->lock);
++    dev_id = stream->dev_id;
++    os_unfair_lock_unlock(&stream->lock);
+ 
+     addr.mScope = get_scope(stream->flow);
+     addr.mSelector = kAudioDevicePropertyLatency;
+     addr.mElement = 0;
+ 
+     size = sizeof(latency);
+-    sc = AudioObjectGetPropertyData(stream->dev_id, &addr, 0, NULL, &size, &latency);
++    sc = AudioObjectGetPropertyData(dev_id, &addr, 0, NULL, &size, &latency);
+     if(sc != noErr){
+         WARN("Couldn't get _Latency property: %x\n", (int)sc);
+-        os_unfair_lock_unlock(&stream->lock);
+         params->result = osstatus_to_hresult(sc);
+         return STATUS_SUCCESS;
+     }
+ 
+-    params->result = ca_get_max_stream_latency(stream, &stream_latency);
+-    if(FAILED(params->result)){
+-        os_unfair_lock_unlock(&stream->lock);
++    params->result = ca_get_max_stream_latency(stream->flow, dev_id, &stream_latency);
++    if(FAILED(params->result))
+         return STATUS_SUCCESS;
+-    }
+ 
+     latency += stream_latency;
+     /* pretend we process audio in Period chunks, so max latency includes
+      * the period time */
+     *params->latency = muldiv(latency, 10000000, stream->fmt->nSamplesPerSec) + stream->period;
+ 
+-    os_unfair_lock_unlock(&stream->lock);
+     params->result = S_OK;
+     return STATUS_SUCCESS;
+ }
+@@ -1829,13 +2351,13 @@ static NTSTATUS unix_is_started(void *args)
+     return STATUS_SUCCESS;
+ }
+ 
+-static NTSTATUS get_device_vid_pid(const char *device, DWORD *vid, DWORD *pid)
++static NTSTATUS get_device_vid_pid(const char *device, EDataFlow flow, DWORD *vid, DWORD *pid)
+ {
+     UInt32 type_property;
+     UInt32 size;
+     OSStatus sc;
+     AudioObjectPropertyAddress addr;
+-    const AudioDeviceID dev_id = dev_id_from_device(device);
++    const AudioDeviceID dev_id = dev_id_from_device(device, flow);
+ 
+     addr.mScope = kAudioObjectPropertyScopeGlobal;
+     addr.mElement = kAudioObjectPropertyElementMain;
+@@ -1875,7 +2397,7 @@ static NTSTATUS unix_get_prop_value(void *args)
+     if(IsEqualPropertyKey(*prop, DEVPKEY_Device_InstanceId)){
+         DWORD vid = 0, pid = 0;
+ 
+-        if (SUCCEEDED(get_device_vid_pid(params->device, &vid, &pid))){
++        if (SUCCEEDED(get_device_vid_pid(params->device, params->flow, &vid, &pid))){
+             int len;
+             char buf[128];
+             PROPVARIANT *out = params->value;
+@@ -1906,32 +2428,50 @@ static NTSTATUS unix_set_volumes(void *args)
+ {
+     struct set_volumes_params *params = args;
+     struct coreaudio_stream *stream = handle_get_stream(params->stream);
+-    Float32 level = params->master_volume;
+-    OSStatus sc;
+-    UINT32 i;
+     AudioObjectPropertyAddress prop_addr = {
+         kAudioDevicePropertyVolumeScalar,
+         kAudioObjectPropertyScopeGlobal,
+         kAudioObjectPropertyElementMain
+     };
++    AudioDeviceID dev_id;
++    Float32 level;
++    OSStatus sc;
++    UINT32 i;
+ 
+-    sc = AudioObjectSetPropertyData(stream->dev_id, &prop_addr, 0, NULL, sizeof(float), &level);
+-    if (sc == noErr)
+-        level = 1.0f;
+-    else
+-        WARN("Couldn't set master volume, applying it directly to the channels: %x\n", (int)sc);
+-
+-    for (i = 1; i <= stream->fmt->nChannels; ++i) {
+-        const float vol = level * params->session_volumes[i - 1] * params->volumes[i - 1];
++    /* Preserve the upstream path byte-for-byte in behaviour unless the
++     * opt-in listener successfully enrolled this stream. */
++    if(!stream->channel_vols){
++        level = params->master_volume;
++        sc = AudioObjectSetPropertyData(stream->dev_id, &prop_addr, 0, NULL, sizeof(float), &level);
++        if(sc == noErr)
++            level = 1.0f;
++        else
++            WARN("Couldn't set master volume, applying it directly to the channels: %x\n", (int)sc);
+ 
+-        prop_addr.mElement = i;
++        for(i = 1; i <= stream->fmt->nChannels; ++i){
++            const float vol = level * params->session_volumes[i - 1] * params->volumes[i - 1];
+ 
+-        sc = AudioObjectSetPropertyData(stream->dev_id, &prop_addr, 0, NULL, sizeof(float), &vol);
+-        if (sc != noErr) {
+-            WARN("Couldn't set channel #%u volume: %x\n", i, (int)sc);
++            prop_addr.mElement = i;
++            sc = AudioObjectSetPropertyData(stream->dev_id, &prop_addr, 0, NULL, sizeof(float), &vol);
++            if(sc != noErr)
++                WARN("Couldn't set channel #%u volume: %x\n", i, (int)sc);
+         }
++        return STATUS_SUCCESS;
+     }
+ 
++    /* cache the volumes so a retarget can re-apply them to the new device */
++    pthread_mutex_lock(&follow_lock);
++    for (i = 0; i < stream->fmt->nChannels; ++i)
++        stream->channel_vols[i] = params->session_volumes[i] * params->volumes[i];
++    stream->master_vol = params->master_volume;
++    stream->vols_set = TRUE;
++    /* dev_id can be retargeted concurrently; take a consistent snapshot */
++    os_unfair_lock_lock(&stream->lock);
++    dev_id = stream->dev_id;
++    os_unfair_lock_unlock(&stream->lock);
++
++    apply_stream_volumes(stream, dev_id);
++    pthread_mutex_unlock(&follow_lock);
+     return STATUS_SUCCESS;
+ }
+ 
+@@ -1956,10 +2496,16 @@ static NTSTATUS unix_set_event_handle(void *args)
+     return STATUS_SUCCESS;
+ }
+ 
++static NTSTATUS unix_process_detach(void *args)
++{
++    shutdown_device_listeners();
++    return STATUS_SUCCESS;
++}
++
+ const unixlib_entry_t __wine_unix_call_funcs[] =
+ {
+     unix_not_implemented,
+-    unix_not_implemented,
++    unix_process_detach,
+     unix_not_implemented,
+     unix_not_implemented,
+     unix_get_endpoint_ids,
+@@ -2409,7 +2955,7 @@ static NTSTATUS unix_wow64_get_prop_value(void *args)
+ const unixlib_entry_t __wine_unix_call_wow64_funcs[] =
+ {
+     unix_wow64_process_attach,
+-    unix_not_implemented,
++    unix_process_detach,
+     unix_not_implemented,
+     unix_not_implemented,
+     unix_wow64_get_endpoint_ids,
+

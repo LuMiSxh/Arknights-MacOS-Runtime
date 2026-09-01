@@ -1,0 +1,56 @@
+name: Candidate
+
+on:
+  workflow_call:
+    inputs:
+      stage:
+        type: string
+        default: combined
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: Patch family to build
+        type: choice
+        default: combined
+        options: [base, audio, cursor, cn, combined]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: candidate-${{ inputs.stage || 'combined' }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-15-intel
+    timeout-minutes: 300
+    env:
+      RUNTIME_STAGE: ${{ inputs.stage || 'combined' }}
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v22
+
+      - name: Install build tools
+        run: brew install ccache mingw-w64 meson ninja
+
+      - name: Build isolated overlay canary
+        run: scripts/build-canary.sh "$RUNTIME_STAGE"
+
+      - name: Upload runtime canary
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: Arknights-MacOS-Runtime-${{ env.RUNTIME_STAGE }}-${{ github.sha }}
+          path: |
+            .build/stages/${{ env.RUNTIME_STAGE }}/Arknights-MacOS-Runtime-${{ env.RUNTIME_STAGE }}.tar.gz
+            .build/stages/${{ env.RUNTIME_STAGE }}/Arknights-MacOS-Runtime-${{ env.RUNTIME_STAGE }}.tar.gz.sha256
+            .build/reports/*.json
+          if-no-files-found: error
+          retention-days: 3

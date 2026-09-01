@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "archiveSchemaVersion": 2,
+  "deploymentTarget": "15.0",
+  "sources": {
+    "wine": {
+      "repository": "https://github.com/dappermint/winecx.git",
+      "commit": "7dbc5b5322a6ef3fb04bdc643c64b188fd641149",
+      "version": "11.16"
+    },
+    "dxmt": {
+      "repository": "https://github.com/3Shain/dxmt.git",
+      "commit": "19e24ee068a44a747e556965730482038c5bb068",
+      "version": "0.80-199-g19e24ee"
+    }
+  },
+  "baseArtifact": {
+    "url": "https://github.com/dappermint/Whisky/releases/download/v4.6.4/Libraries.tar.gz",
+    "sha256": "86a4b36bdee567bbd25273798b90b2e68c672764d72c2dc273daec2942dbe843",
+    "recipeCommit": "c5370a6eeb6b14d039ab208ddbdec09e291d3c04"
+  },
+  "baseProvenance": {
+    "moltenvk": "db66022459ffb663aa2b50f6b018bc2e124f5edf",
+    "gstreamer": "87bc0c6e949e3dcc440658f78ef52aa8088cb62f",
+    "ffmpeg": "db69d06eeeab4f46da15030a80d539efb4503ca8",
+    "wineGecko": "557ea0c2e9f9ebd621323b3dbfbdd18c2528759c"
+  },
+  "build": {
+    "nixpkgsCommit": "ac62194c3917d5f474c1a844b6fd6da2db95077d"
+  },
+  "interface": {
+    "wineDirectory": "Wine",
+    "dxmtDirectory": "DXMT",
+    "executables": ["Wine/bin/wine64", "Wine/bin/wineserver"],
+    "requiredFiles": [
+      "Wine/lib/wine/x86_64-unix/winemac.so",
+      "Wine/lib/wine/x86_64-windows/winemetal.dll",
+      "DXMT/x64/d3d10core.dll",
+      "DXMT/x64/d3d11.dll",
+      "DXMT/x64/dxgi.dll",
+      "DXMT/x64/winemetal.dll",
+      "DXMT/x32/d3d10core.dll",
+      "DXMT/x32/d3d11.dll",
+      "DXMT/x32/dxgi.dll",
+      "DXMT/x32/winemetal.dll"
+    ]
+  },
+  "patches": [
+    {
+      "id": "wine-audio-default-output",
+      "component": "wine",
+      "family": "audio",
+      "path": "patches/wine/audio/0001-winecoreaudio-default-output.patch",
+      "sha256": "2676309df8bbcad45ae9d41848dde3e79c597189ccb2f6f899b3155b24e54a05"
+    },
+    {
+      "id": "dxmt-cursor-frame-latency",
+      "component": "dxmt",
+      "family": "cursor",
+      "path": "patches/dxmt/cursor/0001-dxmt-command-queue-configurable-frame-latency.patch",
+      "sha256": "b9785c4d47e8a866bf57bce13f40f179dc459f4ab9efe4a7b91daed4a1fad7d3"
+    },
+    {
+      "id": "wine-cn-ntoskrnl-surface",
+      "component": "wine",
+      "family": "cn",
+      "path": "patches/wine/cn/ntoskrnl/0001-ntoskrnl-compatibility-surface.patch",
+      "sha256": "ed30e13a9fb1ae3f0888b0226772289a86886733c758db60f559238f96c7a961"
+    },
+    {
+      "id": "wine-cn-dispatcher-spoof",
+      "component": "wine",
+      "family": "cn",
+      "path": "patches/wine/cn/dispatcher/0001-kernel32-cn-dispatcher-spoof.patch",
+      "sha256": "841af59f3560a3dc9eb1db4de52f95c89ff7b30aca644e95cebdebc936032da4"
+    },
+    {
+      "id": "wine-cn-rosetta-workarounds",
+      "component": "wine",
+      "family": "cn",
+      "path": "patches/wine/cn/rosetta/0001-macos-rosetta-cn-workarounds.patch",
+      "sha256": "44fb9a667bf2f601e140ae6f7835a45375985e6ba79b08ba8d8abeadac81fcd6"
+    },
+    {
+      "id": "wine-cn-relative-wait",
+      "component": "wine",
+      "family": "cn",
+      "path": "patches/wine/cn/timing/0001-ntdll-cn-qpc-relative-wait.patch",
+      "sha256": "6a498d4a260fd93356a04a011a9374e228291b3681020ff16e507655a8e3f351"
+    }
+  ]
+}
