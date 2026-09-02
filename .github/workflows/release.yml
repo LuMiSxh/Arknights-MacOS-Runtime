@@ -89,7 +89,7 @@ jobs:
                       extra-platforms = x86_64-darwin
 
             - name: Install build tools
-              run: brew install ccache mingw-w64 meson ninja
+              run: brew install ccache just mingw-w64 meson ninja
 
             - name: Run repository checks
               run: just check
