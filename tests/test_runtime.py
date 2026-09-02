@@ -6,7 +6,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.runtime import LockError, _sha256_file, load_lock, patches_for_stage
+from scripts.runtime import (
+    LockError,
+    _sha256_file,
+    load_lock,
+    monitored_sources,
+    patches_for_stage,
+)
 
 
 class RuntimeLockTests(unittest.TestCase):
@@ -17,7 +23,7 @@ class RuntimeLockTests(unittest.TestCase):
         patch.parent.mkdir(parents=True)
         patch.write_text("example patch\n", encoding="utf-8")
         self.lock = {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "archiveSchemaVersion": 2,
             "deploymentTarget": "15.0",
             "sources": {
@@ -33,15 +39,35 @@ class RuntimeLockTests(unittest.TestCase):
             "baseArtifact": {
                 "url": "https://github.com/example/runtime/releases/download/v1/Libraries.tar.gz",
                 "sha256": "a" * 64,
-                "recipeCommit": "b" * 40,
+                "recipe": {
+                    "repository": "https://github.com/example/recipe.git",
+                    "commit": "b" * 40,
+                },
             },
             "baseProvenance": {
-                "moltenvk": "c" * 40,
-                "gstreamer": "d" * 40,
-                "ffmpeg": "e" * 40,
-                "wineGecko": "f" * 40,
+                "moltenvk": {
+                    "repository": "https://github.com/KhronosGroup/MoltenVK.git",
+                    "commit": "c" * 40,
+                },
+                "gstreamer": {
+                    "repository": "https://github.com/GStreamer/gstreamer.git",
+                    "commit": "d" * 40,
+                },
+                "ffmpeg": {
+                    "repository": "https://github.com/FFmpeg/FFmpeg.git",
+                    "commit": "e" * 40,
+                },
+                "wineGecko": {
+                    "repository": "https://gitlab.winehq.org/wine/wine-gecko.git",
+                    "commit": "f" * 40,
+                },
             },
-            "build": {"nixpkgsCommit": "a" * 40},
+            "build": {
+                "nixpkgs": {
+                    "repository": "https://github.com/NixOS/nixpkgs.git",
+                    "commit": "a" * 40,
+                }
+            },
             "patches": [
                 {
                     "id": "wine-audio-default-output",
@@ -93,6 +119,38 @@ class RuntimeLockTests(unittest.TestCase):
         self.assertEqual(
             _sha256_file(path),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        )
+
+    def test_repository_lock_requires_the_launcher_alias(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        lock = load_lock(root / "runtime.lock.json", repository_root=root)
+
+        self.assertIn("Wine/bin/Arknights", lock["interface"]["executables"])
+
+    def test_exposes_every_monitored_source_without_duplicate_commit_fields(
+        self,
+    ) -> None:
+        loaded = load_lock(self.write_lock(), repository_root=self.root)
+
+        pins = monitored_sources(loaded)
+
+        self.assertEqual(
+            [pin.name for pin in pins],
+            [
+                "wine",
+                "dxmt",
+                "buildRecipe",
+                "moltenvk",
+                "gstreamer",
+                "ffmpeg",
+                "wineGecko",
+                "nixpkgs",
+            ],
+        )
+        self.assertEqual(pins[2].commit, "b" * 40)
+        self.assertEqual(
+            pins[6].repository,
+            "https://gitlab.winehq.org/wine/wine-gecko.git",
         )
 
 

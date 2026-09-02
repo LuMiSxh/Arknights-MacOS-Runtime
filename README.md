@@ -1,33 +1,42 @@
-# Arknights MacOS Runtime
+# Arknights macOS Runtime
 
-**Reproducible, patch-gated WineCX and DXMT builds for [Arknights MacOS Client](https://github.com/LuMiSxh/Arknights-MacOS-Client).**
+**Reproducible, patch-gated WineCX and DXMT builds for [Arknights Client](https://github.com/LuMiSxh/Arknights-MacOS-Client).**
 
 ## Overview
 
-Arknights MacOS Runtime owns the exact WineCX, DXMT, dependency, and patch inputs used to evaluate a
-launcher runtime. It builds isolated canaries, validates the archive contract expected by the client,
-and records enough provenance to reproduce or reject a candidate.
+Arknights macOS Runtime owns the exact WineCX, DXMT, dependency, and patch inputs used to build a
+runtime artifact. The artifact contains the Audio, Cursor, and CN patch families; every
+behavior-changing route retains a safe default and a documented component-local control. The
+repository validates the archive contract and records enough provenance to reproduce the artifact.
 
-The project is pre-release. Current artifacts are engineering canaries, not supported downloads. They
-must not replace the launcher's pinned runtime until the structural, licensing, and real-game promotion
-gates pass.
+> [!NOTE]
+> This is a runtime build repository, not a launcher or game distribution. It does not contain
+> Arknights game files.
 
-The current canary baseline is dappermint runtime 4.6.4 with WineCX 11.16, intentionally newer than
-the runtime bundled by the current client. Cursor and combined stages additionally build a pinned
-post-0.80 DXMT revision. The base retains its released MoltenVK 1.4.2 and GStreamer 1.26.3 stack;
-the build keeps the recipe's Darwin-capable Nix pin until a newer pin passes a separate canary.
-Every input remains pinned by commit and checksum.
+## Reporting problems
+
+Report runtime problems in the
+[Arknights Client issue tracker](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/new?template=runtime-problem.yml).
+Use the Runtime problem template and include the client and runtime versions, Mac and macOS, selected
+region, Wine-prefix history, runtime settings, and reproduction steps. Attach logs only when a
+maintainer requests a specific file.
+
+The current baseline is dappermint runtime 4.6.4 with WineCX 11.16. Cursor and combined stages
+additionally build a pinned post-0.80 DXMT revision. The clean release tree contains newly built Wine
+and DXMT, the pinned Nix media/library closure, and the pinned MoltenVK payload. Candidate baselines
+also record their Wine Gecko input. All repository-controlled source, archive, recipe, and patch
+inputs are pinned by commit and/or checksum.
 
 ## Patch families
 
-| Family | Purpose                                                                                                                                               | Default                  |
-| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| Audio  | Follow the current macOS default output without restarting the game ([client issue #59](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/59)) | Disabled                 |
-| Cursor | Experiment with a bounded DXMT frame queue for cursor latency ([client issue #34](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/34))       | Upstream value `3`       |
-| CN     | Compile selected Wine/ACE compatibility work for isolated future research                                                                             | Disabled and unvalidated |
+| Family | Purpose                                                                                                                                               | Runtime default                                       |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Audio  | Follow the current macOS default output without restarting the game ([client issue #59](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/59)) | Wine's normal routing unless enabled                  |
+| Cursor | Provide a bounded DXMT frame queue control for cursor latency ([client issue #34](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/34))       | Upstream maximum `3`; values `1` through `3` accepted |
+| CN     | Provide selected Wine/ACE compatibility routes                                                                                                        | Inactive unless explicitly enabled                    |
 
-Arknights MacOS Client supports Yostar's Global, Japan, and Korea PC clients. Compiling the CN family
-does not make CN supported or account-safe, and the v0.5 launcher must never activate it.
+The complete artifact contains all three families. Missing or invalid control values preserve the
+defaults listed above.
 
 ## Runtime controls
 
@@ -37,8 +46,8 @@ does not make CN supported or account-safe, and the v0.5 launcher must never act
 | `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY`      | `1` through `3` | Upstream value `3`       |
 | `ARKNIGHTS_RUNTIME_CN_COMPAT`                   | `0`, `1`        | Inactive                 |
 
-Each component parses only its own allowlisted value. There is no master switch and no process-name or
-path-based activation.
+Each component parses only its own allowlisted value. The runtime has no cross-component master switch
+and no process-name or path-based activation.
 
 ## Building
 
@@ -50,17 +59,15 @@ toolchains.
 just check
 just prepare combined
 just build combined
+
+# Clean release-gated build
+just build-release
 just verify .build/stages/combined/candidate/Libraries
 ```
 
 Generated sources, downloads, reports, and artifacts stay below `.build/`. Build and verification
 commands never install or start Wine, create a prefix, launch a game, or modify an Arknights
 installation.
-
-The first candidate lane overlays only rebuilt patched modules onto the verified current runtime. It
-is intentionally fast enough for hardware testing, but remains `releaseEligible: false` while
-unchanged upstream binaries declare a macOS 26 minimum. A release requires a clean build of every
-component for the documented macOS 15 target.
 
 ## Verification
 
@@ -72,21 +79,24 @@ just prepare cn
 just prepare combined
 ```
 
-GitHub Actions repeat the source checks and can build short-lived private candidate artifacts.
-Promotion additionally requires complete corresponding source and notices, a relocatable Mach-O
-closure, both DXMT payload architectures, immutable checksums, and a manual supported-region game
-canary.
+GitHub Actions validate the pinned sources, build the release tree, and create a draft release after
+the checksum, runtime-interface, provenance, source, and notice checks pass.
 
 See:
 
 - [Architecture and repository boundary](docs/architecture.md)
 - [Patch registry and provenance](docs/patch-registry.md)
+- [Runtime redistribution inventory](docs/legal/redistribution.md)
 - [Patch-by-patch test progression](docs/testing.md)
 - [Release and rollback gates](docs/releasing.md)
+- [Pinned runtime identity](runtime.lock.json)
 
 ## License
 
-Original build tooling and documentation are licensed under the
-[Mozilla Public License 2.0](LICENSE). Wine-derived patches retain
-[LGPL-2.1-or-later](LICENSES/Wine-LGPL-2.1.txt). The pinned post-0.80 DXMT revision and its patch retain
-[LGPL-2.1-or-later](LICENSES/DXMT-LGPL-2.1.txt). Individual patch provenance is recorded beside each family.
+Original build tooling and documentation in this repository are licensed under the
+[Mozilla Public License 2.0](LICENSE). The modified Wine source represented by the Wine patches is
+subject to Wine's [LGPL-2.1-or-later terms](LICENSES/Wine-LGPL-2.1.txt), and the modified DXMT source
+represented by the DXMT patch is subject to the pinned revision's
+[LGPL-2.1-or-later terms](LICENSES/DXMT-LGPL-2.1.txt). These license files and the family-level
+provenance records are inputs to a redistribution review; they do not by themselves claim that a
+complete corresponding-source or notice package is already published for a runtime binary.

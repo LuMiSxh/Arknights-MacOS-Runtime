@@ -7,8 +7,8 @@ index ac880100..94bc3fcf 100644
  }
  
 +#ifdef __x86_64__
-+/* Opt-in only: this dispatcher spoof is for the experimental CN runtime and
-+ * must never alter the supported Global/JP/KR process path. */
++/* Opt-in only: this dispatcher spoof is enabled by the CN compatibility control.
++ * Disabled and invalid control values preserve Wine's normal dispatcher path. */
 +static BOOL arknights_runtime_cn_compat_enabled(void)
 +{
 +    static LONG state = -1;

@@ -6,7 +6,7 @@ index 8813d8f8..0d6e4042 100644
  
  WINE_DEFAULT_DEBUG_CHANNEL(sync);
  
-+/* The QPC relative-wait variant is an experimental CN compatibility route.
++/* The QPC relative-wait variant is enabled by the CN compatibility control.
 + * Keep the upstream wall-clock implementation selected unless explicitly
 + * enabled by the runtime launcher. */
 +static BOOL arknights_runtime_cn_compat_enabled(void)

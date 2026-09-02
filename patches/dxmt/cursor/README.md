@@ -2,7 +2,7 @@
 
 This patch targets DXMT commit `19e24ee068a44a747e556965730482038c5bb068`
 (`v0.80-199-g19e24ee`, an unreleased post-0.80 canary revision).
-It adds one bounded, opt-in frame-latency override used by the Arknights MacOS Runtime
+It adds one bounded, opt-in frame-latency override used by the Arknights macOS Runtime
 canary:
 
 `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY=1`, `2`, or `3`
@@ -29,4 +29,4 @@ Apply with `git apply` from the DXMT source root. The patch is intentionally
 small and only changes `src/dxmt/dxmt_command_queue.cpp`. Validate the
 contract by checking that the lookup appears in the command-queue
 initialization and not in `PresentBoundary()`, then compile DXMT through the
-Arknights MacOS Runtime build workflow on Apple Silicon.
+Arknights macOS Runtime build workflow on Apple Silicon.

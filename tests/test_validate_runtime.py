@@ -46,6 +46,13 @@ class RuntimeStructureTests(unittest.TestCase):
         self.create_required_files()
         validate_structure(self.root, self.required)
 
+    def test_accepts_a_required_alias_contained_in_the_runtime(self) -> None:
+        self.create_required_files()
+        alias = self.root / "Wine/bin/Arknights"
+        alias.symlink_to("wine64")
+
+        validate_structure(self.root, [*self.required, "Wine/bin/Arknights"])
+
     def test_rejects_a_missing_required_file(self) -> None:
         with self.assertRaisesRegex(RuntimeValidationError, "missing required file"):
             validate_structure(self.root, self.required)

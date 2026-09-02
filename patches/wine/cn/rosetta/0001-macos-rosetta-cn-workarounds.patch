@@ -6,7 +6,7 @@ index 2b1338c5..f4e1b091 100644
  }
  
  #ifdef __APPLE__
-+/* The additional Rosetta workarounds below are experimental CN compatibility
++/* The additional Rosetta workarounds below are controlled CN compatibility
 + * behavior. Existing CrossOver CET/XGETBV handling remains unchanged. */
 +static volatile LONG arknights_runtime_cn_compat;
 +
@@ -65,7 +65,7 @@ index 2b1338c5..f4e1b091 100644
          if (emulate_xgetbv( sigcontext, &context.c )) return;
 +        /* Rosetta can report ACE's privileged CR3 read as an invalid opcode
 +         * rather than a general-protection fault. Preserve Wine's normal
-+         * classification unless the experimental CN route is enabled. */
++         * classification unless the CN compatibility route is enabled. */
 +        if (arknights_runtime_cn_compat_enabled() &&
 +            (rec.ExceptionCode = is_privileged_instr( &context.c ))) break;
  #endif

@@ -4,13 +4,12 @@
 
 - Wine base: `dappermint/winecx`
 - Wine commit: `7dbc5b5322a6ef3fb04bdc643c64b188fd641149` (Wine 11.16)
-- Candidate reference: `stoicswe/Endfield_FineWine`
+- Candidate reference: [`stoicswe/Endfield_FineWine`](https://github.com/stoicswe/Endfield_FineWine)
 - Reference checkout: `e5d4ccad235eefe32d912733e57e4c0bb53a5b58`
 - Reference patch families: `stage1-macos` and `stage2-dwproton`
 
 The reference repository records the original dw-proton/Endfield work and
-its authors. These files are a port for this exact WineCX pin, not a claim of
-upstream acceptance or CN compatibility.
+its authors. These files port selected changes to this exact WineCX pin.
 
 ## Ported inventory
 
@@ -34,7 +33,7 @@ image-name allocation and releases temporary or failed allocations.
 Carries the x86_64 `KiUserApcDispatcher` / `KiUserCallbackDispatcher`
 `GetProcAddress` int3-stub workaround from the reference dw-proton series.
 The original process-name heuristic is intentionally removed. The route is
-available only with the explicit CN environment gate.
+available only when `ARKNIGHTS_RUNTIME_CN_COMPAT=1`.
 
 ### `rosetta`
 
@@ -65,6 +64,5 @@ waits, zero waits, alertable waits, and the default path remain unchanged.
 - Any Wine export hiding, registry spoofing, or native-arm64 `int3` emulation:
   none is established as necessary by the available evidence.
 
-The three runtime behaviors are experimental and require a real isolated CN
-launcher/login/ACE/gameplay canary. Do not describe a successful build as
-support or account-safe behavior.
+Validate the inactive and enabled routes in an isolated prefix through launcher
+startup, login, ACE initialization, gameplay, and clean shutdown.

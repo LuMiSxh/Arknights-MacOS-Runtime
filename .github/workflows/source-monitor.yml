@@ -1,0 +1,42 @@
+name: Runtime Source Monitor
+
+on:
+    schedule:
+        - cron: "0 4 * * 6"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: runtime-source-monitor
+    cancel-in-progress: true
+
+jobs:
+    monitor:
+        runs-on: ubuntu-24.04
+        timeout-minutes: 10
+        steps:
+            - name: Check out source
+              uses: actions/checkout@v7.0.1
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v10.0.1
+
+            - name: Check pinned sources
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  PYTHONDONTWRITEBYTECODE: "1"
+              run: |
+                  uv run --locked --no-dev scripts/monitor.py \
+                    --output .build/reports/source-monitor.json \
+                    --summary "$GITHUB_STEP_SUMMARY"
+
+            - name: Upload source report
+              if: ${{ always() }}
+              uses: actions/upload-artifact@v7.0.1
+              with:
+                  name: runtime-source-monitor-${{ github.run_id }}
+                  path: .build/reports/source-monitor.json
+                  if-no-files-found: error
+                  retention-days: 30

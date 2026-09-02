@@ -1,6 +1,6 @@
 # Wine CoreAudio default-output follow patch
 
-This patch carries the two-commit Wine draft merge request [!11370](https://gitlab.winehq.org/wine/wine/-/merge_requests/11370), `winecoreaudio: Expose virtual endpoints for default devices`, onto the Arknights MacOS Runtime WineCX pin.
+This patch carries the two-commit Wine draft merge request [!11370](https://gitlab.winehq.org/wine/wine/-/merge_requests/11370), `winecoreaudio: Expose virtual endpoints for default devices`, onto the Arknights macOS Runtime WineCX pin.
 
 ## Provenance
 
@@ -11,7 +11,7 @@ This patch carries the two-commit Wine draft merge request [!11370](https://gitl
 - Base runtime source: `dappermint/winecx` commit `7dbc5b5322a6ef3fb04bdc643c64b188fd641149` (Wine 11.16)
 - License: the modified Wine source file is LGPL-2.1-or-later; this patch is carried under the same license. Preserve the existing Wine copyright and license header when distributing a built runtime.
 
-The patch is a canary carry of an unmerged Wine draft. Arknights-MacOS-Runtime-specific changes are limited to the explicit `ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT=1` opt-in, parsed once per process. An absent, malformed, or `0` value leaves the normal Wine endpoint list and stream behavior in place. When enabled, eligible shared render streams are watched: the virtual endpoint follows the current default output, while an explicitly selected endpoint may recover after disconnect and reconnect. Capture and exclusive streams retain their normal behavior.
+The patch is a canary carry of an unmerged Wine draft. Arknights macOS Runtime-specific changes are limited to the explicit `ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT=1` opt-in, parsed once per process. An absent, malformed, or `0` value leaves the normal Wine endpoint list and stream behavior in place. When enabled, eligible shared render streams are watched: the virtual endpoint follows the current default output, while an explicitly selected endpoint may recover after disconnect and reconnect. Capture and exclusive streams retain their normal behavior.
 
 ## Build and test notes
 

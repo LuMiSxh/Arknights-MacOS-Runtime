@@ -4,6 +4,7 @@
 set -euo pipefail
 
 stage="${1:-combined}"
+build_mode="${2:-overlay}"
 case "$stage" in
 	base|audio|cursor|cn|combined) ;;
 	*)
@@ -11,6 +12,17 @@ case "$stage" in
 		exit 2
 		;;
 esac
+case "$build_mode" in
+	overlay|--clean-release) ;;
+	*)
+		echo "error: expected overlay or --clean-release" >&2
+		exit 2
+		;;
+esac
+if [[ "$build_mode" == "--clean-release" && "$stage" != combined ]]; then
+	echo "error: a clean release build must use the combined stage" >&2
+	exit 2
+fi
 
 repository_root="$(cd "$(dirname "$0")/.." && pwd -P)"
 cd "$repository_root"
@@ -34,7 +46,7 @@ run_python() {
 }
 
 deployment_target="$(run_python -c 'import json,sys; print(json.load(open(sys.argv[1]))["deploymentTarget"])' "$lock")"
-nixpkgs_revision="$(run_python -c 'import json,sys; print(json.load(open(sys.argv[1]))["build"]["nixpkgsCommit"])' "$lock")"
+nixpkgs_revision="$(run_python -c 'import json,sys; print(json.load(open(sys.argv[1]))["build"]["nixpkgs"]["commit"])' "$lock")"
 nixpkgs="github:NixOS/nixpkgs/$nixpkgs_revision"
 
 export MACOSX_DEPLOYMENT_TARGET="$deployment_target"
@@ -48,7 +60,9 @@ run_python "$repository_root/scripts/runtime.py" validate-lock
 base_archive="$(run_python "$repository_root/scripts/runtime.py" fetch-base)"
 mkdir -p "$stage_root/base" "$stage_root/candidate"
 tar -xzf "$base_archive" -C "$stage_root/base"
-if ! cp -cR "$stage_root/base/Libraries" "$stage_root/candidate/Libraries" 2>/dev/null; then
+if [[ "$build_mode" == "--clean-release" ]]; then
+	mkdir -p "$stage_root/candidate/Libraries"
+elif ! cp -cR "$stage_root/base/Libraries" "$stage_root/candidate/Libraries" 2>/dev/null; then
 	cp -R "$stage_root/base/Libraries" "$stage_root/candidate/Libraries"
 fi
 candidate="$stage_root/candidate/Libraries"
@@ -162,6 +176,28 @@ if [[ "$stage" == audio || "$stage" == cn || "$stage" == combined ]]; then
 	wine_install="$staging/opt/whiskywine"
 	patched_machos=()
 
+	if [[ "$build_mode" == "--clean-release" ]]; then
+		mkdir -p "$candidate/Wine"
+		cp -R "$wine_install/bin" "$wine_install/lib" "$wine_install/share" "$candidate/Wine/"
+		loader="$candidate/Wine/lib/wine/x86_64-unix/wine"
+		[[ -x "$loader" ]] || {
+			echo "error: clean Wine install has no loader: $loader" >&2
+			exit 1
+		}
+		for name in wine wine64 wineloader; do
+			ln -sf ../lib/wine/x86_64-unix/wine "$candidate/Wine/bin/$name"
+		done
+		ln -sf wine64 "$candidate/Wine/bin/Arknights"
+		for library in libMoltenVK.dylib; do
+			base_library="$stage_root/base/Libraries/Wine/lib/$library"
+			[[ -f "$base_library" ]] || {
+				echo "error: pinned base is missing required payload: Wine/lib/$library" >&2
+				exit 1
+			}
+			cp "$base_library" "$candidate/Wine/lib/$library"
+		done
+	fi
+
 	overlay_wine_file() {
 		local relative="$1"
 		[[ -f "$wine_install/$relative" ]] || {
@@ -204,6 +240,82 @@ if [[ "$stage" == audio || "$stage" == cn || "$stage" == combined ]]; then
 	done
 fi
 
+if [[ "$build_mode" == "--clean-release" ]]; then
+	library_directory="$candidate/Wine/lib"
+	nix_inventory="$stage_root/nix-copied-outputs.txt"
+	: > "$nix_inventory"
+	record_nix_output() {
+		if [[ "$1" =~ ^(/nix/store/[^/]+) ]]; then
+			printf '%s\n' "${BASH_REMATCH[1]}" >> "$nix_inventory"
+		fi
+	}
+	scan_nix_references() {
+		otool -L "$1" 2>/dev/null | awk '/\/nix\/store\// {print $1}'
+	}
+	mkdir -p "$library_directory/gstreamer-1.0"
+	for output in $nix_outputs; do
+		[[ -d "$output/lib/gstreamer-1.0" ]] || continue
+		for plugin in "$output/lib/gstreamer-1.0/"*.dylib; do
+			[[ -f "$plugin" ]] || continue
+			cp -L "$plugin" "$library_directory/gstreamer-1.0/$(basename "$plugin")"
+			record_nix_output "$plugin"
+			chmod u+w "$library_directory/gstreamer-1.0/$(basename "$plugin")"
+		done
+	done
+
+	queue=""
+	for output in $nix_outputs; do
+		for library in libfreetype.6.dylib libgnutls.30.dylib; do
+			[[ -f "$output/lib/$library" ]] && queue="$queue $output/lib/$library"
+		done
+	done
+	for binary in "$candidate"/Wine/lib/wine/*-unix/*.so "$library_directory"/gstreamer-1.0/*.dylib; do
+		[[ -f "$binary" ]] || continue
+		queue="$queue $(scan_nix_references "$binary" | tr '\n' ' ')"
+	done
+	while [[ -n "$queue" ]]; do
+		next=""
+		for reference in $queue; do
+			name="$(basename "$reference")"
+			[[ -e "$library_directory/$name" ]] && continue
+			cp -L "$reference" "$library_directory/$name"
+			record_nix_output "$reference"
+			chmod u+w "$library_directory/$name"
+			next="$next $(scan_nix_references "$library_directory/$name" | tr '\n' ' ')"
+		done
+		queue=""
+		for reference in $next; do
+			[[ -e "$library_directory/$(basename "$reference")" ]] || queue="$queue $reference"
+		done
+	done
+
+	fixup_macho() {
+		local binary="$1"
+		local relative
+		relative="$(run_python -c 'import os,sys; print(os.path.relpath(sys.argv[1], os.path.dirname(sys.argv[2])))' "$library_directory" "$binary")"
+		chmod u+w "$binary" 2>/dev/null || true
+		case "$binary" in
+			*.dylib*) install_name_tool -id "@loader_path/$(basename "$binary")" "$binary" 2>/dev/null || true ;;
+		esac
+		while IFS= read -r reference; do
+			if [[ "$(basename "$reference")" == libiconv*.dylib ]] && nm -u "$binary" 2>/dev/null | grep -q '^ *_iconv$'; then
+				install_name_tool -change "$reference" /usr/lib/libiconv.2.dylib "$binary"
+			else
+				install_name_tool -change "$reference" "@loader_path/$relative/$(basename "$reference")" "$binary"
+			fi
+		done < <(scan_nix_references "$binary")
+		codesign --force --sign - "$binary" 2>/dev/null || true
+	}
+	for binary in "$library_directory"/*.dylib* "$library_directory"/gstreamer-1.0/*.dylib* "$candidate"/Wine/lib/wine/*-unix/*.so; do
+		[[ -f "$binary" ]] && fixup_macho "$binary"
+	done
+	ln -sf libfreetype.6.dylib "$library_directory/libfreetype.dylib"
+	for binary in "$candidate"/Wine/lib/wine/*-unix/*.so; do
+		install_name_tool -add_rpath '@loader_path/../../' "$binary" 2>/dev/null || true
+		codesign --force --sign - "$binary"
+	done
+fi
+
 if [[ "$stage" == cursor || "$stage" == combined ]]; then
 	require_command meson
 	require_command ninja
@@ -229,6 +341,9 @@ if [[ "$stage" == cursor || "$stage" == combined ]]; then
 		meson compile -C "$stage_root/dxmt-build32"
 		meson install -C "$stage_root/dxmt-build32"
 	)
+	if [[ "$build_mode" == "--clean-release" ]]; then
+		mkdir -p "$candidate/DXMT/x64" "$candidate/DXMT/x32"
+	fi
 
 	for library in d3d10core.dll d3d11.dll dxgi.dll winemetal.dll; do
 		cp "$dxmt_install/x86_64-windows/$library" "$candidate/DXMT/x64/$library"
@@ -246,7 +361,22 @@ if [[ "$stage" == cursor || "$stage" == combined ]]; then
 	done
 fi
 
-run_python "$repository_root/scripts/validate_runtime.py" "$candidate" --baseline "$stage_root/base/Libraries"
+if [[ "$build_mode" == "--clean-release" ]]; then
+	run_python "$repository_root/scripts/validate_runtime.py" "$candidate"
+	component_inventory="$stage_root/runtime-component-inventory.tsv"
+	{
+		printf 'component\trole\tsource\n'
+		printf 'WineCX/Wine\tWindows compatibility runtime\truntime.lock.json:sources.wine\n'
+		printf 'DXMT\tDirect3D-to-Metal payload\truntime.lock.json:sources.dxmt\n'
+		printf 'MoltenVK\tVulkan-to-Metal library\truntime.lock.json:baseProvenance.moltenvk\n'
+		sort -u "$nix_inventory" | while IFS= read -r output; do
+			[[ -n "$output" ]] && printf '%s\tBundled Nix library or plugin\t%s (nixpkgs %s)\n' \
+				"$(basename "$output")" "$output" "$nixpkgs_revision"
+		done
+	} > "$component_inventory"
+else
+	run_python "$repository_root/scripts/validate_runtime.py" "$candidate" --baseline "$stage_root/base/Libraries"
+fi
 tar -czf "$stage_root/Arknights-MacOS-Runtime-$stage.tar.gz" -C "$stage_root/candidate" Libraries
 (cd "$stage_root" && shasum -a 256 "Arknights-MacOS-Runtime-$stage.tar.gz" > "Arknights-MacOS-Runtime-$stage.tar.gz.sha256")
 (cd "$stage_root" && shasum -a 256 -c "Arknights-MacOS-Runtime-$stage.tar.gz.sha256")

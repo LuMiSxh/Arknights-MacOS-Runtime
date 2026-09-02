@@ -1,0 +1,217 @@
+name: Draft Release
+
+on:
+    workflow_dispatch:
+        inputs:
+            version:
+                description: SemVer release version, with or without a leading v
+                required: true
+                type: string
+
+permissions: {}
+
+concurrency:
+    group: runtime-release
+    cancel-in-progress: false
+
+jobs:
+    draft-release:
+        runs-on: macos-15
+        timeout-minutes: 360
+        permissions:
+            contents: write
+        env:
+            RELEASE_VERSION_INPUT: ${{ inputs.version }}
+            PYTHONDONTWRITEBYTECODE: "1"
+        steps:
+            - name: Check out the default branch
+              uses: actions/checkout@v7.0.1
+              with:
+                  ref: ${{ github.event.repository.default_branch }}
+                  fetch-depth: 0
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v10.0.1
+
+            - name: Normalize release version and capture build SHA
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  release_tag="$(uv run --locked --no-dev python -c \
+                    'import sys; from scripts.release.verify import normalize_version; print(normalize_version(sys.argv[1]))' \
+                    "$RELEASE_VERSION_INPUT")"
+                  build_commit="$(git rev-parse --verify HEAD)"
+                  echo "RELEASE_TAG=$release_tag" >> "$GITHUB_ENV"
+                  echo "BUILD_COMMIT=$build_commit" >> "$GITHUB_ENV"
+
+            - name: Refuse an existing tag or release
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  set -euo pipefail
+                  if git ls-remote --exit-code --refs origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+                    echo "error: tag $RELEASE_TAG already exists; corrections require a new version" >&2
+                    exit 1
+                  else
+                    tag_status=$?
+                    if [[ "$tag_status" -ne 2 ]]; then
+                      echo "error: could not verify whether tag $RELEASE_TAG exists" >&2
+                      exit 1
+                    fi
+                  fi
+
+                  release_probe="$RUNNER_TEMP/runtime-release-probe"
+                  if gh api --method GET --include \
+                    "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
+                    > "$release_probe" 2>/dev/null; then
+                    echo "error: release $RELEASE_TAG already exists; corrections require a new version" >&2
+                    exit 1
+                  fi
+                  http_status="$(awk '$1 ~ /^HTTP\// { status=$2 } END { print status }' "$release_probe")"
+                  if [[ "$http_status" != 404 ]]; then
+                    echo "error: could not prove that release $RELEASE_TAG does not exist" >&2
+                    exit 1
+                  fi
+
+                  if [[ -n "$(git status --porcelain)" ]]; then
+                    echo "error: default-branch checkout is not clean" >&2
+                    exit 1
+                  fi
+
+            - name: Install Rosetta
+              run: softwareupdate --install-rosetta --agree-to-license
+
+            - name: Install Nix
+              uses: cachix/install-nix-action@v31
+              with:
+                  extra_nix_config: |
+                      extra-platforms = x86_64-darwin
+
+            - name: Install build tools
+              run: brew install ccache mingw-w64 meson ninja
+
+            - name: Run repository checks
+              run: just check
+
+            - name: Build release-gated runtime from pinned sources
+              run: just build-release
+
+            - name: Assemble immutable release inputs
+              shell: bash
+              env:
+                  RELEASE_DIRECTORY: ${{ runner.temp }}/arknights-runtime-release
+              run: |
+                  set -euo pipefail
+                  if [[ -n "$(git status --porcelain)" ]]; then
+                    echo "error: build modified tracked repository files" >&2
+                    exit 1
+                  fi
+                  stage_directory=".build/stages/combined"
+                  archive="$stage_directory/Arknights-MacOS-Runtime-combined.tar.gz"
+                  source_root="$stage_directory/sources"
+                  mkdir -p "$RELEASE_DIRECTORY"
+                  release_archive="$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG.tar.gz"
+                  source_archive="$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG-source.tar.gz"
+                  cp "$archive" "$release_archive"
+                  cp "$stage_directory/runtime-component-inventory.tsv" "$RELEASE_DIRECTORY/"
+                  (
+                    cd "$RELEASE_DIRECTORY"
+                    shasum -a 256 "$(basename "$release_archive")" > "$(basename "$release_archive").sha256"
+                  )
+                  tar -czf "$source_archive" --exclude='.git' \
+                    -C "$source_root" wine-combined dxmt-combined \
+                    -C "$stage_directory" runtime-component-inventory.tsv \
+                    -C "$GITHUB_WORKSPACE" patches runtime.lock.json docs/patch-registry.md \
+                    docs/legal LICENSE LICENSES
+                  (
+                    cd "$RELEASE_DIRECTORY"
+                    shasum -a 256 "$(basename "$source_archive")" > "$(basename "$source_archive").sha256"
+                  )
+                  printf 'RELEASE_DIRECTORY=%s\n' "$RELEASE_DIRECTORY" >> "$GITHUB_ENV"
+
+            - name: Verify release checksum, provenance, and notices
+              run: |
+                  uv run --locked --no-dev scripts/release/verify.py \
+                    --tag "$RELEASE_TAG" \
+                    --commit "$BUILD_COMMIT" \
+                    --archive "$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG.tar.gz" \
+                    --checksum "$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG.tar.gz.sha256" \
+                    --source-root .build/stages/combined/sources \
+                    --source-archive "$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG-source.tar.gz" \
+                    --source-checksum "$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG-source.tar.gz.sha256" \
+                    --validation-report .build/reports/candidate-validation.json \
+                    --component-inventory .build/stages/combined/runtime-component-inventory.tsv \
+                    --output-directory "$RELEASE_DIRECTORY"
+
+            - name: Re-check the tag and release before creation
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  set -euo pipefail
+                  if git ls-remote --exit-code --refs origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+                    echo "error: tag $RELEASE_TAG appeared during the build; refusing to mutate it" >&2
+                    exit 1
+                  else
+                    tag_status=$?
+                    if [[ "$tag_status" -ne 2 ]]; then
+                      echo "error: could not re-check whether tag $RELEASE_TAG exists" >&2
+                      exit 1
+                    fi
+                  fi
+
+                  release_probe="$RUNNER_TEMP/runtime-release-probe-final"
+                  if gh api --method GET --include \
+                    "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
+                    > "$release_probe" 2>/dev/null; then
+                    echo "error: release $RELEASE_TAG appeared during the build; refusing to mutate it" >&2
+                    exit 1
+                  fi
+                  http_status="$(awk '$1 ~ /^HTTP\// { status=$2 } END { print status }' "$release_probe")"
+                  if [[ "$http_status" != 404 ]]; then
+                    echo "error: could not prove that release $RELEASE_TAG is still absent" >&2
+                    exit 1
+                  fi
+
+            - name: Create exact tag and draft release
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  set -euo pipefail
+                  workflow_marker="runtime-release-workflow:$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT"
+                  cleanup() {
+                    status=$?
+                    trap - ERR
+                    echo "error: tag $RELEASE_TAG may now exist at $BUILD_COMMIT; it is intentionally retained" >&2
+                    echo "error: inspect the partial state and use a new version for corrections" >&2
+                    exit "$status"
+                  }
+                  trap cleanup ERR
+
+                  gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+                    -f ref="refs/tags/$RELEASE_TAG" \
+                    -f sha="$BUILD_COMMIT" >/dev/null
+                  tag_sha="$(gh api --method GET \
+                    "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha')"
+                  if [[ "$tag_sha" != "$BUILD_COMMIT" ]]; then
+                    echo "error: created tag does not reference the verified build SHA" >&2
+                    exit 1
+                  fi
+
+                  gh release create "$RELEASE_TAG" \
+                    "$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG.tar.gz" \
+                    "$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG.tar.gz.sha256" \
+                    "$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG-source.tar.gz" \
+                    "$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG-source.tar.gz.sha256" \
+                    "$RELEASE_DIRECTORY/provenance.json" \
+                    "$RELEASE_DIRECTORY/THIRD-PARTY-NOTICES.txt" \
+                    "$RELEASE_DIRECTORY/runtime-component-inventory.tsv" \
+                    --repo "$GITHUB_REPOSITORY" \
+                    --verify-tag \
+                    --title "Arknights macOS Runtime $RELEASE_TAG" \
+                    --notes "<!-- $workflow_marker -->" \
+                    --draft \
+                    --latest=false
+                  trap - ERR

@@ -17,6 +17,9 @@ check:
 validate:
 	{{ uv }} scripts/runtime.py validate-lock
 
+monitor:
+	{{ uv }} scripts/monitor.py --output .build/reports/source-monitor.json
+
 prepare stage="combined":
 	{{ uv }} scripts/runtime.py prepare "{{stage}}"
 
@@ -25,6 +28,9 @@ fetch-base:
 
 build stage="combined":
 	scripts/build-canary.sh "{{stage}}"
+
+build-release:
+	scripts/build-release.sh
 
 verify path=".build/stages/combined/candidate/Libraries":
 	{{ uv }} scripts/validate_runtime.py "{{path}}"

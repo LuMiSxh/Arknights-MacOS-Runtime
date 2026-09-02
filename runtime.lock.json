@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "archiveSchemaVersion": 2,
   "deploymentTarget": "15.0",
   "sources": {
@@ -17,21 +17,39 @@
   "baseArtifact": {
     "url": "https://github.com/dappermint/Whisky/releases/download/v4.6.4/Libraries.tar.gz",
     "sha256": "86a4b36bdee567bbd25273798b90b2e68c672764d72c2dc273daec2942dbe843",
-    "recipeCommit": "c5370a6eeb6b14d039ab208ddbdec09e291d3c04"
+    "recipe": {
+      "repository": "https://github.com/dappermint/winecx-gptk.git",
+      "commit": "c5370a6eeb6b14d039ab208ddbdec09e291d3c04"
+    }
   },
   "baseProvenance": {
-    "moltenvk": "db66022459ffb663aa2b50f6b018bc2e124f5edf",
-    "gstreamer": "87bc0c6e949e3dcc440658f78ef52aa8088cb62f",
-    "ffmpeg": "db69d06eeeab4f46da15030a80d539efb4503ca8",
-    "wineGecko": "557ea0c2e9f9ebd621323b3dbfbdd18c2528759c"
+    "moltenvk": {
+      "repository": "https://github.com/KhronosGroup/MoltenVK.git",
+      "commit": "db66022459ffb663aa2b50f6b018bc2e124f5edf"
+    },
+    "gstreamer": {
+      "repository": "https://github.com/GStreamer/gstreamer.git",
+      "commit": "87bc0c6e949e3dcc440658f78ef52aa8088cb62f"
+    },
+    "ffmpeg": {
+      "repository": "https://github.com/FFmpeg/FFmpeg.git",
+      "commit": "db69d06eeeab4f46da15030a80d539efb4503ca8"
+    },
+    "wineGecko": {
+      "repository": "https://gitlab.winehq.org/wine/wine-gecko.git",
+      "commit": "557ea0c2e9f9ebd621323b3dbfbdd18c2528759c"
+    }
   },
   "build": {
-    "nixpkgsCommit": "ac62194c3917d5f474c1a844b6fd6da2db95077d"
+    "nixpkgs": {
+      "repository": "https://github.com/NixOS/nixpkgs.git",
+      "commit": "ac62194c3917d5f474c1a844b6fd6da2db95077d"
+    }
   },
   "interface": {
     "wineDirectory": "Wine",
     "dxmtDirectory": "DXMT",
-    "executables": ["Wine/bin/wine64", "Wine/bin/wineserver"],
+    "executables": ["Wine/bin/Arknights", "Wine/bin/wine64", "Wine/bin/wineserver"],
     "requiredFiles": [
       "Wine/lib/wine/x86_64-unix/winemac.so",
       "Wine/lib/wine/x86_64-windows/winemetal.dll",
@@ -65,28 +83,28 @@
       "component": "wine",
       "family": "cn",
       "path": "patches/wine/cn/ntoskrnl/0001-ntoskrnl-compatibility-surface.patch",
-      "sha256": "ed30e13a9fb1ae3f0888b0226772289a86886733c758db60f559238f96c7a961"
+      "sha256": "e496f4762f6d445ec07887bfe1fa07588c56fbd5050ab125126f3b368b18c6df"
     },
     {
       "id": "wine-cn-dispatcher-spoof",
       "component": "wine",
       "family": "cn",
       "path": "patches/wine/cn/dispatcher/0001-kernel32-cn-dispatcher-spoof.patch",
-      "sha256": "841af59f3560a3dc9eb1db4de52f95c89ff7b30aca644e95cebdebc936032da4"
+      "sha256": "975ddfdbb4cc4396278305f337aa59c65563c91bc354bc01579842e03e689407"
     },
     {
       "id": "wine-cn-rosetta-workarounds",
       "component": "wine",
       "family": "cn",
       "path": "patches/wine/cn/rosetta/0001-macos-rosetta-cn-workarounds.patch",
-      "sha256": "44fb9a667bf2f601e140ae6f7835a45375985e6ba79b08ba8d8abeadac81fcd6"
+      "sha256": "789dee6f7871ce4d9ddb3ded8cef199beda1b080be4096261c68bae58a0f682a"
     },
     {
       "id": "wine-cn-relative-wait",
       "component": "wine",
       "family": "cn",
       "path": "patches/wine/cn/timing/0001-ntdll-cn-qpc-relative-wait.patch",
-      "sha256": "6a498d4a260fd93356a04a011a9374e228291b3681020ff16e507655a8e3f351"
+      "sha256": "2ce7ac549ce8f827f40a487e6f4ec15eeb7d35efc21afb77fa7e69895db35342"
     }
   ]
 }

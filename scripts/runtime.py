@@ -11,8 +11,10 @@ import json
 import re
 import subprocess
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 if __package__:
     from .lib.console import Progress, error, info, success
@@ -29,6 +31,15 @@ COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 
 class LockError(ValueError):
     """The runtime lock is unsafe or internally inconsistent."""
+
+
+@dataclass(frozen=True)
+class SourcePin:
+    """One immutable upstream source identity monitored by this repository."""
+
+    name: str
+    repository: str
+    commit: str
 
 
 def _sha256_file(path: Path) -> str:
@@ -53,8 +64,46 @@ def _require_string(mapping: dict[str, Any], key: str, context: str) -> str:
 
 
 def _validated_repository(url: str, context: str) -> None:
-    if not url.startswith("https://github.com/") or not url.endswith(".git"):
-        raise LockError(f"{context} must be an immutable GitHub HTTPS repository URL")
+    parsed = urlparse(url)
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname not in {"github.com", "gitlab.winehq.org"}
+        or not parsed.path.endswith(".git")
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise LockError(f"{context} must be an allowlisted HTTPS Git repository URL")
+
+
+def _source_pin(value: Any, name: str) -> SourcePin:
+    source = _require_mapping(value, name)
+    repository = _require_string(source, "repository", name)
+    commit = _require_string(source, "commit", name)
+    _validated_repository(repository, f"{name}.repository")
+    if COMMIT_PATTERN.fullmatch(commit) is None:
+        raise LockError(f"{name}.commit must be a full commit hash")
+    return SourcePin(name.rsplit(".", maxsplit=1)[-1], repository, commit)
+
+
+def monitored_sources(lock: dict[str, Any]) -> tuple[SourcePin, ...]:
+    """Return every source pin owned and monitored by the runtime repository."""
+
+    sources = _require_mapping(lock.get("sources"), "sources")
+    artifact = _require_mapping(lock.get("baseArtifact"), "baseArtifact")
+    provenance = _require_mapping(lock.get("baseProvenance"), "baseProvenance")
+    build = _require_mapping(lock.get("build"), "build")
+    pins = [
+        _source_pin(sources.get("wine"), "sources.wine"),
+        _source_pin(sources.get("dxmt"), "sources.dxmt"),
+        _source_pin(artifact.get("recipe"), "baseArtifact.buildRecipe"),
+    ]
+    pins[-1] = SourcePin("buildRecipe", pins[-1].repository, pins[-1].commit)
+    for component in ("moltenvk", "gstreamer", "ffmpeg", "wineGecko"):
+        pin = _source_pin(provenance.get(component), f"baseProvenance.{component}")
+        pins.append(SourcePin(component, pin.repository, pin.commit))
+    pin = _source_pin(build.get("nixpkgs"), "build.nixpkgs")
+    pins.append(SourcePin("nixpkgs", pin.repository, pin.commit))
+    return tuple(pins)
 
 
 def _contained_file(root: Path, relative: str) -> Path:
@@ -83,8 +132,8 @@ def load_lock(
     except (OSError, json.JSONDecodeError) as error:
         raise LockError(f"cannot read {path}: {error}") from error
 
-    if lock.get("schemaVersion") != 1:
-        raise LockError("schemaVersion must be 1")
+    if lock.get("schemaVersion") != 2:
+        raise LockError("schemaVersion must be 2")
     if lock.get("archiveSchemaVersion") != 2:
         raise LockError("archiveSchemaVersion must be 2")
     if lock.get("deploymentTarget") != "15.0":
@@ -92,34 +141,16 @@ def load_lock(
 
     sources = _require_mapping(lock.get("sources"), "sources")
     for component in ("wine", "dxmt"):
-        source = _require_mapping(sources.get(component), f"sources.{component}")
-        repository = _require_string(source, "repository", f"sources.{component}")
-        commit = _require_string(source, "commit", f"sources.{component}")
-        _validated_repository(repository, f"sources.{component}.repository")
-        if COMMIT_PATTERN.fullmatch(commit) is None:
-            raise LockError(f"sources.{component}.commit must be a full commit hash")
+        _source_pin(sources.get(component), f"sources.{component}")
 
     artifact = _require_mapping(lock.get("baseArtifact"), "baseArtifact")
     artifact_url = _require_string(artifact, "url", "baseArtifact")
     artifact_hash = _require_string(artifact, "sha256", "baseArtifact")
-    recipe_commit = _require_string(artifact, "recipeCommit", "baseArtifact")
     if not artifact_url.startswith("https://github.com/"):
         raise LockError("baseArtifact.url must use GitHub HTTPS")
     if HASH_PATTERN.fullmatch(artifact_hash) is None:
         raise LockError("baseArtifact.sha256 must be a lowercase SHA-256 hash")
-    if COMMIT_PATTERN.fullmatch(recipe_commit) is None:
-        raise LockError("baseArtifact.recipeCommit must be a full commit hash")
-
-    base_provenance = _require_mapping(lock.get("baseProvenance"), "baseProvenance")
-    for component in ("moltenvk", "gstreamer", "ffmpeg", "wineGecko"):
-        commit = _require_string(base_provenance, component, "baseProvenance")
-        if COMMIT_PATTERN.fullmatch(commit) is None:
-            raise LockError(f"baseProvenance.{component} must be a full commit hash")
-
-    build = _require_mapping(lock.get("build"), "build")
-    nixpkgs_commit = _require_string(build, "nixpkgsCommit", "build")
-    if COMMIT_PATTERN.fullmatch(nixpkgs_commit) is None:
-        raise LockError("build.nixpkgsCommit must be a full commit hash")
+    monitored_sources(lock)
 
     patches = lock.get("patches")
     if not isinstance(patches, list):
