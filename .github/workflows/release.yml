@@ -107,7 +107,7 @@ jobs:
                     echo "error: build modified tracked repository files" >&2
                     exit 1
                   fi
-                  stage_directory=".build/stages/combined"
+                  stage_directory="$GITHUB_WORKSPACE/.build/stages/combined"
                   archive="$stage_directory/Arknights-MacOS-Runtime-combined.tar.gz"
                   source_root="$stage_directory/sources"
                   mkdir -p "$RELEASE_DIRECTORY"
