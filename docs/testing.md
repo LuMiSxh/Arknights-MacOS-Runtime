@@ -33,6 +33,7 @@ commit, lock, Mac, macOS version, prefix history, display, and audio devices.
 - Cursor: compare frame latency 3, 2, and 1 at identical graphics settings, VSync modes, refresh
   rates, and capture method; record FPS, frame pacing, stutter, crashes, and cursor latency.
 - CN: compare the absent, `0`, invalid, and `1` control values in an isolated test prefix; record
-  launcher startup, login, ACE initialization, gameplay, and clean shutdown.
+  launcher startup, login, ACE initialization, gameplay, and clean shutdown. For Bilibili, complete a
+  captcha and verify both its renderer and a translucent error toast.
 - Combined: test all flags absent, each family independently, and all enabled together; cover clean
   shutdown and both fresh and existing test prefixes.

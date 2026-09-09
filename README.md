@@ -33,7 +33,7 @@ inputs are pinned by commit and/or checksum.
 | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
 | Audio  | Follow the current macOS default output without restarting the game ([client issue #59](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/59)) | Wine's normal routing unless enabled                  |
 | Cursor | Provide a bounded DXMT frame queue control for cursor latency ([client issue #34](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/34))       | Upstream maximum `3`; values `1` through `3` accepted |
-| CN     | Provide selected Wine/ACE compatibility routes                                                                                                        | Inactive unless explicitly enabled                    |
+| CN     | Provide selected Wine/ACE compatibility routes, including the narrowly preflighted Bilibili renderer path                                             | Inactive unless explicitly enabled                    |
 
 The complete artifact contains all three families. Missing or invalid control values preserve the
 defaults listed above.
@@ -46,8 +46,8 @@ defaults listed above.
 | `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY`      | `1` through `3` | Upstream value `3`       |
 | `ARKNIGHTS_RUNTIME_CN_COMPAT`                   | `0`, `1`        | Inactive                 |
 
-Each component parses only its own allowlisted value. The runtime has no cross-component master switch
-and no process-name or path-based activation.
+Each component parses only its own allowlisted value. The CN gate covers every CN patch; its exact Bilibili
+image and window preflights are listed in the [patch registry](docs/patch-registry.md#cn).
 
 ## Building
 

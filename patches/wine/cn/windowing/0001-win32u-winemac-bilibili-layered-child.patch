@@ -1,0 +1,589 @@
+diff --git a/dlls/win32u/window.c b/dlls/win32u/window.c
+index 687e4e79..f463caf9 100644
+--- a/dlls/win32u/window.c
++++ b/dlls/win32u/window.c
+@@ -24,6 +24,7 @@
+ #endif
+ 
+ #include <assert.h>
++#include <stdlib.h>
+ 
+ #include "ntstatus.h"
+ #include "ntgdi_private.h"
+@@ -57,6 +58,58 @@ static void *client_objects[MAX_USER_HANDLES];
+ static volatile unsigned int startup_info_flags;
+ static unsigned int startup_show_window;
+ 
++static BOOL arknights_runtime_cn_compat_enabled(void)
++{
++    static LONG state = -1;
++    LONG value = state;
++    const char *flag;
++
++    if (value == -1)
++    {
++        flag = getenv("ARKNIGHTS_RUNTIME_CN_COMPAT");
++        value = flag && flag[0] == '1' && !flag[1];
++        InterlockedCompareExchange(&state, value, -1);
++    }
++    return value;
++}
++
++static BOOL is_bilibili_layered_proxy_candidate( const UNICODE_STRING *class_name, HWND parent )
++{
++    static const WCHAR platformW[] = {'P','C','G','a','m','e','P','l','a','t','f','o','r','m','.','e','x','e',0};
++    static const WCHAR chrome_widgetW[] = {'C','h','r','o','m','e','_','W','i','d','g','e','t','W','i','n','_','0',0};
++    static const WCHAR webviewW[] = {'C','M','y','W','e','b','V','i','e','w','D','l','g',0};
++    WCHAR root_class[MAX_ATOM_LEN] = {0};
++    UNICODE_STRING root_class_name = {.Buffer = root_class, .MaximumLength = sizeof(root_class)};
++    const WCHAR *path = NtCurrentTeb()->Peb->ProcessParameters->ImagePathName.Buffer;
++    const WCHAR *name, *separator;
++    HWND root;
++
++    if (!arknights_runtime_cn_compat_enabled() || !path || !class_name || !class_name->Buffer ||
++        class_name->Length != sizeof(chrome_widgetW) - sizeof(WCHAR) ||
++        wcsncmp( class_name->Buffer, chrome_widgetW, ARRAY_SIZE(chrome_widgetW) - 1 ))
++        return FALSE;
++
++    name = path;
++    if ((separator = wcsrchr( name, '\\' ))) name = separator + 1;
++    if ((separator = wcsrchr( name, '/' ))) name = separator + 1;
++    if (wcsicmp( name, platformW )) return FALSE;
++
++    root = NtUserGetAncestor( parent, GA_ROOT );
++    return root && NtUserGetClassName( root, FALSE, &root_class_name ) && !wcscmp( root_class, webviewW );
++}
++
++static BOOL is_bilibili_layered_proxy_window( HWND hwnd )
++{
++    /* Chrome.WindowTranslucent selects Chromium's browser-process proxy. */
++    static const WCHAR translucentW[] = {'C','h','r','o','m','e','.','W','i','n','d','o','w','T','r','a','n','s','l','u','c','e','n','t',0};
++    WCHAR class_name[MAX_ATOM_LEN] = {0};
++    UNICODE_STRING name = {.Buffer = class_name, .MaximumLength = sizeof(class_name)};
++    HWND parent = NtUserGetAncestor( hwnd, GA_PARENT );
++
++    return NtUserGetProp( hwnd, translucentW ) && NtUserGetClassName( hwnd, FALSE, &name ) &&
++           is_bilibili_layered_proxy_candidate( &name, parent );
++}
++
+ static unsigned int set_startup_info_flags( unsigned int mask, unsigned int flags )
+ {
+     unsigned int prev, new;
+@@ -2713,6 +2766,11 @@ BOOL WINAPI NtUserUpdateLayeredWindow( HWND hwnd, HDC hdc_dst, const POINT *pts_
+ 
+     get_window_rects( hwnd, COORDS_PARENT, &new_rects, get_thread_dpi() );
+ 
++    /* Chromium supplies screen coordinates for this child proxy. Its parent
++     * already owns the child geometry, so UpdateLayeredWindow updates only
++     * pixels and size. */
++    if (pts_dst && is_bilibili_layered_proxy_window( hwnd )) pts_dst = NULL;
++
+     if (pts_dst)
+     {
+         offset.cx = pts_dst->x - new_rects.window.left;
+@@ -5922,6 +5980,7 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
+     RECT surface_rect;
+     UINT context;
+     WND *win;
++    BOOL bilibili_layered_proxy;
+ 
+     TRACE( "ex_style %#x, class_name %s, version %s, window_name %s, style %#x, x %u, y %u, cx %u, cy %u, "
+            "parent %p, menu %p, class_instance %p, params %p, flags %#x, instance %p, class %s, ansi %u\n",
+@@ -6006,6 +6065,7 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
+ 
+     fix_cs_coordinates( &cs, &sw );
+     cs.dwExStyle = fix_exstyle( cs.style, cs.dwExStyle );
++    bilibili_layered_proxy = is_bilibili_layered_proxy_candidate( class_name, parent );
+ 
+     /* Create the window structure */
+ 
+@@ -6041,6 +6101,13 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
+ 
+     release_win_ptr( win );
+ 
++    if (bilibili_layered_proxy)
++    {
++        static const WCHAR translucentW[] = {'C','h','r','o','m','e','.','W','i','n','d','o','w','T','r','a','n','s','l','u','c','e','n','t',0};
++
++        NtUserSetProp( hwnd, translucentW, ULongToHandle( 1 ) );
++    }
++
+     if (class && IS_INTRESOURCE(class)) cs.lpszClass = class;
+     else
+     {
+diff --git a/dlls/winemac.drv/cocoa_window.m b/dlls/winemac.drv/cocoa_window.m
+index 34c3f572..0edce229 100644
+--- a/dlls/winemac.drv/cocoa_window.m
++++ b/dlls/winemac.drv/cocoa_window.m
+@@ -397,6 +397,7 @@ @interface WineContentView : WineBaseView <NSTextInputClient, NSViewLayerContent
+ 
+ @public void *d3dmetal_client_surface;   /* CW HACK 22435 */
+     NSMutableDictionary<NSNumber*, CALayerHost*>* _caLayerHosts;
++    BOOL windowSurfaceView;
+ }
+ 
+ @property (readonly, nonatomic) BOOL everHadGLContext;
+@@ -533,6 +534,12 @@ - (BOOL) isFlipped
+         return YES;
+     }
+ 
++    - (NSView *) hitTest:(NSPoint)point
++    {
++        if (windowSurfaceView) return nil;
++        return [super hitTest:point];
++    }
++
+     - (BOOL) wantsUpdateLayer
+     {
+         return YES /*!_everHadGLContext*/;
+@@ -545,7 +552,7 @@ - (void) updateLayer
+         CGRect imageRect;
+         CALayer* layer = [self layer];
+ 
+-        if ([window contentView] != self)
++        if (!windowSurfaceView && [window contentView] != self)
+             return;
+ 
+         if (window.closing)
+@@ -564,15 +571,16 @@ - (void) updateLayer
+ 
+         if (image)
+         {
+-            layer.position = surfaceRect.origin;
++            if (!windowSurfaceView) layer.position = surfaceRect.origin;
+             layer.contents = (id)image;
+             CFRelease(image);
+-            [window windowDidDrawContent];
++            if (!windowSurfaceView) [window windowDidDrawContent];
+ 
+             // If the window may be transparent, then we have to invalidate the
+             // shadow every time we draw.  Also, if this is the first time we've
+             // drawn since changing from transparent to opaque.
+-            if (shapeImage || window.usePerPixelAlpha || window.shapeChangedSinceLastDraw)
++            if (!windowSurfaceView &&
++                (shapeImage || window.usePerPixelAlpha || window.shapeChangedSinceLastDraw))
+             {
+                 window.shapeChangedSinceLastDraw = FALSE;
+                 [window invalidateShadow];
+@@ -3914,6 +3922,30 @@ macdrv_view macdrv_create_view(CGRect rect)
+ 
+     return (macdrv_view)view;
+ }
++
++macdrv_view macdrv_create_window_surface_view(CGRect rect)
++{
++    WineContentView *view = (WineContentView *)macdrv_create_view(rect);
++
++    OnMainThread(^{ view->windowSurfaceView = YES; });
++    return (macdrv_view)view;
++}
++}
++
++macdrv_view macdrv_retain_view(macdrv_view v)
++{
++@autoreleasepool
++{
++    return (macdrv_view)[(WineContentView *)v retain];
++}
++}
++
++void macdrv_release_view(macdrv_view v)
++{
++@autoreleasepool
++{
++    [(WineContentView *)v release];
++}
+ }
+ 
+ /***********************************************************************
+@@ -3991,13 +4023,13 @@ void macdrv_set_view_superview(macdrv_view v, macdrv_view s, macdrv_window w, ma
+ {
+ @autoreleasepool
+ {
+-    OnMainThreadAsync(^{
+-        WineContentView* view = (WineContentView*)v;
+-        WineContentView* superview = (WineContentView*)s;
+-        WineWindow* window = (WineWindow*)w;
+-        WineContentView* prev = (WineContentView*)p;
+-        WineContentView* next = (WineContentView*)n;
++    WineContentView* view = (WineContentView*)v;
++    WineContentView* superview = (WineContentView*)s;
++    WineWindow* window = (WineWindow*)w;
++    WineContentView* prev = (WineContentView*)p;
++    WineContentView* next = (WineContentView*)n;
+ 
++    OnMainThreadAsync(^{
+         if (!superview)
+             superview = [window contentView];
+ 
+@@ -4044,6 +4076,48 @@ void macdrv_set_view_hidden(macdrv_view v, bool hidden)
+         [(WineWindow*)view.window updateForGLSubviews];
+     });
+ }
++
++void macdrv_set_view_alpha(macdrv_view v, CGFloat alpha)
++{
++@autoreleasepool
++{
++    WineContentView* view = (WineContentView*)v;
++
++    OnMainThreadAsync(^{ [view setAlphaValue:alpha]; });
++}
++}
++
++void macdrv_view_set_color_image(macdrv_view v, CGImageRef image, CGRect rect, CGRect dirty)
++{
++@autoreleasepool
++{
++    WineContentView *view = [(WineContentView *)v retain];
++
++    CGImageRetain(image);
++    OnMainThreadAsync(^{
++        [view setColorImage:image];
++        [view setSurfaceRect:cgrect_mac_from_win(rect)];
++        [view setNeedsDisplayInRect:NSRectFromCGRect(cgrect_mac_from_win(dirty))];
++        CGImageRelease(image);
++        [view release];
++    });
++}
++}
++
++void macdrv_view_set_shape_image(macdrv_view v, CGImageRef image)
++{
++@autoreleasepool
++{
++    WineContentView *view = [(WineContentView *)v retain];
++
++    if (image) CGImageRetain(image);
++    OnMainThreadAsync(^{
++        [view setShapeImage:image];
++        if (image) CGImageRelease(image);
++        [view release];
++    });
++}
++}
+ }
+ 
+ /***********************************************************************
+diff --git a/dlls/winemac.drv/macdrv.h b/dlls/winemac.drv/macdrv.h
+index a09b1e17..aecf674c 100644
+--- a/dlls/winemac.drv/macdrv.h
++++ b/dlls/winemac.drv/macdrv.h
+@@ -157,6 +157,9 @@ extern void macdrv_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alph
+ extern BOOL macdrv_GetWindowStyleMasks(HWND hwnd, UINT style, UINT ex_style, UINT *style_mask, UINT *ex_style_mask);
+ extern struct client_surface *macdrv_CreateClientSurface(HWND hwnd, int pixel_format);
+ extern BOOL macdrv_CreateWindowSurface(HWND hwnd, BOOL layered, const RECT *surface_rect, struct window_surface **surface);
++extern BOOL macdrv_is_bilibili_layered_child(HWND hwnd);
++extern BOOL macdrv_attach_layered_child_view(HWND hwnd, macdrv_view view);
++extern void macdrv_detach_layered_child_view(HWND hwnd, macdrv_view view);
+ extern void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT swp_flags,
+                                     const struct window_rects *new_rects, struct window_surface *surface);
+ extern void macdrv_DestroyCursorIcon(HCURSOR cursor);
+@@ -187,6 +190,7 @@ extern BOOL macdrv_SystemParametersInfo(UINT action, UINT int_param, void *ptr_p
+     HWND                hwnd;                   /* hwnd that this private data belongs to */
+     macdrv_window       cocoa_window;
+     macdrv_view         client_view;
++    macdrv_view         layered_view;
+     struct remote_layer_entry *remote_layers;   /* which context renders which child hwnd */
+     unsigned int        remote_layer_count;
+     struct window_rects rects;                  /* window rects in monitor DPI, relative to parent client area */
+diff --git a/dlls/winemac.drv/macdrv_cocoa.h b/dlls/winemac.drv/macdrv_cocoa.h
+index c6552baa..4b3da62e 100644
+--- a/dlls/winemac.drv/macdrv_cocoa.h
++++ b/dlls/winemac.drv/macdrv_cocoa.h
+@@ -549,10 +549,16 @@ extern void macdrv_order_cocoa_window(macdrv_window w, macdrv_window prev,
+ extern void macdrv_give_cocoa_window_focus(macdrv_window w, bool activate);
+ extern void macdrv_set_window_min_max_sizes(macdrv_window w, CGSize min_size, CGSize max_size);
+ extern macdrv_view macdrv_create_view(CGRect rect);
++extern macdrv_view macdrv_create_window_surface_view(CGRect rect);
++extern macdrv_view macdrv_retain_view(macdrv_view v);
++extern void macdrv_release_view(macdrv_view v);
+ extern void macdrv_dispose_view(macdrv_view v);
+ extern void macdrv_set_view_frame(macdrv_view v, CGRect rect);
+ extern void macdrv_set_view_superview(macdrv_view v, macdrv_view s, macdrv_window w, macdrv_view p, macdrv_view n);
+ extern void macdrv_set_view_hidden(macdrv_view v, bool hidden);
++extern void macdrv_set_view_alpha(macdrv_view v, CGFloat alpha);
++extern void macdrv_view_set_color_image(macdrv_view v, CGImageRef image, CGRect rect, CGRect dirty);
++extern void macdrv_view_set_shape_image(macdrv_view v, CGImageRef image);
+ extern void macdrv_add_view_opengl_context(macdrv_view v, macdrv_opengl_context c);
+ extern void macdrv_remove_view_opengl_context(macdrv_view v, macdrv_opengl_context c);
+ extern macdrv_metal_device macdrv_create_metal_device(void);
+diff --git a/dlls/winemac.drv/surface.c b/dlls/winemac.drv/surface.c
+index fb1aeaa3..523fe559 100644
+--- a/dlls/winemac.drv/surface.c
++++ b/dlls/winemac.drv/surface.c
+@@ -47,6 +47,7 @@ struct macdrv_window_surface
+ {
+     struct window_surface   header;
+     macdrv_window           window;
++    macdrv_view             layered_view;
+     CGDataProviderRef       provider;
+ };
+ 
+@@ -92,13 +93,19 @@ static BOOL macdrv_surface_flush(struct window_surface *window_surface, const RE
+                           alpha_info | kCGBitmapByteOrder32Little, surface->provider, NULL, retina_on, kCGRenderingIntentDefault);
+     CGColorSpaceRelease(colorspace);
+ 
+-    macdrv_window_set_color_image(surface->window, image, cgrect_from_rect(*rect), cgrect_from_rect(*dirty));
++    if (surface->layered_view)
++        macdrv_view_set_color_image(surface->layered_view, image, cgrect_from_rect(*rect), cgrect_from_rect(*dirty));
++    else
++        macdrv_window_set_color_image(surface->window, image, cgrect_from_rect(*rect), cgrect_from_rect(*dirty));
+     CGImageRelease(image);
+ 
+     if (shape_changed)
+     {
+         if (!shape_bits)
+-            macdrv_window_set_shape_image(surface->window, NULL);
++        {
++            if (surface->layered_view) macdrv_view_set_shape_image(surface->layered_view, NULL);
++            else macdrv_window_set_shape_image(surface->window, NULL);
++        }
+         else
+         {
+             const BYTE *src = shape_bits;
+@@ -115,7 +122,8 @@ static BOOL macdrv_surface_flush(struct window_surface *window_surface, const RE
+                                       provider, NULL, retina_on);
+             CGDataProviderRelease(provider);
+ 
+-            macdrv_window_set_shape_image(surface->window, image);
++            if (surface->layered_view) macdrv_view_set_shape_image(surface->layered_view, image);
++            else macdrv_window_set_shape_image(surface->window, image);
+             CGImageRelease(image);
+         }
+     }
+@@ -138,6 +146,11 @@ static void macdrv_surface_destroy(struct window_surface *window_surface)
+     struct macdrv_window_surface *surface = get_mac_surface(window_surface);
+ 
+     TRACE("freeing %p\n", surface);
++    if (surface->layered_view)
++    {
++        macdrv_detach_layered_child_view(window_surface->hwnd, surface->layered_view);
++        macdrv_dispose_view(surface->layered_view);
++    }
+     CGDataProviderRelease(surface->provider);
+ }
+ 
+@@ -208,6 +221,7 @@ static struct window_surface *create_surface(HWND hwnd, macdrv_window window, co
+     {
+         surface = get_mac_surface(window_surface);
+         surface->window = window;
++        surface->layered_view = NULL;
+         surface->provider = provider;
+     }
+ 
+@@ -238,5 +252,14 @@ BOOL macdrv_CreateWindowSurface(HWND hwnd, BOOL layered, const RECT *surface_rec
+     *surface = create_surface(hwnd, data->cocoa_window, surface_rect);
+ 
+     release_win_data(data);
++
++    if (*surface && layered && macdrv_is_bilibili_layered_child(hwnd))
++    {
++        struct macdrv_window_surface *mac_surface = get_mac_surface(*surface);
++        macdrv_view view = macdrv_create_window_surface_view(CGRectZero);
++
++        if (view && macdrv_attach_layered_child_view(hwnd, view)) mac_surface->layered_view = view;
++        else if (view) macdrv_dispose_view(view);
++    }
+     return TRUE;
+ }
+diff --git a/dlls/winemac.drv/window.c b/dlls/winemac.drv/window.c
+index 75346483..3ef86713 100644
+--- a/dlls/winemac.drv/window.c
++++ b/dlls/winemac.drv/window.c
+@@ -27,6 +27,8 @@
+ 
+ #include "config.h"
+ 
++#include <stdlib.h>
++
+ #include <IOKit/pwr_mgt/IOPMLib.h>
+ #define GetCurrentThread Mac_GetCurrentThread
+ #define LoadResource Mac_LoadResource
+@@ -44,6 +46,7 @@ static pthread_mutex_t win_data_mutex;
+ static CFMutableDictionaryRef win_datas;
+ 
+ static unsigned int activate_on_focus_time;
++static BOOL sync_layered_child_view(HWND hwnd, macdrv_view view);
+ 
+ 
+ /* CrossOver Hack #16933 */
+@@ -339,6 +342,11 @@ static void sync_window_opacity(struct macdrv_win_data *data, BYTE alpha,
+     }
+ }
+ 
++static void sync_layered_child_opacity(macdrv_view view, BYTE alpha, DWORD flags)
++{
++    macdrv_set_view_alpha(view, flags & LWA_ALPHA ? alpha / 255.0 : 1.0);
++}
++
+ 
+ /***********************************************************************
+  *              sync_window_min_max_info
+@@ -846,6 +854,32 @@ static BOOL running_image_is(const char *exe_name)
+     return !*appname && !*exe_name;
+ }
+ 
++static BOOL arknights_runtime_cn_compat_enabled(void)
++{
++    const char *flag = getenv("ARKNIGHTS_RUNTIME_CN_COMPAT");
++
++    return flag && flag[0] == '1' && !flag[1];
++}
++
++BOOL macdrv_is_bilibili_layered_child(HWND hwnd)
++{
++    static const WCHAR webviewW[] = {'C','M','y','W','e','b','V','i','e','w','D','l','g',0};
++    static const WCHAR chrome_widgetW[] = {'C','h','r','o','m','e','_','W','i','d','g','e','t','W','i','n','_','0',0};
++    static const WCHAR translucentW[] = {'C','h','r','o','m','e','.','W','i','n','d','o','w','T','r','a','n','s','l','u','c','e','n','t',0};
++    WCHAR root_class[MAX_ATOM_LEN] = {0};
++    WCHAR class[MAX_ATOM_LEN] = {0};
++    UNICODE_STRING class_name = {.Buffer = root_class, .MaximumLength = sizeof(root_class)};
++    UNICODE_STRING name = {.Buffer = class, .MaximumLength = sizeof(class)};
++    HWND root;
++
++    if (!arknights_runtime_cn_compat_enabled() || !running_image_is("PCGamePlatform.exe") ||
++        !NtUserGetProp(hwnd, translucentW) || !NtUserGetClassName(hwnd, FALSE, &name) ||
++        wcscmp(class, chrome_widgetW))
++        return FALSE;
++    root = NtUserGetAncestor(hwnd, GA_ROOT);
++    return root && root != hwnd && NtUserGetClassName(root, FALSE, &class_name) && !wcscmp(root_class, webviewW);
++}
++
+ static void set_app_icon(void)
+ {
+     CFArrayRef images = create_app_icon_images();
+@@ -1224,6 +1258,57 @@ static BOOL get_hosted_rects(HWND hwnd, HWND toplevel, RECT *container, RECT *fr
+     return !IsRectEmpty(container);
+ }
+ 
++static BOOL sync_layered_child_view(HWND hwnd, macdrv_view view)
++{
++    HWND toplevel = NtUserGetAncestor(hwnd, GA_ROOT);
++    RECT container, frame;
++    struct macdrv_win_data *data;
++    macdrv_window window;
++
++    if (!view) return FALSE;
++    if (!macdrv_is_bilibili_layered_child(hwnd) || !toplevel ||
++        !(data = get_win_data(toplevel)))
++    {
++        macdrv_set_view_hidden(view, TRUE);
++        return FALSE;
++    }
++    window = data->cocoa_window;
++    if (!window || !get_hosted_rects(hwnd, toplevel, &container, &frame))
++    {
++        release_win_data(data);
++        macdrv_set_view_hidden(view, TRUE);
++        return FALSE;
++    }
++
++    macdrv_set_view_superview(view, NULL, window, NULL, NULL);
++    macdrv_set_view_frame(view, cgrect_from_rect(frame));
++    macdrv_set_view_hidden(view, !NtUserIsWindowVisible(hwnd));
++    release_win_data(data);
++    return TRUE;
++}
++
++BOOL macdrv_attach_layered_child_view(HWND hwnd, macdrv_view view)
++{
++    struct macdrv_win_data *data;
++
++    if (!view || !macdrv_is_bilibili_layered_child(hwnd)) return FALSE;
++    if (!sync_layered_child_view(hwnd, view)) return FALSE;
++
++    if (!(data = get_win_data(hwnd))) return FALSE;
++    data->layered_view = view;
++    release_win_data(data);
++    return TRUE;
++}
++
++void macdrv_detach_layered_child_view(HWND hwnd, macdrv_view view)
++{
++    struct macdrv_win_data *data;
++
++    if (!(data = get_win_data(hwnd))) return;
++    if (data->layered_view == view) data->layered_view = NULL;
++    release_win_data(data);
++}
++
+ static void macdrv_client_surface_update(struct client_surface *client)
+ {
+     struct macdrv_client_surface *surface = impl_from_client_surface(client);
+@@ -1497,7 +1582,9 @@ void macdrv_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alpha, DWOR
+     {
+         data->layered = TRUE;
+         data->ulw_layered = FALSE;
+-        if (data->cocoa_window)
++        if (data->layered_view)
++            sync_layered_child_opacity(data->layered_view, alpha, flags);
++        else if (data->cocoa_window)
+         {
+             sync_window_opacity(data, alpha, FALSE, flags);
+             /* since layered attributes are now set, can now show the window */
+@@ -1517,12 +1604,13 @@ void macdrv_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alpha, DWOR
+ void macdrv_SetParent(HWND hwnd, HWND parent, HWND old_parent)
+ {
+     struct macdrv_win_data *data;
++    macdrv_view layered_view;
+ 
+     TRACE("%p, %p, %p\n", hwnd, parent, old_parent);
+ 
+     if (parent == old_parent) return;
+     if (!(data = get_win_data(hwnd))) return;
+-
++    layered_view = macdrv_retain_view(data->layered_view);
+     if (parent != NtUserGetDesktopWindow()) /* a child window */
+     {
+         if (old_parent == NtUserGetDesktopWindow())
+@@ -1536,6 +1624,11 @@ void macdrv_SetParent(HWND hwnd, HWND parent, HWND old_parent)
+         create_cocoa_window(data);
+     }
+     release_win_data(data);
++    if (layered_view)
++    {
++        sync_layered_child_view(hwnd, layered_view);
++        macdrv_release_view(layered_view);
++    }
+ }
+ 
+ 
+@@ -1712,7 +1805,10 @@ void macdrv_UpdateLayeredWindow(HWND hwnd, BYTE alpha, UINT flags)
+             show_window(data);
+ 
+         /* The ULW flags are a superset of the LWA flags. */
+-        sync_window_opacity(data, alpha, TRUE, flags);
++        if (data->layered_view)
++            sync_layered_child_opacity(data->layered_view, alpha, flags);
++        else
++            sync_window_opacity(data, alpha, TRUE, flags);
+         release_win_data(data);
+     }
+ }
+@@ -1855,11 +1951,12 @@ void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT
+     BOOL fullscreen = swp_flags & WINE_SWP_FULLSCREEN;
+     struct macdrv_thread_data *thread_data;
+     struct macdrv_win_data *data;
++    macdrv_view layered_view;
+     unsigned int new_style = NtUserGetWindowLongW(hwnd, GWL_STYLE);
+     struct window_rects old_rects;
+ 
+     if (!(data = get_win_data(hwnd))) return;
+-
++    layered_view = macdrv_retain_view(data->layered_view);
+     thread_data = macdrv_thread_data();
+ 
+     old_rects = data->rects;
+@@ -1910,6 +2007,11 @@ void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT
+ 
+ done:
+     release_win_data(data);
++    if (layered_view)
++    {
++        sync_layered_child_view(hwnd, layered_view);
++        macdrv_release_view(layered_view);
++    }
+ }
+ 
+ 

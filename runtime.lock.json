@@ -105,6 +105,20 @@
       "family": "cn",
       "path": "patches/wine/cn/timing/0001-ntdll-cn-qpc-relative-wait.patch",
       "sha256": "2ce7ac549ce8f827f40a487e6f4ec15eeb7d35efc21afb77fa7e69895db35342"
+    },
+    {
+      "id": "wine-cn-bilibili-cef80-stackbase",
+      "component": "wine",
+      "family": "cn",
+      "path": "patches/wine/cn/cef/0001-ntdll-bilibili-cef-80-stackbase.patch",
+      "sha256": "02a8fea36a07d64deabd3d9cefab677d9b2c92b8807a24024f7c35e870a0ade6"
+    },
+    {
+      "id": "wine-bilibili-layered-child",
+      "component": "wine",
+      "family": "cn",
+      "path": "patches/wine/cn/windowing/0001-win32u-winemac-bilibili-layered-child.patch",
+      "sha256": "0059090be51f66b089eeb1914dfcc76dd80abb744040901dad14f03979c00454"
     }
   ]
 }

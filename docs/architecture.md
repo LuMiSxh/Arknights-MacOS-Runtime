@@ -21,7 +21,7 @@ validation still requires a clean build of every component. Both lanes must pres
 x64/x32 DXMT payloads expected by the launcher.
 
 Runtime flags are parsed inside their owning component. `ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT` and
-`ARKNIGHTS_RUNTIME_CN_COMPAT` accept only `0` or `1`; `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY` accepts only `1` through
-`3`. Absent or invalid values preserve the documented defaults. CN behavior remains inactive unless
-`ARKNIGHTS_RUNTIME_CN_COMPAT=1`. The runtime
-has no cross-component master switch. No patch uses a process name or path as an activation signal.
+`ARKNIGHTS_RUNTIME_CN_COMPAT` accept only `0` or `1`; `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY` accepts only
+`1` through `3`. Absent or invalid values preserve the documented defaults. The single CN gate owns all CN
+patches; its Bilibili image and window preflights are documented in the [patch registry](patch-registry.md#cn).
+The runtime has no cross-component master switch.

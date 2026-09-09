@@ -55,6 +55,15 @@ Carries the dw-proton relative `NtDelayExecution` QPC path. It is selected
 only for negative relative waits and only with the explicit CN gate; absolute
 waits, zero waits, alertable waits, and the default path remain unchanged.
 
+### `cef` and `windowing`
+
+The Bilibili CEF 80 StackBase port and the layered-child renderer containment
+are original Arknights macOS Runtime changes. The StackBase patch is limited to
+the `libcef.dll` basename, guarded RVA bytes, and the shared `ARKNIGHTS_RUNTIME_CN_COMPAT=1`
+gate. The renderer patch is limited to `PCGamePlatform.exe`, the `CMyWebViewDlg`
+root, and Chromium's `Chrome_WidgetWin_0` property contract. Exact scope and
+verification are maintained in the [CN patch registry](../../../docs/patch-registry.md#cn).
+
 ## Intentionally omitted candidates
 
 - Historical `wintrust` `winex11`/`winewayland` signature bypass: X11-only and

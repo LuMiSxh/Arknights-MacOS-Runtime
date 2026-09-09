@@ -196,6 +196,11 @@ if [[ "$stage" == audio || "$stage" == cn || "$stage" == combined ]]; then
 			}
 			cp "$base_library" "$candidate/Wine/lib/$library"
 		done
+	else
+		if [[ ! -e "$candidate/Wine/bin/Arknights" && ! -L "$candidate/Wine/bin/Arknights" ]]; then
+			echo "warning: overlay base is missing Wine/bin/Arknights; linking to wine64" >&2
+			ln -sf wine64 "$candidate/Wine/bin/Arknights"
+		fi
 	fi
 
 	overlay_wine_file() {
@@ -212,13 +217,19 @@ if [[ "$stage" == audio || "$stage" == cn || "$stage" == combined ]]; then
 		patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/winecoreaudio.so")
 	fi
 	if [[ "$stage" == cn || "$stage" == combined ]]; then
+		overlay_wine_file lib/wine/x86_64-unix/winemac.so
+		patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/winemac.so")
+		overlay_wine_file lib/wine/x86_64-unix/win32u.so
+		patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/win32u.so")
 		overlay_wine_file lib/wine/x86_64-unix/ntdll.so
 		patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/ntdll.so")
 		overlay_wine_file lib/wine/x86_64-windows/kernel32.dll
+		overlay_wine_file lib/wine/x86_64-windows/ntdll.dll
 		overlay_wine_file lib/wine/x86_64-windows/ntoskrnl.exe
 		overlay_wine_file lib/wine/i386-windows/ntoskrnl.exe
 		x86_64-w64-mingw32-strip --strip-debug \
 			"$candidate/Wine/lib/wine/x86_64-windows/kernel32.dll" \
+			"$candidate/Wine/lib/wine/x86_64-windows/ntdll.dll" \
 			"$candidate/Wine/lib/wine/x86_64-windows/ntoskrnl.exe"
 		i686-w64-mingw32-strip --strip-debug \
 			"$candidate/Wine/lib/wine/i386-windows/ntoskrnl.exe"

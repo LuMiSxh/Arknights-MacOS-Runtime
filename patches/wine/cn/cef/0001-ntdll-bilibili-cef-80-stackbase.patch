@@ -1,0 +1,145 @@
+diff --git a/dlls/ntdll/loader.c b/dlls/ntdll/loader.c
+index 22d2ef7e..08085dc5 100644
+--- a/dlls/ntdll/loader.c
++++ b/dlls/ntdll/loader.c
+@@ -2991,6 +2991,129 @@ static void apply_fuzzy_binary_patches( WINE_MODREF *wm )
+ #endif
+ 
+ #if defined(__i386__) || defined(__x86_64__)
++#ifdef __x86_64__
++/* Bilibili's libcef.dll 80.1.15 build reads the Windows StackBase directly from
++ * gs:[0x8]. Wine exposes the TEB at gs:[0x30] on macOS, so install the
++ * smallest possible in-memory compatibility thunk for this exact build.
++ * Keep this opt-in: other CEF builds and the regular Yostar path must remain
++ * untouched. */
++/* Gate: ARKNIGHTS_RUNTIME_CN_COMPAT=1. */
++static BOOL arknights_runtime_cn_compat_enabled(void)
++{
++    static LONG state = -1;
++    LONG value = state;
++    static const WCHAR nameW[] = {'A','R','K','N','I','G','H','T','S','_','R','U','N','T','I','M','E','_','C','N','_','C','O','M','P','A','T',0};
++    UNICODE_STRING name = {sizeof(nameW) - sizeof(WCHAR), sizeof(nameW), (WCHAR *)nameW};
++    WCHAR flag[2] = {0};
++    UNICODE_STRING valueW = {0, sizeof(flag), flag};
++
++    if (value == -1)
++    {
++        value = RtlQueryEnvironmentVariable_U( NULL, &name, &valueW ) == STATUS_SUCCESS &&
++                valueW.Length == sizeof(WCHAR) && flag[0] == '1';
++        InterlockedCompareExchange(&state, value, -1);
++    }
++    return value;
++}
++
++static void apply_bilibili_cef80_stackbase_patch( WINE_MODREF *wm )
++{
++    static const WCHAR cef_name[] = {'l','i','b','c','e','f','.','d','l','l',0};
++    static const char before_thunk[] =
++    {
++        0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc,
++        0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc
++    };
++    static const char after_thunk[] =
++    {
++        0x65, 0x48, 0x8b, 0x04, 0x25, 0x30, 0x00, 0x00, 0x00, /* mov rax, qword [gs:0x30] */
++        0x48, 0x8b, 0x40, 0x08,                               /* mov rax, qword [rax+8] */
++        0xc3,                                                   /* ret */
++        0xcc                                                    /* preserve the alignment byte */
++    };
++    C_ASSERT( sizeof(before_thunk) == sizeof(after_thunk) );
++    static const char before_stackbase_pair[] =
++    {
++        0x65, 0x48, 0x8b, 0x04, 0x25, 0x08, 0x00, 0x00, 0x00, /* mov rax, qword [gs:0x8] */
++        0xc3,                                                   /* ret */
++        0x56,                                                   /* push rsi */
++        0x48, 0x83, 0xec, 0x20,                                /* sub rsp, 0x20 */
++        0x65, 0x48, 0x8b, 0x04, 0x25, 0x08, 0x00, 0x00, 0x00, /* mov rax, qword [gs:0x8] */
++        0x48, 0xc7, 0xc6, 0xf8, 0xff, 0xff, 0xff              /* mov rsi, 0xfffffffffffffff8 */
++    };
++    static const char after_stackbase_pair[] =
++    {
++        0xe8, 0x0c, 0x46, 0xff, 0xff, /* call the local thunk */
++        0x90, 0x90, 0x90, 0x90, 0xc3, /* preserve the original return */
++        0x56, 0x48, 0x83, 0xec, 0x20, /* preserve the stack frame */
++        0xe8, 0xfd, 0x45, 0xff, 0xff, /* call the local thunk */
++        0x90, 0x90, 0x90, 0x90,
++        0x48, 0xc7, 0xc6, 0xf8, 0xff, 0xff, 0xff              /* preserve the frame adjustment */
++    };
++    C_ASSERT( sizeof(before_stackbase_pair) == sizeof(after_stackbase_pair) );
++    static const char before_stackbase_check[] =
++    {
++        0x48, 0x8b, 0x46, 0x08,                                 /* mov rax, qword [rsi+8] */
++        0x65, 0x48, 0x8b, 0x34, 0x25, 0x08, 0x00, 0x00, 0x00,   /* mov rsi, qword [gs:0x8] */
++        0x48, 0x85, 0xf6,                                       /* test rsi, rsi */
++        0x74, 0x2e                                             /* je 0x30 */
++    };
++    static const char after_stackbase_check[] =
++    {
++        0x48, 0x8b, 0x46, 0x08,                                 /* mov rax, qword [rsi+8] */
++        0x65, 0x48, 0x8b, 0x34, 0x25, 0x30, 0x00, 0x00, 0x00,   /* mov rsi, qword [gs:0x30] */
++        0x48, 0x8b, 0x76, 0x08,                                 /* mov rsi, qword [rsi+8] */
++        0x90                                                   /* nop */
++    };
++    C_ASSERT( sizeof(before_stackbase_check) == sizeof(after_stackbase_check) );
++    struct cef_patch
++    {
++        ULONG_PTR offset;
++        const char *before;
++        const char *after;
++        SIZE_T size;
++    } static const patches[] =
++    {
++        { 0x24b87f1, before_thunk, after_thunk, sizeof(before_thunk) },
++        /* The second gs:[0x8] instruction starts at RVA 0x24c41ef; RVA
++         * 0x24c41e9 is the ret byte immediately after the first instruction. */
++        { 0x24c41e0, before_stackbase_pair, after_stackbase_pair, sizeof(before_stackbase_pair) },
++        { 0x24c425f, before_stackbase_check, after_stackbase_check, sizeof(before_stackbase_check) }
++    };
++    unsigned int i;
++
++    if (wcscmp( wm->ldr.BaseDllName.Buffer, cef_name )) return;
++    if (!arknights_runtime_cn_compat_enabled()) return;
++
++    /* Preflight all expected bytes before writing any patch bytes. */
++    for (i = 0; i < ARRAY_SIZE(patches); i++)
++    {
++        void *target;
++
++        if (patches[i].offset > wm->ldr.SizeOfImage ||
++            patches[i].size > wm->ldr.SizeOfImage - patches[i].offset)
++            return;
++        target = (char *)wm->ldr.DllBase + patches[i].offset;
++        if (memcmp( target, patches[i].before, patches[i].size ))
++            return;
++    }
++
++    for (i = 0; i < ARRAY_SIZE(patches); i++)
++    {
++        DWORD old_prot;
++        SIZE_T pagesize = page_size;
++        void *target = (char *)wm->ldr.DllBase + patches[i].offset;
++        void *target_page = (void *)((ULONG_PTR)target & ~(page_size - 1));
++
++        if (NtProtectVirtualMemory( NtCurrentProcess(), &target_page, &pagesize,
++                                    PAGE_EXECUTE_READWRITE, &old_prot ))
++            return;
++        memcpy( target, patches[i].after, patches[i].size );
++        NtProtectVirtualMemory( NtCurrentProcess(), &target_page, &pagesize, old_prot, &old_prot );
++    }
++}
++#endif
++
+ static void apply_binary_patches( WINE_MODREF* wm )
+ {
+ #ifdef __x86_64__
+@@ -3382,6 +3505,10 @@ static void apply_binary_patches( WINE_MODREF* wm )
+     SIZE_T pagesize = page_size;
+     WCHAR *libname = wm->ldr.BaseDllName.Buffer;
+ 
++#ifdef __x86_64__
++    apply_bilibili_cef80_stackbase_patch( wm );
++#endif
++
+     for (i = 0; i < ARRAY_SIZE(patches); i++)
+     {
+         DWORD old_prot;
