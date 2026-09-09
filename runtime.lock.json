@@ -49,7 +49,11 @@
   "interface": {
     "wineDirectory": "Wine",
     "dxmtDirectory": "DXMT",
-    "executables": ["Wine/bin/Arknights", "Wine/bin/wine64", "Wine/bin/wineserver"],
+    "executables": [
+      "Wine/bin/Arknights",
+      "Wine/bin/wine64",
+      "Wine/bin/wineserver"
+    ],
     "requiredFiles": [
       "Wine/lib/wine/x86_64-unix/winemac.so",
       "Wine/lib/wine/x86_64-windows/winemetal.dll",
@@ -118,7 +122,7 @@
       "component": "wine",
       "family": "cn",
       "path": "patches/wine/cn/windowing/0001-win32u-winemac-bilibili-layered-child.patch",
-      "sha256": "ccf9159b1d61e84f38baf1a97d31f21b28c21bde329a512aed6c95f92f616a4a"
+      "sha256": "cbf37e0e4b590505a1b3d398e045ba547610f6b21d5d6e4cb818befb7c8a6b24"
     }
   ]
 }
