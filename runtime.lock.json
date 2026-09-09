@@ -118,7 +118,7 @@
       "component": "wine",
       "family": "cn",
       "path": "patches/wine/cn/windowing/0001-win32u-winemac-bilibili-layered-child.patch",
-      "sha256": "0059090be51f66b089eeb1914dfcc76dd80abb744040901dad14f03979c00454"
+      "sha256": "f5a40a2d6952cb274263c85ff52bb40fd5cafd2d9e0f3171eb9c62ba3baa65ea"
     }
   ]
 }

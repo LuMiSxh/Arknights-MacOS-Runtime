@@ -112,7 +112,7 @@ index 687e4e79..f463caf9 100644
      else
      {
 diff --git a/dlls/winemac.drv/cocoa_window.m b/dlls/winemac.drv/cocoa_window.m
-index 34c3f572..0edce229 100644
+index 34c3f572..61850770 100644
 --- a/dlls/winemac.drv/cocoa_window.m
 +++ b/dlls/winemac.drv/cocoa_window.m
 @@ -397,6 +397,7 @@ @interface WineContentView : WineBaseView <NSTextInputClient, NSViewLayerContent
@@ -165,18 +165,16 @@ index 34c3f572..0edce229 100644
              {
                  window.shapeChangedSinceLastDraw = FALSE;
                  [window invalidateShadow];
-@@ -3914,6 +3922,30 @@ macdrv_view macdrv_create_view(CGRect rect)
- 
-     return (macdrv_view)view;
+@@ -3916,6 +3924,30 @@ macdrv_view macdrv_create_view(CGRect rect)
  }
-+
+ }
+ 
 +macdrv_view macdrv_create_window_surface_view(CGRect rect)
 +{
 +    WineContentView *view = (WineContentView *)macdrv_create_view(rect);
 +
 +    OnMainThread(^{ view->windowSurfaceView = YES; });
 +    return (macdrv_view)view;
-+}
 +}
 +
 +macdrv_view macdrv_retain_view(macdrv_view v)
@@ -193,10 +191,12 @@ index 34c3f572..0edce229 100644
 +{
 +    [(WineContentView *)v release];
 +}
- }
- 
++}
++
  /***********************************************************************
-@@ -3991,13 +4023,13 @@ void macdrv_set_view_superview(macdrv_view v, macdrv_view s, macdrv_window w, ma
+  *              macdrv_dispose_view
+  *
+@@ -3991,19 +4023,18 @@ void macdrv_set_view_superview(macdrv_view v, macdrv_view s, macdrv_window w, ma
  {
  @autoreleasepool
  {
@@ -207,20 +207,44 @@ index 34c3f572..0edce229 100644
 -        WineContentView* prev = (WineContentView*)p;
 -        WineContentView* next = (WineContentView*)n;
 +    WineContentView* view = (WineContentView*)v;
-+    WineContentView* superview = (WineContentView*)s;
++    WineContentView* requestedSuperview = (WineContentView*)s;
 +    WineWindow* window = (WineWindow*)w;
 +    WineContentView* prev = (WineContentView*)p;
 +    WineContentView* next = (WineContentView*)n;
  
+-        if (!superview)
+-            superview = [window contentView];
 +    OnMainThreadAsync(^{
-         if (!superview)
-             superview = [window contentView];
++        WineContentView* target = requestedSuperview ?: [window contentView];
  
-@@ -4044,6 +4076,48 @@ void macdrv_set_view_hidden(macdrv_view v, bool hidden)
-         [(WineWindow*)view.window updateForGLSubviews];
-     });
+-        if (superview == [view superview])
++        if (target == [view superview])
+         {
+-            NSArray* subviews = [superview subviews];
++            NSArray* subviews = [target subviews];
+             NSUInteger index = [subviews indexOfObjectIdenticalTo:view];
+             if (!prev && !next && index == [subviews count] - 1)
+                 return;
+@@ -4014,12 +4045,12 @@ void macdrv_set_view_superview(macdrv_view v, macdrv_view s, macdrv_window w, ma
+         }
+ 
+         WineWindow* oldWindow = (WineWindow*)[view window];
+-        WineWindow* newWindow = (WineWindow*)[superview window];
++        WineWindow* newWindow = (WineWindow*)[target window];
+ 
+         if (prev)
+-            [superview addSubview:view positioned:NSWindowBelow relativeTo:prev];
++            [target addSubview:view positioned:NSWindowBelow relativeTo:prev];
+         else
+-            [superview addSubview:view positioned:NSWindowAbove relativeTo:next];
++            [target addSubview:view positioned:NSWindowAbove relativeTo:next];
+ 
+         if (oldWindow != newWindow)
+         {
+@@ -4046,6 +4077,49 @@ void macdrv_set_view_hidden(macdrv_view v, bool hidden)
  }
-+
+ }
+ 
 +void macdrv_set_view_alpha(macdrv_view v, CGFloat alpha)
 +{
 +@autoreleasepool
@@ -262,9 +286,10 @@ index 34c3f572..0edce229 100644
 +    });
 +}
 +}
- }
- 
++
  /***********************************************************************
+  *              macdrv_add_view_opengl_context
+  *
 diff --git a/dlls/winemac.drv/macdrv.h b/dlls/winemac.drv/macdrv.h
 index a09b1e17..aecf674c 100644
 --- a/dlls/winemac.drv/macdrv.h
