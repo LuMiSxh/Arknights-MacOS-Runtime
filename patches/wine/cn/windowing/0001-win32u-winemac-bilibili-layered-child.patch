@@ -112,7 +112,7 @@ index 687e4e79..f463caf9 100644
      else
      {
 diff --git a/dlls/winemac.drv/cocoa_window.m b/dlls/winemac.drv/cocoa_window.m
-index 34c3f572..61850770 100644
+index 34c3f572..abe989b5 100644
 --- a/dlls/winemac.drv/cocoa_window.m
 +++ b/dlls/winemac.drv/cocoa_window.m
 @@ -397,6 +397,7 @@ @interface WineContentView : WineBaseView <NSTextInputClient, NSViewLayerContent
@@ -241,7 +241,7 @@ index 34c3f572..61850770 100644
  
          if (oldWindow != newWindow)
          {
-@@ -4046,6 +4077,49 @@ void macdrv_set_view_hidden(macdrv_view v, bool hidden)
+@@ -4046,6 +4077,48 @@ void macdrv_set_view_hidden(macdrv_view v, bool hidden)
  }
  }
  
