@@ -89,6 +89,21 @@ def validate_required_architectures(root: Path, required_paths: list[str]) -> in
             raise RuntimeValidationError(
                 f"{relative} has unexpected architecture: {kind}"
             )
+        if relative.startswith("DXMT/") and path.name in (
+            "d3d10core.dll",
+            "d3d11.dll",
+            "dxgi.dll",
+        ):
+            # Wine's DOS-stub marker overrides native-first DLL loading. The
+            # build recipe clears it for these payloads, but keeps winemetal builtin.
+            with path.open("rb") as file:
+                file.seek(64)
+                marker = file.read(32)
+            if marker.startswith((b"Wine builtin DLL\0", b"Wine placeholder DLL\0")):
+                raise RuntimeValidationError(
+                    f"{relative}: native DXMT payload retains a Wine loader marker; "
+                    "apply the build recipe's DOS-stub preparation"
+                )
         checked += 1
     return checked
 

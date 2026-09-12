@@ -15,13 +15,18 @@ runtime.lock.json -> verified source checkouts -> ordered patch families
                  -> structural report -> canary artifact
 ```
 
-The release artifact contains the Audio, Cursor, and CN patch families in one archive. Release
+The release artifact contains the Audio, Cursor, Performance, and CN patch families in one archive. Release
 validation still requires a clean build of every component. Both lanes must preserve archive schema
 2: top-level `Wine/` and `DXMT/`, the Wine loader and server, macOS driver, WineMetal bridge, and the
 x64/x32 DXMT payloads expected by the launcher.
 
 Runtime flags are parsed inside their owning component. `ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT` and
-`ARKNIGHTS_RUNTIME_CN_COMPAT` accept only `0` or `1`; `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY` accepts only `1` through
-`3`. Absent or invalid values preserve the documented defaults. CN behavior remains inactive unless
-`ARKNIGHTS_RUNTIME_CN_COMPAT=1`. The runtime
-has no cross-component master switch. No patch uses a process name or path as an activation signal.
+`ARKNIGHTS_RUNTIME_CN_COMPAT` accept only `0` or `1`; `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY` accepts only
+`1` through `3`. Absent or invalid values preserve the documented defaults. The single CN gate owns all CN
+patches; its Bilibili image and window preflights are documented in the [patch registry](patch-registry.md#cn).
+`ARKNIGHTS_RUNTIME_PERFORMANCE=1` enables WineMetal's display-profile cache and ColorSync
+resource cleanup. Missing, `0`, and invalid values keep the upstream route. WineMetal reads the
+flag once when its library loads; display queries only check the cached boolean. Display/profile
+notifications invalidate cached chromaticities, with a one-second expiry as a fallback. EDR values
+remain live. Existing audio, CN, synchronization, shader-cache, and frame-latency controls retain
+their independent behavior.

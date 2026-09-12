@@ -6,9 +6,9 @@ set -euo pipefail
 stage="${1:-combined}"
 build_mode="${2:-overlay}"
 case "$stage" in
-	base|audio|cursor|cn|combined) ;;
+	base|audio|cursor|performance|cn|combined) ;;
 	*)
-		echo "error: expected base, audio, cursor, cn, or combined" >&2
+		echo "error: expected base, audio, cursor, performance, cn, or combined" >&2
 		exit 2
 		;;
 esac
@@ -67,6 +67,10 @@ elif ! cp -cR "$stage_root/base/Libraries" "$stage_root/candidate/Libraries" 2>/
 fi
 candidate="$stage_root/candidate/Libraries"
 
+if [[ "$build_mode" == overlay && ! -e "$candidate/Wine/bin/Arknights" && ! -L "$candidate/Wine/bin/Arknights" ]]; then
+	ln -s wine64 "$candidate/Wine/bin/Arknights"
+fi
+
 if [[ "$stage" == base ]]; then
 	run_python "$repository_root/scripts/validate_runtime.py" "$candidate" --baseline "$stage_root/base/Libraries"
 	tar -czf "$stage_root/Arknights-MacOS-Runtime-$stage.tar.gz" -C "$stage_root/candidate" Libraries
@@ -78,15 +82,15 @@ fi
 require_command nix
 
 source_root="$stage_root/sources"
-if [[ "$stage" == cursor ]]; then
-	run_python "$repository_root/scripts/runtime.py" prepare cursor --destination-root "$source_root"
+if [[ "$stage" == cursor || "$stage" == performance ]]; then
+	run_python "$repository_root/scripts/runtime.py" prepare "$stage" --destination-root "$source_root"
 	run_python "$repository_root/scripts/runtime.py" prepare base --destination-root "$source_root"
 else
 	run_python "$repository_root/scripts/runtime.py" prepare "$stage" --destination-root "$source_root"
 fi
 
 wine_source="$source_root/wine-$stage"
-if [[ "$stage" == cursor ]]; then
+if [[ "$stage" == cursor || "$stage" == performance ]]; then
 	wine_source="$source_root/wine-base"
 fi
 
@@ -135,7 +139,7 @@ export ac_cv_lib_soname_gnutls="libgnutls.30.dylib"
 export ac_cv_lib_soname_MoltenVK="libMoltenVK.dylib"
 
 llvm_path=""
-if [[ "$stage" == cursor || "$stage" == combined ]]; then
+if [[ "$stage" == cursor || "$stage" == performance || "$stage" == combined ]]; then
 	llvm_attribute="$nixpkgs#legacyPackages.x86_64-darwin.llvmPackages_15.llvm"
 	llvm_dev="$(nix build --no-link --print-out-paths "$llvm_attribute.dev")"
 	llvm_lib="$(nix build --no-link --print-out-paths "$llvm_attribute.lib")"
@@ -212,13 +216,19 @@ if [[ "$stage" == audio || "$stage" == cn || "$stage" == combined ]]; then
 		patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/winecoreaudio.so")
 	fi
 	if [[ "$stage" == cn || "$stage" == combined ]]; then
+		overlay_wine_file lib/wine/x86_64-unix/winemac.so
+		patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/winemac.so")
+		overlay_wine_file lib/wine/x86_64-unix/win32u.so
+		patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/win32u.so")
 		overlay_wine_file lib/wine/x86_64-unix/ntdll.so
 		patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/ntdll.so")
 		overlay_wine_file lib/wine/x86_64-windows/kernel32.dll
+		overlay_wine_file lib/wine/x86_64-windows/ntdll.dll
 		overlay_wine_file lib/wine/x86_64-windows/ntoskrnl.exe
 		overlay_wine_file lib/wine/i386-windows/ntoskrnl.exe
 		x86_64-w64-mingw32-strip --strip-debug \
 			"$candidate/Wine/lib/wine/x86_64-windows/kernel32.dll" \
+			"$candidate/Wine/lib/wine/x86_64-windows/ntdll.dll" \
 			"$candidate/Wine/lib/wine/x86_64-windows/ntoskrnl.exe"
 		i686-w64-mingw32-strip --strip-debug \
 			"$candidate/Wine/lib/wine/i386-windows/ntoskrnl.exe"
@@ -316,7 +326,7 @@ if [[ "$build_mode" == "--clean-release" ]]; then
 	done
 fi
 
-if [[ "$stage" == cursor || "$stage" == combined ]]; then
+if [[ "$stage" == cursor || "$stage" == performance || "$stage" == combined ]]; then
 	require_command meson
 	require_command ninja
 	dxmt_source="$source_root/dxmt-$stage"

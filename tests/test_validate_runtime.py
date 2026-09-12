@@ -89,6 +89,40 @@ class RuntimeStructureTests(unittest.TestCase):
         ):
             validate_required_architectures(self.root, self.required)
 
+    def test_native_dxmt_payloads_reject_wine_loader_markers(self) -> None:
+        for architecture, kind in (
+            ("x64", "PE32+ executable (DLL) x86-64"),
+            ("x32", "PE32 executable (DLL) Intel 80386"),
+        ):
+            for library in ("d3d10core.dll", "d3d11.dll", "dxgi.dll"):
+                relative = f"DXMT/{architecture}/{library}"
+                path = self.root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                for marker in (b"Wine builtin DLL\0", b"Wine placeholder DLL\0"):
+                    with self.subTest(path=relative, marker=marker):
+                        path.write_bytes(bytes(64) + marker.ljust(32, b"\0"))
+                        with (
+                            patch(
+                                "scripts.validate_runtime.subprocess.run",
+                                return_value=CompletedProcess([], 0, kind, ""),
+                            ),
+                            self.assertRaisesRegex(
+                                RuntimeValidationError, "native DXMT payload.*Wine"
+                            ),
+                        ):
+                            validate_required_architectures(self.root, [relative])
+
+    def test_winemetal_keeps_its_builtin_loader_marker(self) -> None:
+        relative = "DXMT/x64/winemetal.dll"
+        path = self.root / relative
+        path.parent.mkdir(parents=True)
+        path.write_bytes(bytes(64) + b"Wine builtin DLL\0")
+        with patch(
+            "scripts.validate_runtime.subprocess.run",
+            return_value=CompletedProcess([], 0, "PE32+ executable x86-64", ""),
+        ):
+            self.assertEqual(validate_required_architectures(self.root, [relative]), 1)
+
     def test_rejects_a_symlink_that_escapes_the_runtime(self) -> None:
         self.create_required_files()
         outside = self.root.parent / "outside-runtime"

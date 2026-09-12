@@ -69,6 +69,7 @@ class ReleaseVerificationTests(unittest.TestCase):
         patch_definitions = (
             ("example-audio", "audio"),
             ("example-cursor", "cursor"),
+            ("example-performance", "performance"),
             ("example-cn", "cn"),
         )
         patches = []
@@ -80,7 +81,9 @@ class ReleaseVerificationTests(unittest.TestCase):
             patches.append(
                 {
                     "id": patch_id,
-                    "component": "wine" if family != "cursor" else "dxmt",
+                    "component": "dxmt"
+                    if family in ("cursor", "performance")
+                    else "wine",
                     "family": family,
                     "path": str(patch.relative_to(self.root)),
                     "sha256": hashlib.sha256(content.encode()).hexdigest(),
@@ -139,7 +142,7 @@ class ReleaseVerificationTests(unittest.TestCase):
             "LICENSE": "project license\n",
             "LICENSES/Wine-LGPL-2.1.txt": "wine license\n",
             "LICENSES/DXMT-LGPL-2.1.txt": "dxmt license\n",
-            "docs/patch-registry.md": "example-audio example-cursor example-cn\n",
+            "docs/patch-registry.md": " ".join(patch["id"] for patch in patches) + "\n",
             "docs/legal/redistribution.md": "redistribution inventory\n",
             "LICENSES/runtime/Apache-2.0.txt": "apache license\n",
             "LICENSES/runtime/GPL-2.0.txt": "gpl2 license\n",
@@ -218,13 +221,16 @@ class ReleaseVerificationTests(unittest.TestCase):
     def test_rejects_a_release_lock_missing_a_patch_family(self) -> None:
         lock_path = self.root / "runtime.lock.json"
         lock = json.loads(lock_path.read_text(encoding="utf-8"))
-        lock["patches"] = [
-            patch for patch in lock["patches"] if patch["family"] != "cn"
-        ]
-        lock_path.write_text(json.dumps(lock), encoding="utf-8")
+        for family in ("audio", "cursor", "performance", "cn"):
+            with self.subTest(family=family):
+                incomplete_lock = dict(lock)
+                incomplete_lock["patches"] = [
+                    patch for patch in lock["patches"] if patch["family"] != family
+                ]
+                lock_path.write_text(json.dumps(incomplete_lock), encoding="utf-8")
 
-        with self.assertRaisesRegex(ReleaseValidationError, "patch families"):
-            self._verify()
+                with self.assertRaisesRegex(ReleaseValidationError, "patch families"):
+                    self._verify()
 
     def test_rejects_checksum_that_names_another_artifact(self) -> None:
         self.checksum.write_text(

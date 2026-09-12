@@ -5,7 +5,7 @@
 ## Overview
 
 Arknights macOS Runtime owns the exact WineCX, DXMT, dependency, and patch inputs used to build a
-runtime artifact. The artifact contains the Audio, Cursor, and CN patch families; every
+runtime artifact. The artifact contains the Audio, Cursor, Performance, and CN patch families; every
 behavior-changing route retains a safe default and a documented component-local control. The
 repository validates the archive contract and records enough provenance to reproduce the artifact.
 
@@ -21,7 +21,7 @@ Use the Runtime problem template and include the client and runtime versions, Ma
 region, Wine-prefix history, runtime settings, and reproduction steps. Attach logs only when a
 maintainer requests a specific file.
 
-The current baseline is dappermint runtime 4.6.4 with WineCX 11.16. Cursor and combined stages
+The current baseline is dappermint runtime 4.6.8 with WineCX 11.16. Cursor, Performance, and combined stages
 additionally build a pinned post-0.80 DXMT revision. The clean release tree contains newly built Wine
 and DXMT, the pinned Nix media/library closure, and the pinned MoltenVK payload. Candidate baselines
 also record their Wine Gecko input. All repository-controlled source, archive, recipe, and patch
@@ -29,13 +29,14 @@ inputs are pinned by commit and/or checksum.
 
 ## Patch families
 
-| Family | Purpose                                                                                                                                               | Runtime default                                       |
-| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Audio  | Follow the current macOS default output without restarting the game ([client issue #59](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/59)) | Wine's normal routing unless enabled                  |
-| Cursor | Provide a bounded DXMT frame queue control for cursor latency ([client issue #34](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/34))       | Upstream maximum `3`; values `1` through `3` accepted |
-| CN     | Provide selected Wine/ACE compatibility routes                                                                                                        | Inactive unless explicitly enabled                    |
+| Family      | Purpose                                                                                                                                               | Runtime default                                       |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Audio       | Follow the current macOS default output without restarting the game ([client issue #59](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/59)) | Wine's normal routing unless enabled                  |
+| Cursor      | Provide a bounded DXMT frame queue control for cursor latency ([client issue #34](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/34))       | Upstream maximum `3`; values `1` through `3` accepted |
+| Performance | Cache display chromaticities and release ColorSync resources                                         | Inactive unless explicitly enabled                    |
+| CN          | Provide selected Wine/ACE compatibility routes, including the narrowly preflighted Bilibili renderer path                                             | Inactive unless explicitly enabled                    |
 
-The complete artifact contains all three families. Missing or invalid control values preserve the
+The complete artifact contains all four families. Missing or invalid control values preserve the
 defaults listed above.
 
 ## Runtime controls
@@ -44,10 +45,11 @@ defaults listed above.
 | ----------------------------------------------- | --------------- | ------------------------ |
 | `ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT` | `0`, `1`        | Wine's normal routing    |
 | `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY`      | `1` through `3` | Upstream value `3`       |
+| `ARKNIGHTS_RUNTIME_PERFORMANCE`                 | `0`, `1`        | Inactive                 |
 | `ARKNIGHTS_RUNTIME_CN_COMPAT`                   | `0`, `1`        | Inactive                 |
 
-Each component parses only its own allowlisted value. The runtime has no cross-component master switch
-and no process-name or path-based activation.
+Each component parses only its own allowlisted value. The CN gate covers every CN patch; its exact Bilibili
+image and window preflights are listed in the [patch registry](docs/patch-registry.md#cn).
 
 ## Building
 
@@ -75,6 +77,7 @@ installation.
 just check
 just prepare audio
 just prepare cursor
+just prepare performance
 just prepare cn
 just prepare combined
 ```

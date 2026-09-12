@@ -1,0 +1,207 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Arknights MacOS Runtime Maintainers <arknights-macos-runtime@users.noreply.github.com>
+Date: Fri, 11 Sep 2026 18:00:00 +0000
+Subject: [PATCH] winemetal: gate display profile caching behind performance experiment
+
+Read ARKNIGHTS_RUNTIME_PERFORMANCE exactly once at library load. Only 1
+opts into the experiment; absent or invalid input preserves upstream behavior.
+Cache display chromaticities with display/profile notification invalidation
+and a one-second expiry bound. Keep EDR queries live. Do not publish a result
+across invalidation. Release created profiles and copied tags on the enabled
+route. Gameplay profiling identified repeated ColorSync profile parsing as
+measurable CPU work; a frame-rate improvement remains unproven.
+
+---
+diff --git a/src/winemetal/unix/display_profile.h b/src/winemetal/unix/display_profile.h
+new file mode 100644
+index 0000000..a2005db
+--- /dev/null
++++ b/src/winemetal/unix/display_profile.h
+@@ -0,0 +1,131 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/* ARKNIGHTS_RUNTIME_PERFORMANCE is read once when WineMetal is loaded. */
++#ifndef WINEMETAL_DISPLAY_PROFILE_H
++#define WINEMETAL_DISPLAY_PROFILE_H
++
++#include <pthread.h>
++#include <stddef.h>
++#include <stdlib.h>
++#include <string.h>
++#include <time.h>
++
++static bool runtime_performance_enabled;
++static CFMutableDictionaryRef display_profiles;
++static pthread_mutex_t display_profile_mutex = PTHREAD_MUTEX_INITIALIZER;
++static uint64_t display_profile_generation;
++static uint64_t cached_display_profile_generation;
++static bool display_callback_registered;
++
++struct CachedDisplayProfile {
++  uint64_t created_at;
++  struct WMTDisplayDescription description;
++};
++
++bool GetDisplayColorGamut(ColorSyncProfileRef profile, struct WMTDisplayDescription *desc_out);
++
++static void
++InvalidateDisplayProfiles(CFNotificationCenterRef center, void *observer, CFStringRef name,
++                          const void *object, CFDictionaryRef user_info) {
++  pthread_mutex_lock(&display_profile_mutex);
++  ++display_profile_generation;
++  pthread_mutex_unlock(&display_profile_mutex);
++}
++
++static void
++DisplayReconfigured(CGDirectDisplayID display_id, CGDisplayChangeSummaryFlags flags, void *context) {
++  InvalidateDisplayProfiles(NULL, NULL, NULL, NULL, NULL);
++}
++
++__attribute__((constructor)) static void
++InitializeRuntimePerformance(void) {
++  const char *value = getenv("ARKNIGHTS_RUNTIME_PERFORMANCE");
++  runtime_performance_enabled = value && !strcmp(value, "1");
++  if (!runtime_performance_enabled)
++    return;
++  display_profiles = CFDictionaryCreateMutable(NULL, 0, NULL, &kCFTypeDictionaryValueCallBacks);
++  CFNotificationCenterRef center = CFNotificationCenterGetDistributedCenter();
++  CFNotificationCenterAddObserver(center, &display_profiles, InvalidateDisplayProfiles,
++      kColorSyncDisplayDeviceProfilesNotification, NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
++  CFNotificationCenterAddObserver(center, &display_profiles, InvalidateDisplayProfiles,
++      kColorSyncProfileRepositoryChangeNotification, NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
++  display_callback_registered = CGDisplayRegisterReconfigurationCallback(DisplayReconfigured, NULL) == kCGErrorSuccess;
++}
++
++__attribute__((destructor)) static void
++DestroyRuntimePerformance(void) {
++  if (!runtime_performance_enabled)
++    return;
++  CFNotificationCenterRemoveEveryObserver(CFNotificationCenterGetDistributedCenter(), &display_profiles);
++  if (display_callback_registered)
++    CGDisplayRemoveReconfigurationCallback(DisplayReconfigured, NULL);
++  pthread_mutex_lock(&display_profile_mutex);
++  CFMutableDictionaryRef profiles = display_profiles;
++  display_profiles = NULL;
++  pthread_mutex_unlock(&display_profile_mutex);
++  if (profiles)
++    CFRelease(profiles);
++}
++
++static void
++GetCachedDisplayColorGamut(CGDirectDisplayID display_id, struct WMTDisplayDescription *desc_out) {
++  /* Display IDs are integer keys; offset by one because CFDictionary rejects NULL keys. */
++  const void *key = (const void *)((uintptr_t)display_id + 1);
++  /* Only the primaries and white point precede EDR in the bridge ABI. EDR stays live. */
++  const size_t gamut_size = offsetof(struct WMTDisplayDescription, maximum_edr_color_component_value);
++
++  for (;;) {
++    uint64_t now = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
++    struct CachedDisplayProfile entry = {0};
++    pthread_mutex_lock(&display_profile_mutex);
++    uint64_t generation = display_profile_generation;
++    if (display_profiles) {
++      if (generation != cached_display_profile_generation) {
++        CFDictionaryRemoveAllValues(display_profiles);
++        cached_display_profile_generation = generation;
++      }
++      CFDataRef cached = CFDictionaryGetValue(display_profiles, key);
++      if (cached) {
++        memcpy(&entry, CFDataGetBytePtr(cached), sizeof(entry));
++        /* Bound staleness even if a notification is delayed by the host run loop. */
++        if (now - entry.created_at < NSEC_PER_SEC) {
++          memcpy(desc_out, &entry.description, gamut_size);
++          pthread_mutex_unlock(&display_profile_mutex);
++          return;
++        }
++      }
++    }
++    pthread_mutex_unlock(&display_profile_mutex);
++
++    ColorSyncProfileRef profile = ColorSyncProfileCreateWithDisplayID(display_id);
++    bool valid = profile && GetDisplayColorGamut(profile, &entry.description);
++    if (profile)
++      CFRelease(profile);
++    if (!valid) {
++      profile = ColorSyncProfileCreateWithName(kColorSyncGenericRGBProfile);
++      if (profile) {
++        valid = GetDisplayColorGamut(profile, &entry.description);
++        CFRelease(profile);
++      }
++    }
++    if (!valid)
++      return;
++    entry.created_at = now;
++    CFDataRef data = CFDataCreate(NULL, (const UInt8 *)&entry, sizeof(entry));
++    pthread_mutex_lock(&display_profile_mutex);
++    if (generation != display_profile_generation) {
++      pthread_mutex_unlock(&display_profile_mutex);
++      if (data)
++        CFRelease(data);
++      continue;
++    }
++    memcpy(desc_out, &entry.description, gamut_size);
++    if (display_profiles && data)
++      CFDictionarySetValue(display_profiles, key, data);
++    pthread_mutex_unlock(&display_profile_mutex);
++    if (data)
++      CFRelease(data);
++    return;
++  }
++}
++
++#endif
+diff --git a/src/winemetal/unix/winemetal_unix.c b/src/winemetal/unix/winemetal_unix.c
+index 5fda009..34d9524 100644
+--- a/src/winemetal/unix/winemetal_unix.c
++++ b/src/winemetal/unix/winemetal_unix.c
+@@ -12,6 +12,7 @@
+ #define WINEMETAL_API
+ #include "../winemetal_thunks.h"
+ #include "../airconv_thunks.h"
++#include "display_profile.h"
+ 
+ typedef int NTSTATUS;
+ #define STATUS_SUCCESS 0
+@@ -2290,16 +2291,24 @@ GetChromaticity_xy(ColorSyncProfileRef profile, CFStringRef tag, float *out_x, f
+   CFDataRef tag_data = ColorSyncProfileCopyTag(profile, tag);
+   if (!tag_data)
+     return false;
+-  if (CFDataGetLength(tag_data) != sizeof(icc_XYZ_t))
++  if (CFDataGetLength(tag_data) != sizeof(icc_XYZ_t)) {
++    if (runtime_performance_enabled)
++      CFRelease(tag_data);
+     return false;
++  }
+   icc_XYZ_t *data = (icc_XYZ_t *)CFDataGetBytePtr(tag_data);
+-  if (data->sig != 0x205a5958)
++  if (data->sig != 0x205a5958) {
++    if (runtime_performance_enabled)
++      CFRelease(tag_data);
+     return false;
++  }
+   double X = (int32_t)__builtin_bswap32(data->x) / 65536.0;
+   double Y = (int32_t)__builtin_bswap32(data->y) / 65536.0;
+   double Z = (int32_t)__builtin_bswap32(data->z) / 65536.0;
+   *out_x = X / (X + Y + Z);
+   *out_y = Y / (X + Y + Z);
++  if (runtime_performance_enabled)
++    CFRelease(tag_data);
+   return true;
+ }
+ 
+@@ -2335,9 +2344,13 @@ _WMTGetDisplayDescription(void *obj) {
+   struct unixcall_generic_obj_ptr_noret *params = obj;
+   CGDirectDisplayID display_id = params->handle;
+   struct WMTDisplayDescription *desc_out = params->arg.ptr;
+-  ColorSyncProfileRef profile = ColorSyncProfileCreateWithDisplayID(display_id);
+-  if (!profile || !GetDisplayColorGamut(profile, desc_out))
+-    GetDisplayColorGamut(ColorSyncProfileCreateWithName(kColorSyncGenericRGBProfile), desc_out);
++  if (runtime_performance_enabled) {
++    GetCachedDisplayColorGamut(display_id, desc_out);
++  } else {
++    ColorSyncProfileRef profile = ColorSyncProfileCreateWithDisplayID(display_id);
++    if (!profile || !GetDisplayColorGamut(profile, desc_out))
++      GetDisplayColorGamut(ColorSyncProfileCreateWithName(kColorSyncGenericRGBProfile), desc_out);
++  }
+   NSScreen *screen = GetNSScreenForDisplayID(display_id);
+   if (screen) {
+     desc_out->maximum_edr_color_component_value = [screen maximumExtendedDynamicRangeColorComponentValue];
