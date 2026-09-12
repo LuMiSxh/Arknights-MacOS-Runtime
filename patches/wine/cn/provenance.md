@@ -3,7 +3,7 @@
 ## Source pins
 
 - Wine base: `dappermint/winecx`
-- Wine commit: `7dbc5b5322a6ef3fb04bdc643c64b188fd641149` (Wine 11.16)
+- Wine commit: `e1b410a5fdd96a32722a5f2617b5068bd385b7db` (Wine 11.16)
 - Candidate reference: [`stoicswe/Endfield_FineWine`](https://github.com/stoicswe/Endfield_FineWine)
 - Reference checkout: `e5d4ccad235eefe32d912733e57e4c0bb53a5b58`
 - Reference patch families: `stage1-macos` and `stage2-dwproton`

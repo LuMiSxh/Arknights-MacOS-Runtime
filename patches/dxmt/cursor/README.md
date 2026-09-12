@@ -1,7 +1,7 @@
 # DXMT cursor-latency patch
 
-This patch targets DXMT commit `19e24ee068a44a747e556965730482038c5bb068`
-(`v0.80-199-g19e24ee`, an unreleased post-0.80 canary revision).
+This patch targets DXMT commit `4ddb20e54672c0cb56115ce80d6db1beef94ae28`
+(`v0.80-213-g4ddb20e`, an unreleased post-0.80 canary revision).
 It adds one bounded, opt-in frame-latency override used by the Arknights macOS Runtime
 canary:
 
@@ -20,7 +20,7 @@ reports, and it is not enabled by default.
 ## Provenance
 
 - Upstream: <https://github.com/3Shain/dxmt>
-- Base commit: `19e24ee068a44a747e556965730482038c5bb068`
+- Base commit: `4ddb20e54672c0cb56115ce80d6db1beef94ae28`
 - License: LGPL-2.1-or-later, matching the pinned DXMT revision and modified source file.
 
 ## Static validation

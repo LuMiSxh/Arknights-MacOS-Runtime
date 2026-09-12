@@ -12,7 +12,7 @@ on:
         description: Patch family to build
         type: choice
         default: combined
-        options: [base, audio, cursor, cn, combined]
+        options: [base, audio, cursor, performance, cn, combined]
 
 permissions:
   contents: read

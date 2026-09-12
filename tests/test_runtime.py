@@ -121,6 +121,18 @@ class RuntimeLockTests(unittest.TestCase):
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
         )
 
+    def test_performance_stage_is_isolated_and_included_in_combined(self) -> None:
+        performance = dict(self.lock["patches"][0])
+        performance.update(
+            id="dxmt-display-profile-cache", component="dxmt", family="performance"
+        )
+        self.lock["patches"].append(performance)
+        loaded = load_lock(self.write_lock(), repository_root=self.root)
+
+        self.assertEqual(patches_for_stage(loaded, "performance"), [performance])
+        self.assertEqual(len(patches_for_stage(loaded, "audio")), 1)
+        self.assertEqual(patches_for_stage(loaded, "combined"), self.lock["patches"])
+
     def test_repository_lock_requires_the_launcher_alias(self) -> None:
         root = Path(__file__).resolve().parents[1]
         lock = load_lock(root / "runtime.lock.json", repository_root=root)

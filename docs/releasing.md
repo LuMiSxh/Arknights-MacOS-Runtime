@@ -2,7 +2,7 @@
 
 No release is published automatically. Candidate workflows validate and build disposable overlay
 artifacts; the manually dispatched release workflow builds the runtime, which contains the
-Audio, Cursor, and CN patch families, and creates only a draft. A build is promotable only after
+Audio, Cursor, Performance, and CN patch families, and creates only a draft. A build is promotable only after
 source/patch checks, a clean full build, archive validation, complete corresponding source and
 licenses, and the documented manual compatibility checks.
 

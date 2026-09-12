@@ -15,7 +15,9 @@ class BuildCLIContractTests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(result.returncode, 2)
-        self.assertIn("expected base, audio, cursor, cn, or combined", result.stderr)
+        self.assertIn(
+            "expected base, audio, cursor, performance, cn, or combined", result.stderr
+        )
 
     def test_combined_overlay_replaces_bilibili_renderer_artifacts(self) -> None:
         root = Path(__file__).resolve().parents[1]
