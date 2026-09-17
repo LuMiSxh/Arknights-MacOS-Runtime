@@ -10,7 +10,7 @@
 2. `just monitor`: verifies every pinned upstream commit and reports newer repository heads without
    changing the lock.
 3. `just prepare base`: verifies the unmodified source pins.
-4. `just prepare audio`, `cursor`, `performance`, and `cn`: applies each family independently without fuzz.
+4. `just prepare audio`, `cursor`, `performance`, `ace`, and `cn`: applies each family independently without fuzz.
 5. `just build combined`: builds an isolated overlay canary for iteration; it is not a release
    build.
 6. `just verify`: checks archive paths, file types, DXMT native-loader markers, dependency references,
@@ -41,8 +41,9 @@ commit, lock, Mac, macOS version, prefix history, display, and audio devices.
   SDR/HDR changes, and multiple displays; HDR/EDR must remain live. A cache has a one-second expiry
   bound if macOS delays or drops a profile notification. Check startup with the flag both disabled
   and enabled; the device-initialization correction applies in both cases.
-- CN: compare the absent, `0`, invalid, and `1` control values in an isolated test prefix; record
-  launcher startup, login, ACE initialization, gameplay, and clean shutdown. For Bilibili, complete a
-  captcha and verify both its renderer and a translucent error toast.
+- ACE: compare the absent, `0`, invalid, and `1` control values in an isolated test prefix; record
+  launcher startup, ACE initialization, gameplay, and clean shutdown.
+- CN: compare the absent, `0`, invalid, and `1` control values in an isolated test prefix; for Bilibili,
+  complete a captcha and verify both its renderer and a translucent error toast.
 - Combined: test all flags absent, each family independently, and all enabled together; cover clean
   shutdown and both fresh and existing test prefixes.

@@ -7,9 +7,9 @@ index ac880100..94bc3fcf 100644
  }
  
 +#ifdef __x86_64__
-+/* Opt-in only: this dispatcher spoof is enabled by the CN compatibility control.
++/* Opt-in only: this dispatcher spoof is enabled by the ACE compact compatibility control.
 + * Disabled and invalid control values preserve Wine's normal dispatcher path. */
-+static BOOL arknights_runtime_cn_compat_enabled(void)
++static BOOL arknights_runtime_ace_compact_enabled(void)
 +{
 +    static LONG state = -1;
 +    LONG value = state;
@@ -17,7 +17,7 @@ index ac880100..94bc3fcf 100644
 +
 +    if (value == -1)
 +    {
-+        value = GetEnvironmentVariableA("ARKNIGHTS_RUNTIME_CN_COMPAT", flag, sizeof(flag)) == 1 && flag[0] == '1';
++        value = GetEnvironmentVariableA("ARKNIGHTS_RUNTIME_ACE_COMPACT", flag, sizeof(flag)) == 1 && flag[0] == '1';
 +        InterlockedCompareExchange(&state, value, -1);
 +    }
 +    return value;
@@ -40,7 +40,7 @@ index ac880100..94bc3fcf 100644
          ANSI_STRING     str;
  
 +#ifdef __x86_64__
-+        if (arknights_runtime_cn_compat_enabled() &&
++        if (arknights_runtime_ace_compact_enabled() &&
 +            (strcmp( function, "KiUserApcDispatcher" ) == 0 || strcmp( function, "KiUserCallbackDispatcher" ) == 0))
 +        {
 +            FIXME( "HACK: returning int3 stub instead of %s\n", function );

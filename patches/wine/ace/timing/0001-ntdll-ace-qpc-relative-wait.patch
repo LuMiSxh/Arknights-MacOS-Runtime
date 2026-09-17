@@ -6,10 +6,10 @@ index 8813d8f8..0d6e4042 100644
  
  WINE_DEFAULT_DEBUG_CHANNEL(sync);
  
-+/* The QPC relative-wait variant is enabled by the CN compatibility control.
++/* The QPC relative-wait variant is enabled by the ACE compact compatibility control.
 + * Keep the upstream wall-clock implementation selected unless explicitly
 + * enabled by the runtime launcher. */
-+static BOOL arknights_runtime_cn_compat_enabled(void)
++static BOOL arknights_runtime_ace_compact_enabled(void)
 +{
 +    static LONG state = -1;
 +    LONG value = state;
@@ -17,7 +17,7 @@ index 8813d8f8..0d6e4042 100644
 +
 +    if (value == -1)
 +    {
-+        flag = getenv("ARKNIGHTS_RUNTIME_CN_COMPAT");
++        flag = getenv("ARKNIGHTS_RUNTIME_ACE_COMPACT");
 +        value = flag && !strcmp(flag, "1");
 +        InterlockedCompareExchange(&state, value, -1);
 +    }
@@ -32,7 +32,7 @@ index 8813d8f8..0d6e4042 100644
          for (;;) select( 0, NULL, NULL, NULL, NULL );
      }
 -    else
-+    else if (arknights_runtime_cn_compat_enabled() && timeout->QuadPart < 0)
++    else if (arknights_runtime_ace_compact_enabled() && timeout->QuadPart < 0)
      {
 +        timeout_t when = -timeout->QuadPart, diff;
          LARGE_INTEGER now;

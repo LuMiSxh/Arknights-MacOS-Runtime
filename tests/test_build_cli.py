@@ -16,7 +16,8 @@ class BuildCLIContractTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 2)
         self.assertIn(
-            "expected base, audio, cursor, performance, cn, or combined", result.stderr
+            "expected base, audio, cursor, performance, ace, cn, or combined",
+            result.stderr,
         )
 
     def test_combined_overlay_replaces_bilibili_renderer_artifacts(self) -> None:
@@ -30,7 +31,7 @@ class BuildCLIContractTests(unittest.TestCase):
         ):
             self.assertIn(f"overlay_wine_file {artifact}", script)
 
-    def test_bilibili_runtime_contract_has_no_separate_toggle(self) -> None:
+    def test_bilibili_runtime_contract_uses_the_cn_toggle(self) -> None:
         root = Path(__file__).resolve().parents[1]
         texts = [
             (root / "runtime.lock.json").read_text(encoding="utf-8"),
@@ -55,6 +56,7 @@ class BuildCLIContractTests(unittest.TestCase):
 
         for text in texts[2:]:
             self.assertIn("ARKNIGHTS_RUNTIME_CN_COMPAT", text)
+            self.assertNotIn("ARKNIGHTS_RUNTIME_ACE_COMPACT", text)
             self.assertNotIn("MESSAGE(", text)
         for text in texts:
             self.assertNotIn("ARKNIGHTS_RUNTIME_BILIBILI_", text)
@@ -69,6 +71,18 @@ class BuildCLIContractTests(unittest.TestCase):
             "macdrv_release_view(layered_view)",
         ):
             self.assertIn(required, texts[3])
+
+    def test_ace_runtime_contract_uses_the_ace_toggle(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        texts = [
+            path.read_text(encoding="utf-8")
+            for path in sorted((root / "patches" / "wine" / "ace").rglob("*.patch"))
+        ]
+
+        self.assertEqual(len(texts), 4)
+        for text in texts:
+            self.assertIn("ARKNIGHTS_RUNTIME_ACE_COMPACT", text)
+            self.assertNotIn("ARKNIGHTS_RUNTIME_CN_COMPAT", text)
 
 
 if __name__ == "__main__":

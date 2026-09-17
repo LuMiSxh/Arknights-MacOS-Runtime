@@ -6,19 +6,19 @@ index 2b1338c5..f4e1b091 100644
  }
  
  #ifdef __APPLE__
-+/* The additional Rosetta workarounds below are controlled CN compatibility
++/* The additional Rosetta workarounds below are controlled ACE compact compatibility
 + * behavior. Existing CrossOver CET/XGETBV handling remains unchanged. */
-+static volatile LONG arknights_runtime_cn_compat;
++static volatile LONG arknights_runtime_ace_compact;
 +
-+static BOOL arknights_runtime_cn_compat_enabled(void)
++static BOOL arknights_runtime_ace_compact_enabled(void)
 +{
-+    return arknights_runtime_cn_compat != 0;
++    return arknights_runtime_ace_compact != 0;
 +}
 +
-+static void arknights_runtime_cn_compat_init(void)
++static void arknights_runtime_ace_compact_init(void)
 +{
-+    const char *flag = getenv("ARKNIGHTS_RUNTIME_CN_COMPAT");
-+    InterlockedExchange(&arknights_runtime_cn_compat, flag && flag[0] == '1' && flag[1] == 0);
++    const char *flag = getenv("ARKNIGHTS_RUNTIME_ACE_COMPACT");
++    InterlockedExchange(&arknights_runtime_ace_compact, flag && flag[0] == '1' && flag[1] == 0);
 +}
 +
  /***********************************************************************
@@ -36,7 +36,7 @@ index 2b1338c5..f4e1b091 100644
 +            BOOL has_sib = FALSE;
 +            BYTE modrm, sib;
 +
-+            if (!arknights_runtime_cn_compat_enabled() || p >= len) return FALSE;
++            if (!arknights_runtime_ace_compact_enabled() || p >= len) return FALSE;
 +            modrm = instr[p++];
 +            if (modrm & 0x38) return FALSE; /* /0 is the NOP encoding */
 +            mod = modrm >> 6;
@@ -65,8 +65,8 @@ index 2b1338c5..f4e1b091 100644
          if (emulate_xgetbv( sigcontext, &context.c )) return;
 +        /* Rosetta can report ACE's privileged CR3 read as an invalid opcode
 +         * rather than a general-protection fault. Preserve Wine's normal
-+         * classification unless the CN compatibility route is enabled. */
-+        if (arknights_runtime_cn_compat_enabled() &&
++         * classification unless the ACE compact compatibility route is enabled. */
++        if (arknights_runtime_ace_compact_enabled() &&
 +            (rec.ExceptionCode = is_privileged_instr( &context.c ))) break;
  #endif
          rec.ExceptionCode = EXCEPTION_ILLEGAL_INSTRUCTION;
@@ -75,7 +75,7 @@ index 2b1338c5..f4e1b091 100644
      signal_alloc_thread( teb );
  
  #ifdef __APPLE__
-+    arknights_runtime_cn_compat_init();
++    arknights_runtime_ace_compact_init();
      /* CW Hack 24256: We need the value of sysctl.proc_translated in signal
         handlers but sysctl[byname] is not signal-safe. */
      {

@@ -97,32 +97,32 @@
       "sha256": "7c1ca8c2dc8adecec0ad90fbb6803d02b3ac78ddbe959dc1dba5ec5c44cb856f"
     },
     {
-      "id": "wine-cn-ntoskrnl-surface",
+      "id": "wine-ace-ntoskrnl-surface",
       "component": "wine",
-      "family": "cn",
-      "path": "patches/wine/cn/ntoskrnl/0001-ntoskrnl-compatibility-surface.patch",
-      "sha256": "e496f4762f6d445ec07887bfe1fa07588c56fbd5050ab125126f3b368b18c6df"
+      "family": "ace",
+      "path": "patches/wine/ace/ntoskrnl/0001-ntoskrnl-compatibility-surface.patch",
+      "sha256": "db7bf4961021af48264532b64ea2df9a7f825e2ffdbd73ddfa87aa223ef0d51c"
     },
     {
-      "id": "wine-cn-dispatcher-spoof",
+      "id": "wine-ace-dispatcher-spoof",
       "component": "wine",
-      "family": "cn",
-      "path": "patches/wine/cn/dispatcher/0001-kernel32-cn-dispatcher-spoof.patch",
-      "sha256": "975ddfdbb4cc4396278305f337aa59c65563c91bc354bc01579842e03e689407"
+      "family": "ace",
+      "path": "patches/wine/ace/dispatcher/0001-kernel32-ace-dispatcher-spoof.patch",
+      "sha256": "063245f6c057b25285c8249335c726a86702fde5572543e8bcbab4b31de3e05e"
     },
     {
-      "id": "wine-cn-rosetta-workarounds",
+      "id": "wine-ace-rosetta-workarounds",
       "component": "wine",
-      "family": "cn",
-      "path": "patches/wine/cn/rosetta/0001-macos-rosetta-cn-workarounds.patch",
-      "sha256": "789dee6f7871ce4d9ddb3ded8cef199beda1b080be4096261c68bae58a0f682a"
+      "family": "ace",
+      "path": "patches/wine/ace/rosetta/0001-macos-rosetta-ace-workarounds.patch",
+      "sha256": "1c222f6121a33e6659aea7e35f0f232740922a0ac3d7487381e07ef0c8ea9539"
     },
     {
-      "id": "wine-cn-relative-wait",
+      "id": "wine-ace-relative-wait",
       "component": "wine",
-      "family": "cn",
-      "path": "patches/wine/cn/timing/0001-ntdll-cn-qpc-relative-wait.patch",
-      "sha256": "2ce7ac549ce8f827f40a487e6f4ec15eeb7d35efc21afb77fa7e69895db35342"
+      "family": "ace",
+      "path": "patches/wine/ace/timing/0001-ntdll-ace-qpc-relative-wait.patch",
+      "sha256": "1c9c0964cb4257e29164d0868c3ba3a670bac852842d558162886b1be945e4ca"
     },
     {
       "id": "wine-cn-bilibili-cef80-stackbase",
@@ -132,7 +132,7 @@
       "sha256": "02a8fea36a07d64deabd3d9cefab677d9b2c92b8807a24024f7c35e870a0ade6"
     },
     {
-      "id": "wine-bilibili-layered-child",
+      "id": "wine-cn-bilibili-layered-child",
       "component": "wine",
       "family": "cn",
       "path": "patches/wine/cn/windowing/0001-win32u-winemac-bilibili-layered-child.patch",

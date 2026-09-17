@@ -111,6 +111,7 @@ class RuntimeLockTests(unittest.TestCase):
     def test_family_stage_selects_only_that_family(self) -> None:
         loaded = load_lock(self.write_lock(), repository_root=self.root)
         self.assertEqual(len(patches_for_stage(loaded, "audio")), 1)
+        self.assertEqual(patches_for_stage(loaded, "ace"), [])
         self.assertEqual(patches_for_stage(loaded, "cursor"), [])
 
     def test_hashes_files_incrementally(self) -> None:

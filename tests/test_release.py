@@ -70,6 +70,7 @@ class ReleaseVerificationTests(unittest.TestCase):
             ("example-audio", "audio"),
             ("example-cursor", "cursor"),
             ("example-performance", "performance"),
+            ("example-ace", "ace"),
             ("example-cn", "cn"),
         )
         patches = []
@@ -221,7 +222,7 @@ class ReleaseVerificationTests(unittest.TestCase):
     def test_rejects_a_release_lock_missing_a_patch_family(self) -> None:
         lock_path = self.root / "runtime.lock.json"
         lock = json.loads(lock_path.read_text(encoding="utf-8"))
-        for family in ("audio", "cursor", "performance", "cn"):
+        for family in ("audio", "cursor", "performance", "ace", "cn"):
             with self.subTest(family=family):
                 incomplete_lock = dict(lock)
                 incomplete_lock["patches"] = [
