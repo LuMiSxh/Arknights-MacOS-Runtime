@@ -33,7 +33,7 @@ inputs are pinned by commit and/or checksum.
 | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
 | Audio       | Follow the current macOS default output without restarting the game ([client issue #59](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/59)) | Wine's normal routing unless enabled                  |
 | Cursor      | Provide a bounded DXMT frame queue control for cursor latency ([client issue #34](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/34))       | Upstream maximum `3`; values `1` through `3` accepted |
-| Performance | Cache display chromaticities and release ColorSync resources                                                                                          | Inactive unless explicitly enabled                    |
+| Performance | Initialize DXMT command helpers safely and skip release-dead present statistics                                                                           | Compile-time changes; statistics gate follows `DXMT_DEBUG` |
 | ACE         | Provide the opt-in kernel, dispatcher, Rosetta, and timing routes required by ACE-protected clients                                                   | Inactive unless explicitly enabled                    |
 | CN          | Provide the narrowly preflighted Bilibili CEF and layered-renderer paths                                                                              | Inactive unless explicitly enabled                    |
 
@@ -46,7 +46,6 @@ defaults listed above.
 | ----------------------------------------------- | --------------- | ------------------------ |
 | `ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT` | `0`, `1`        | Wine's normal routing    |
 | `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY`      | `1` through `3` | Upstream value `3`       |
-| `ARKNIGHTS_RUNTIME_PERFORMANCE`                 | `0`, `1`        | Inactive                 |
 | `ARKNIGHTS_RUNTIME_ACE_COMPACT`                 | `0`, `1`        | Inactive                 |
 | `ARKNIGHTS_RUNTIME_CN_COMPAT`                   | `0`, `1`        | Inactive                 |
 

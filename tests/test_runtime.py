@@ -125,7 +125,9 @@ class RuntimeLockTests(unittest.TestCase):
     def test_performance_stage_is_isolated_and_included_in_combined(self) -> None:
         performance = dict(self.lock["patches"][0])
         performance.update(
-            id="dxmt-display-profile-cache", component="dxmt", family="performance"
+            id="dxmt-command-context-device-initialization",
+            component="dxmt",
+            family="performance",
         )
         self.lock["patches"].append(performance)
         loaded = load_lock(self.write_lock(), repository_root=self.root)

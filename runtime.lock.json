@@ -83,18 +83,18 @@
       "sha256": "b9785c4d47e8a866bf57bce13f40f179dc459f4ab9efe4a7b91daed4a1fad7d3"
     },
     {
-      "id": "dxmt-display-profile-cache",
-      "component": "dxmt",
-      "family": "performance",
-      "path": "patches/dxmt/performance/0001-winemetal-cache-display-profiles.patch",
-      "sha256": "0fd90a5f8922a8abe14a709ccade6d54f24f3ade77ce2121028163944e704ffc"
-    },
-    {
       "id": "dxmt-command-context-device-initialization",
       "component": "dxmt",
       "family": "performance",
-      "path": "patches/dxmt/performance/0002-dxmt-initialize-device-before-command-helpers.patch",
+      "path": "patches/dxmt/performance/0001-dxmt-initialize-device-before-command-helpers.patch",
       "sha256": "7c1ca8c2dc8adecec0ad90fbb6803d02b3ac78ddbe959dc1dba5ec5c44cb856f"
+    },
+    {
+      "id": "dxmt-skip-release-present-statistics",
+      "component": "dxmt",
+      "family": "performance",
+      "path": "patches/dxmt/performance/0002-dxmt-skip-release-present-statistics.patch",
+      "sha256": "fc833832a654154645cf5ebf58e1c5de1c6b6af2d9a7d5d4ceda890384285e04"
     },
     {
       "id": "wine-ace-ntoskrnl-surface",

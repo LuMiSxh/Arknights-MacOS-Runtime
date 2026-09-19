@@ -25,14 +25,10 @@ Runtime flags are parsed inside their owning component. `ARKNIGHTS_RUNTIME_AUDIO
 `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY` accepts only `1` through `3`. Absent or invalid values preserve
 the documented defaults. The ACE gate owns the kernel, dispatcher, Rosetta, and timing routes; the CN gate
 owns the Bilibili image and window preflights documented in the [patch registry](patch-registry.md#cn).
-`ARKNIGHTS_RUNTIME_PERFORMANCE=1` enables WineMetal's display-profile cache and ColorSync
-resource cleanup. Missing, `0`, and invalid values keep the upstream route. WineMetal reads the
-flag once when its library loads; display queries only check the cached boolean. Display/profile
-notifications invalidate cached chromaticities, with a one-second expiry as a fallback. EDR values
-remain live. Existing audio, ACE, CN, synchronization, shader-cache, and frame-latency controls retain
-their independent behavior.
-
-The launcher selects these flags from the active client's profile. A profile owns its publisher,
+The performance family contains the unconditional DXMT command-context initialization correction and
+a `DXMT_DEBUG`-gated release hot-path reduction for presentation statistics. These changes preserve
+debug HUD output and release frame counters; neither changes rendering policy. The launcher selects the remaining flags from the active
+client's profile. A profile owns its publisher,
 distribution variant, runtime environment overrides, and whether Play must show the ACE warning;
 the runtime does not infer compatibility from a publisher name. This keeps a future publisher's ACE
 client independent from the Bilibili CN routes while preserving the same component-local defaults.

@@ -20,6 +20,9 @@ validate:
 monitor:
 	{{ uv }} scripts/monitor.py --output .build/reports/source-monitor.json
 
+frametime-record case seconds:
+	{{ uv }} scripts/frametime.py record "{{case}}" --seconds "{{seconds}}"
+
 prepare stage="combined":
 	{{ uv }} scripts/runtime.py prepare "{{stage}}"
 

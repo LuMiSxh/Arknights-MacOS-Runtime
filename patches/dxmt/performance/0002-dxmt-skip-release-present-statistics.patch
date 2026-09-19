@@ -1,0 +1,48 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Arknights MacOS Runtime Maintainers <arknights-macos-runtime@users.noreply.github.com>
+Date: Sat, 19 Sep 2026 00:00:00 +0000
+Subject: [PATCH] dxmt: skip release present statistics work
+
+DXMT's HUD is compiled out of release builds, but each present still formats
+the statistics strings before the HUD no-op returns. Release builds also
+aggregate the rolling statistics window at every present even though only the
+debug HUD consumes the aggregates.
+
+Keep frame counters, per-frame measurements, and the debug HUD unchanged while
+gating only the release-dead aggregation and presentation update work.
+
+---
+diff --git a/src/d3d11/d3d11_swapchain.cpp b/src/d3d11/d3d11_swapchain.cpp
+--- a/src/d3d11/d3d11_swapchain.cpp
++++ b/src/d3d11/d3d11_swapchain.cpp
+@@ -788,5 +788,7 @@ public:
+         ctx.upscale(backbuffer, upscaled, scaler);
+         ctx.present(upscaled, presenter, vsync_duration, state.metadata);
+         ReleaseSemaphore(present_semaphore_, 1, nullptr);
++#ifdef DXMT_DEBUG
+         this->UpdateStatistics(ctx.queue().statistics, ctx.currentFrameId());
++#endif
+       });
+@@ -798,5 +798,7 @@ public:
+       ](ArgumentEncodingContext &ctx) mutable {
+         ctx.present(backbuffer, presenter, vsync_duration, state.metadata);
+         ReleaseSemaphore(present_semaphore_, 1, nullptr);
++#ifdef DXMT_DEBUG
+         this->UpdateStatistics(ctx.queue().statistics, ctx.currentFrameId());
++#endif
+       });
+diff --git a/src/dxmt/dxmt_command_queue.hpp b/src/dxmt/dxmt_command_queue.hpp
+--- a/src/dxmt/dxmt_command_queue.hpp
++++ b/src/dxmt/dxmt_command_queue.hpp
+@@ -259,7 +259,9 @@ public:
+ 
+   void
+   PresentBoundary() {
++#ifdef DXMT_DEBUG
+     statistics.compute(frame_count);
++#endif
+     frame_count++;
+     statistics.at(frame_count).reset();
+     // After present N-th frame (N starts from 1), wait for (N - max_latency)-th frame to finish rendering 
+-- 
+2.45.2

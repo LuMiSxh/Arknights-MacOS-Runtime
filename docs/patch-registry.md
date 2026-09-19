@@ -39,50 +39,44 @@ The carried MR is a draft. Capture and exclusive streams are deliberately unchan
 
 ## Performance
 
-| Field             | Value                                                                                                                                                                                                                         |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ID                | `dxmt-display-profile-cache`                                                                                                                                                                                                  |
-| File              | `patches/dxmt/performance/0001-winemetal-cache-display-profiles.patch`                                                                                                                                                        |
-| Component/base    | DXMT `4ddb20e54672c0cb56115ce80d6db1beef94ae28` (`v0.80-213-g4ddb20e`)                                                                                                                                                        |
-| Source/author     | Original Arknights macOS Runtime experiment, Arknights macOS Runtime maintainers; [pinned WineMetal source](https://github.com/3Shain/dxmt/blob/4ddb20e54672c0cb56115ce80d6db1beef94ae28/src/winemetal/unix/winemetal_unix.c) |
-| License           | LGPL-2.1-or-later, matching the pinned DXMT revision                                                                                                                                                                          |
-| Gate              | `ARKNIGHTS_RUNTIME_PERFORMANCE=1`, read once when WineMetal loads                                                                                                                                                             |
-| Inactive behavior | Missing or invalid input preserves upstream profile lookup and resource lifetime behavior                                                                                                                                     |
-| Automated gate    | Hash, clean patch application, and native compilation                                                                                                                                                                         |
-| Manual gate       | Controlled baseline/candidate gameplay profiles and profile/display/SDR/HDR changes                                                                                                                                           |
-| Removal           | Drop when upstream supplies equivalent caching and ownership fixes, or gameplay evidence rejects the experiment                                                                                                               |
-
-The enabled route caches only display primaries and white points. ColorSync distributed notifications
-and Core Graphics reconfiguration invalidate it; a one-second expiry bounds stale data when a
-notification is delayed or lost. Queries run outside the cache mutex and cannot populate a newer
-generation. NSScreen and EDR values are read on every call. Created profiles and copied ICC tags are
-released on the enabled route. Gameplay profiling found repeated ColorSync parsing; it does not yet
-establish an FPS improvement. The flag itself performs no per-frame environment lookup.
-
-The notification contracts are documented by Apple for
-[display profile changes](https://developer.apple.com/documentation/colorsync/kcolorsyncdisplaydeviceprofilesnotification)
-and [display reconfiguration](<https://developer.apple.com/documentation/coregraphics/cgdisplayregisterreconfigurationcallback(_:_:)>).
-
-### Command-context initialization prerequisite
-
-| Field             | Value                                                                                                                                       |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| ID                | `dxmt-command-context-device-initialization`                                                                                                |
-| File              | `patches/dxmt/performance/0002-dxmt-initialize-device-before-command-helpers.patch`                                                         |
-| Component/base    | DXMT `4ddb20e54672c0cb56115ce80d6db1beef94ae28`                                                                                             |
-| Source/author     | Original Arknights macOS Runtime correction, Arknights macOS Runtime maintainers                                                            |
-| License           | LGPL-2.1-or-later, matching DXMT                                                                                                            |
-| Gate              | Unconditional initialization-correctness prerequisite in the performance build; no runtime query                                            |
-| Inactive behavior | The device is valid before helper construction with the Performance Canary disabled or enabled; experimental rendering changes remain gated |
-| Automated gate    | Hash, clean application, and DXMT compilation                                                                                               |
-| Manual gate       | Game startup and rendering with the Performance Canary disabled and enabled                                                                 |
-| Removal           | Drop when the pinned upstream revision initializes the device before its consumers                                                          |
+| Field             | Value                                                                                                     |
+| ----------------- | --------------------------------------------------------------------------------------------------------- |
+| ID                | `dxmt-command-context-device-initialization`                                                              |
+| File              | `patches/dxmt/performance/0001-dxmt-initialize-device-before-command-helpers.patch`                       |
+| Component/base    | DXMT `4ddb20e54672c0cb56115ce80d6db1beef94ae28`                                                           |
+| Source/author     | Original Arknights macOS Runtime correction, Arknights macOS Runtime maintainers                          |
+| License           | LGPL-2.1-or-later, matching the pinned DXMT revision                                                      |
+| Gate              | Unconditional initialization-correctness prerequisite in the performance build; no runtime query          |
+| Inactive behavior | No alternate route; the device is initialized before helper construction in every performance-stage build |
+| Automated gate    | Hash, clean application, and DXMT compilation                                                             |
+| Manual gate       | Game startup and rendering with the performance family applied                                            |
+| Removal           | Drop when the pinned upstream revision initializes the device before its consumers                        |
 
 `ClearUAV` creates pipelines through its outer context during member construction. The original
 declaration order initialized that context's device later, reading indeterminate storage. Zero
 could silently leave ten missing pipelines; a value of `1` reproduced the invalid Objective-C
 receiver and startup exit status 1. Moving the declaration and initializer fixes this lifetime
 dependency without a hot-path check. This is a correctness fix, not an FPS claim.
+
+### Release present statistics gate
+
+| Field             | Value                                                                                                                                                   |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ID                | `dxmt-skip-release-present-statistics`                                                                                                                    |
+| File              | `patches/dxmt/performance/0002-dxmt-skip-release-present-statistics.patch`                                                                               |
+| Component/base    | DXMT `4ddb20e54672c0cb56115ce80d6db1beef94ae28`                                                                                                         |
+| Source/author     | Original Arknights macOS Runtime optimization, Arknights macOS Runtime maintainers                                                                      |
+| License           | LGPL-2.1-or-later, matching DXMT                                                                                                                         |
+| Gate              | `DXMT_DEBUG`; debug builds retain present statistics aggregation and HUD updates, release builds skip both release-dead paths                           |
+| Inactive behavior | Per-frame counters, measurements, frame advancement, latency waits, and frame resets remain unchanged                                                   |
+| Automated gate    | Hash, clean application, both DXMT architectures, and release/debug preprocessor contract                                                               |
+| Manual gate       | Controlled startup/rendering and frametime comparison with the same scene, settings, and runtime as the clean-removal control                           |
+| Removal           | Drop when the pinned DXMT revision removes the release-dead statistics work or provides an equivalent supported build configuration                      |
+
+Both `Present` paths keep `UpdateStatistics` behind `DXMT_DEBUG`, which also avoids its per-present
+`std::format` calls in release builds. `PresentBoundary` keeps the rolling statistics aggregation on
+the same gate. Debug builds preserve the existing HUD output and aggregation; release builds retain
+the underlying frame counters and synchronization behavior.
 
 ## ACE
 

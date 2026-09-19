@@ -29,18 +29,28 @@ or missing pin fails the monitor without opening or mutating issues.
 Do not skip the current-runtime control or Arknights macOS Runtime base comparison. Record the runtime
 commit, lock, Mac, macOS version, prefix history, display, and audio devices.
 
+## Frametime capture
+
+On macOS 27, start the client and navigate to the fixed scene manually. Warm up the scene first, then
+run `just frametime-record CASE SECONDS` and begin the fixed scene when instructed. The harness never
+launches Wine, the client, or the game; it stores the raw `.atrc` traces, timeline overviews, and
+manifest under `.build/frametimes/`.
+
+Restart the game before every comparison. First capture same-binary A/A runs to establish normal
+variation, then use the same scene, settings, warm-up, and duration for the A/B runtime comparison.
+
 ## Hardware canary
 
 - Audio: switch built-in, wired, Bluetooth, and HDMI defaults during playback; test disconnect,
   reconnect, mute, volume, sleep/wake, browser audio, and a long session.
 - Cursor: compare frame latency 3, 2, and 1 at identical graphics settings, VSync modes, refresh
   rates, and capture method; record FPS, frame pacing, stutter, crashes, and cursor latency.
-- Performance: compare `ARKNIGHTS_RUNTIME_PERFORMANCE=0` and `1` after restarting the game, using
-  the same scene, graphics settings, and capture duration. Record ColorSync CPU samples, total CPU,
-  GPU activity, and frame times separately. Exercise profile changes, display reconnect, sleep/wake,
-  SDR/HDR changes, and multiple displays; HDR/EDR must remain live. A cache has a one-second expiry
-  bound if macOS delays or drops a profile notification. Check startup with the flag both disabled
-  and enabled; the device-initialization correction applies in both cases.
+- Performance: apply the performance stage and run a startup and rendering smoke test after
+  restarting the game. Record crashes, missing effects, and frame times. The device-initialization
+  correction is unconditional and has no runtime flag. The release statistics gate is compile-time
+  only: debug builds retain the HUD and aggregation, while release builds retain frame counters and
+  synchronization. Verify the release candidate with the same game settings and fixed scene used for
+  the preceding control.
 - ACE: compare the absent, `0`, invalid, and `1` control values in an isolated test prefix; record
   launcher startup, ACE initialization, gameplay, and clean shutdown.
 - CN: compare the absent, `0`, invalid, and `1` control values in an isolated test prefix; for Bilibili,
