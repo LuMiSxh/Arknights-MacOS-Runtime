@@ -13,7 +13,10 @@ descriptor family and ACE compact compatibility family.
 
 ### `windowing`
 
-The layered-child renderer route is limited to `PCGamePlatform.exe`, the
-`CMyWebViewDlg` root, and Chromium's `Chrome_WidgetWin_0` property contract.
-It is enabled only by `ARKNIGHTS_RUNTIME_CN_COMPAT=1` and retains the bounded
-Bilibili image/window preflights described in the [CN patch registry](../../../docs/patch-registry.md#cn).
+The layered-child renderer route is limited to `PCGamePlatform.exe`,
+Chromium's `Chrome_WidgetWin_0` and `Chrome.WindowTranslucent` property
+contract, and a `CMyWebViewDlg` found anywhere in the candidate's parent
+chain. This supports nested Bilibili dialogs while retaining the same process,
+class, property, and CN gates. It is enabled only by
+`ARKNIGHTS_RUNTIME_CN_COMPAT=1` and retains the bounded Bilibili image/window
+preflights described in the [CN patch registry](../../../docs/patch-registry.md#cn).

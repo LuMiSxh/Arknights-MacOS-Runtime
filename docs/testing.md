@@ -57,6 +57,8 @@ variation, then use the same scene, settings, warm-up, and duration for the A/B 
   that explicit CEF control takes precedence over the legacy CN fallback; exercise the Bilibili
   descriptor only with its matching module and bytes.
 - CN: compare the absent, `0`, invalid, and `1` control values in an isolated test prefix; for Bilibili,
-  complete a captcha and verify its layered renderer and a translucent error toast.
+  complete a captcha and verify its layered renderer and a translucent error toast. Include nested
+  dialogs with a `CMyWebViewDlg` parent-chain match where available. The issue #79 payment flow remains
+  an explicit follow-up and is not considered verified by the captcha check.
 - Combined: test all flags absent, each family independently, and all enabled together; cover clean
   shutdown and both fresh and existing test prefixes.
