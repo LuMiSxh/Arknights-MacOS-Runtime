@@ -5,9 +5,9 @@ This directory contains the ordered ACE compatibility family for the `ace` and
 [ACE patch registry](../../../docs/patch-registry.md#ace).
 
 Compatibility-only routes in the four patches use `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`; absent, `0`, or
-any other value leaves those ordinary Wine routes selected. General process accessors preserve their
-normal behavior regardless of the compatibility toggle. The control is read by each owning component
-once, preserving the upstream behavior by default.
+any other value leaves those ordinary Wine routes selected. General process accessors, including image-name
+and exit-status lookup, preserve their normal behavior regardless of the compatibility toggle. The control
+is read by each owning component once, preserving the upstream behavior by default.
 
 Apply in this order:
 

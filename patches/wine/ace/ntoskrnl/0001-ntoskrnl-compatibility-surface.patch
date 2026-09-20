@@ -102,7 +102,7 @@ index a701041d..88400863 100644
  };
  
  POBJECT_TYPE PsProcessType = &process_type;
-@@ -2581,6 +2656,47 @@ HANDLE WINAPI PsGetProcessInheritedFromUniqueProcessId( PEPROCESS process )
+@@ -2581,6 +2656,55 @@ HANDLE WINAPI PsGetProcessInheritedFromUniqueProcessId( PEPROCESS process )
      return id;
  }
  
@@ -134,6 +134,14 @@ index a701041d..88400863 100644
 +    if (!process) return NULL;
 +    TRACE("%p -> %s\n", process, debugstr_an(process->imageName, sizeof(process->imageName)));
 +    return process->imageName;
++}
++
++/*********************************************************************
++ *           PsGetProcessExitStatus    (NTOSKRNL.@)
++ */
++NTSTATUS WINAPI PsGetProcessExitStatus( PEPROCESS process )
++{
++    return process->info.ExitStatus;
 +}
 +
 +/*********************************************************************
@@ -456,7 +464,8 @@ index 3a9c6897..b4acd4ca 100644
 +@ stdcall PsGetProcessCreateTimeQuadPart(ptr)
  @ stub PsGetProcessDebugPort
  @ stub PsGetProcessExitProcessCalled
- @ stub PsGetProcessExitStatus
+-@ stub PsGetProcessExitStatus
++@ stdcall PsGetProcessExitStatus(ptr)
  @ stub PsGetProcessExitTime
  @ stdcall PsGetProcessId(ptr)
 -@ stub PsGetProcessImageFileName

@@ -17,8 +17,8 @@ authors. These files port selected changes to this exact WineCX pin.
 
 Carries the non-X11 kernel surface required by the ACE client: process session,
 creation time, image name, primary token, thread process/context accessors,
-current-thread process and process-ID accessors, and an unconditional safe image-name
-accessor for valid process objects,
+current-thread process and process-ID accessors, and unconditional image-name and exit-status
+accessors for valid process objects,
 guarded bug-check callback registration stubs, the
 `KeCapturePersistentThreadState` export stub, the callable
 `SeSetAuditParameter` no-op, physical-memory compatibility stubs, and
@@ -28,7 +28,9 @@ writing through any pointer. `SeSetAuditParameter` logs its arguments and
 returns `STATUS_SUCCESS` only when `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`; it never
 dereferences or writes through its pointer arguments. The original Wine stub
 behavior remains active otherwise. The current-thread process accessors are
-unconditional aliases of the corresponding current-process functions.
+unconditional aliases of the corresponding current-process functions. The
+process image-name and exit-status accessors are unconditional for valid
+process objects; their `_In_` process parameters are not NULL-checked.
 
 ### `dispatcher`
 

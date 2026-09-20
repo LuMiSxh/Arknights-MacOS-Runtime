@@ -152,6 +152,31 @@ class BuildCLIContractTests(unittest.TestCase):
         self.assertIn("return process->imageName;", function)
         self.assertNotIn("arknights_runtime_ace_compact_enabled", function)
 
+    def test_ace_ntoskrnl_process_exit_status_is_an_unconditional_accessor(
+        self,
+    ) -> None:
+        root = Path(__file__).resolve().parents[1]
+        patch = (
+            root
+            / "patches"
+            / "wine"
+            / "ace"
+            / "ntoskrnl"
+            / "0001-ntoskrnl-compatibility-surface.patch"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "NTSTATUS WINAPI PsGetProcessExitStatus( PEPROCESS process )", patch
+        )
+        function = patch.split(
+            "NTSTATUS WINAPI PsGetProcessExitStatus( PEPROCESS process )", 1
+        )[1].split(
+            "/*********************************************************************", 1
+        )[0]
+
+        self.assertIn("return process->info.ExitStatus;", function)
+        self.assertNotIn("arknights_runtime_ace_compact_enabled", function)
+        self.assertIn("@ stdcall PsGetProcessExitStatus(ptr)", patch)
+
     def test_ace_ntoskrnl_exports_current_thread_process_accessors(self) -> None:
         root = Path(__file__).resolve().parents[1]
         patch = (
