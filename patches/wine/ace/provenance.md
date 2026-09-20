@@ -17,9 +17,12 @@ authors. These files port selected changes to this exact WineCX pin.
 
 Carries the non-X11 kernel surface required by the ACE client: process session,
 creation time, image name, primary token, thread process/context accessors,
-guarded bug-check callback registration stubs, physical-memory compatibility
-stubs, and process-object metadata lifetime handling. The original Wine stub
-behavior remains active unless `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`.
+guarded bug-check callback registration stubs, the
+`KeCapturePersistentThreadState` export stub, physical-memory compatibility
+stubs, and process-object metadata lifetime handling. The capture function
+logs its arguments and returns `STATUS_NOT_IMPLEMENTED` without dereferencing
+or writing through any pointer. The original Wine stub behavior remains active
+unless `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`.
 
 ### `dispatcher`
 

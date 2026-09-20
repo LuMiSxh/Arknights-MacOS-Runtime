@@ -337,10 +337,30 @@ index a701041d..8e153f76 100644
  }
  
  /*********************************************************************
+@@ -4760,4 +4760,12 @@
+     FIXME("apc_state %p stub.\n", apc_state);
+ }
+ 
++NTSTATUS WINAPI KeCapturePersistentThreadState(CONTEXT *context, PKTHREAD thread, ULONG code,
++                                               ULONG param1, ULONG param2, ULONG param3, ULONG param4, void *addr)
++{
++    FIXME("%p %p %lu %lu %lu %lu %lu %p", context, thread, code, param1, param2, param3, param4, addr);
++
++    return STATUS_NOT_IMPLEMENTED;
++}
++
+ NTSTATUS WINAPI KdChangeOption(ULONG option, ULONG in_size, PVOID in_buffer,
 diff --git a/dlls/ntoskrnl.exe/ntoskrnl.exe.spec b/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
 index 3a9c6897..c2d299c0 100644
 --- a/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
 +++ b/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
+@@ -550,5 +550,5 @@
+ @ stdcall KeBugCheck(long)
+ @ stdcall KeBugCheckEx(long long long long long)
+ @ stdcall KeCancelTimer(ptr)
+-@ stub KeCapturePersistentThreadState
++@ stdcall KeCapturePersistentThreadState(ptr ptr long long long long long ptr)
+ @ stdcall KeClearEvent(ptr)
 @@ -556,7 +556,7 @@
  @ stub KeDcacheFlushCount
  @ stdcall KeDelayExecutionThread(long long ptr)
