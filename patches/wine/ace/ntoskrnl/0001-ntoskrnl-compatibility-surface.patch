@@ -1,5 +1,5 @@
 diff --git a/dlls/ntoskrnl.exe/ntoskrnl.c b/dlls/ntoskrnl.exe/ntoskrnl.c
-index a701041d..63b8d27f 100644
+index a701041d..88400863 100644
 --- a/dlls/ntoskrnl.exe/ntoskrnl.c
 +++ b/dlls/ntoskrnl.exe/ntoskrnl.c
 @@ -2513,23 +2513,98 @@ NTSTATUS WINAPI FsRtlRegisterUncProvider(PHANDLE MupHandle, PUNICODE_STRING Redi
@@ -275,7 +275,30 @@ index a701041d..63b8d27f 100644
  /***********************************************************************
   *           MmMapIoSpace   (NTOSKRNL.EXE.@)
   */
-@@ -4414,14 +4627,73 @@ BOOLEAN WINAPI SePrivilegeCheck(PRIVILEGE_SET *privileges, SECURITY_SUBJECT_CONT
+@@ -3270,6 +3483,22 @@ HANDLE WINAPI PsGetCurrentProcessId(void)
+     return KeGetCurrentThread()->id.UniqueProcess;
+ }
+ 
++/***********************************************************************
++ *           PsGetCurrentThreadProcess   (NTOSKRNL.EXE.@)
++ */
++PEPROCESS WINAPI PsGetCurrentThreadProcess(void)
++{
++    return PsGetCurrentProcess();
++}
++
++/***********************************************************************
++ *           PsGetCurrentThreadProcessId   (NTOSKRNL.EXE.@)
++ */
++HANDLE WINAPI PsGetCurrentThreadProcessId(void)
++{
++    return PsGetCurrentProcessId();
++}
++
+ /***********************************************************************
+  *           PsGetCurrentProcessSessionId   (NTOSKRNL.EXE.@)
+  */
+@@ -4414,14 +4643,73 @@ BOOLEAN WINAPI SePrivilegeCheck(PRIVILEGE_SET *privileges, SECURITY_SUBJECT_CONT
      return TRUE;
  }
  
@@ -352,7 +375,7 @@ index a701041d..63b8d27f 100644
  }
  
  /*********************************************************************
-@@ -4760,6 +5032,14 @@ void WINAPI KeUnstackDetachProcess(KAPC_STATE *apc_state)
+@@ -4760,6 +5048,14 @@ void WINAPI KeUnstackDetachProcess(KAPC_STATE *apc_state)
      FIXME("apc_state %p stub.\n", apc_state);
  }
  
@@ -368,7 +391,7 @@ index a701041d..63b8d27f 100644
                                 ULONG out_size, PVOID out_buffer, PULONG ret_size)
  {
 diff --git a/dlls/ntoskrnl.exe/ntoskrnl.exe.spec b/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
-index 3a9c6897..5e416568 100644
+index 3a9c6897..b4acd4ca 100644
 --- a/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
 +++ b/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
 @@ -550,13 +550,13 @@
@@ -410,7 +433,7 @@ index 3a9c6897..5e416568 100644
  @ stub MmGrowKernelStack
  @ stub MmHighestUserAddress
  @ stdcall MmIsAddressValid(ptr)
-@@ -911,7 +911,7 @@
+@@ -911,39 +911,41 @@
  @ stub PsDereferencePrimaryToken
  @ stub PsDisableImpersonation
  @ stub PsEstablishWin32Callouts
@@ -419,7 +442,13 @@ index 3a9c6897..5e416568 100644
  @ stdcall PsGetCurrentProcess() IoGetCurrentProcess
  @ stdcall PsGetCurrentProcessId()
  @ stdcall PsGetCurrentProcessSessionId()
-@@ -923,27 +923,27 @@
+ @ stdcall PsGetCurrentThread() KeGetCurrentThread
+ @ stdcall PsGetCurrentThreadId()
++@ stdcall PsGetCurrentThreadProcess()
++@ stdcall PsGetCurrentThreadProcessId()
+ @ stub PsGetCurrentThreadPreviousMode
+ @ stub PsGetCurrentThreadStackBase
+ @ stub PsGetCurrentThreadStackLimit
  @ stub PsGetJobLock
  @ stub PsGetJobSessionId
  @ stub PsGetJobUIRestrictionsClass
@@ -451,7 +480,7 @@ index 3a9c6897..5e416568 100644
  @ stdcall PsGetThreadProcessId(ptr)
  @ stub PsGetThreadSessionId
  @ stub PsGetThreadTeb
-@@ -961,7 +961,7 @@
+@@ -961,7 +963,7 @@
  @ stdcall PsLookupThreadByThreadId(ptr ptr)
  @ extern PsProcessType
  @ stub PsReferenceImpersonationToken
@@ -460,7 +489,7 @@ index 3a9c6897..5e416568 100644
  @ stdcall PsReferenceProcessFilePointer(ptr ptr)
  @ stdcall PsReleaseProcessExitSynchronization(ptr)
  @ stdcall PsRemoveCreateThreadNotifyRoutine(ptr)
-@@ -1375,6 +1375,7 @@
+@@ -1375,6 +1377,7 @@
  @ stub SeReleaseSecurityDescriptor
  @ stub SeReleaseSubjectContext
  @ stub SeSetAccessStateGenericMapping

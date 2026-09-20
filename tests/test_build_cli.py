@@ -130,6 +130,30 @@ class BuildCLIContractTests(unittest.TestCase):
         )
         self.assertIn("return STATUS_SUCCESS;", patch)
 
+    def test_ace_ntoskrnl_exports_current_thread_process_accessors(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        patch = (
+            root
+            / "patches"
+            / "wine"
+            / "ace"
+            / "ntoskrnl"
+            / "0001-ntoskrnl-compatibility-surface.patch"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "PEPROCESS WINAPI PsGetCurrentThreadProcess(void)",
+            patch,
+        )
+        self.assertIn("return PsGetCurrentProcess();", patch)
+        self.assertIn(
+            "HANDLE WINAPI PsGetCurrentThreadProcessId(void)",
+            patch,
+        )
+        self.assertIn("return PsGetCurrentProcessId();", patch)
+        self.assertIn("@ stdcall PsGetCurrentThreadProcess()", patch)
+        self.assertIn("@ stdcall PsGetCurrentThreadProcessId()", patch)
+
 
 if __name__ == "__main__":
     unittest.main()
