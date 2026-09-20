@@ -114,6 +114,23 @@ class RuntimeLockTests(unittest.TestCase):
         self.assertEqual(patches_for_stage(loaded, "ace"), [])
         self.assertEqual(patches_for_stage(loaded, "cursor"), [])
 
+    def test_cef_family_stage_is_separate_from_cn_windowing(self) -> None:
+        cef = dict(self.lock["patches"][0])
+        cef.update(
+            id="wine-cef-bilibili-stackbase",
+            family="cef",
+        )
+        cn = dict(self.lock["patches"][0])
+        cn.update(
+            id="wine-cn-bilibili-layered-child",
+            family="cn",
+        )
+        self.lock["patches"] = [cef, cn]
+        loaded = load_lock(self.write_lock(), repository_root=self.root)
+
+        self.assertEqual(patches_for_stage(loaded, "cef"), [cef])
+        self.assertEqual(patches_for_stage(loaded, "cn"), [cn])
+
     def test_hashes_files_incrementally(self) -> None:
         path = self.root / "payload"
         path.write_bytes(b"abc")

@@ -5,17 +5,11 @@
 - Wine base: `dappermint/winecx`
 - Wine commit: `e1b410a5fdd96a32722a5f2617b5068bd385b7db` (Wine 11.16)
 
-The Bilibili routes are original Arknights macOS Runtime changes for the
-verified client binaries and window contract. They are deliberately separate
-from the ACE compact compatibility family.
+The Bilibili windowing route is an original Arknights macOS Runtime change for
+the verified client window contract. It is deliberately separate from the CEF
+descriptor family and ACE compact compatibility family.
 
 ## Ported inventory
-
-### `cef`
-
-The CEF 80.1.15 StackBase route is limited to the `libcef.dll` basename and
-all three expected RVA byte sequences before any write. It is enabled only by
-`ARKNIGHTS_RUNTIME_CN_COMPAT=1`.
 
 ### `windowing`
 

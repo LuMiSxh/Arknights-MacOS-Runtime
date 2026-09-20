@@ -16,7 +16,7 @@ class BuildCLIContractTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 2)
         self.assertIn(
-            "expected base, audio, cursor, performance, ace, cn, or combined",
+            "expected base, audio, cursor, performance, ace, cef, cn, or combined",
             result.stderr,
         )
 
@@ -31,18 +31,18 @@ class BuildCLIContractTests(unittest.TestCase):
         ):
             self.assertIn(f"overlay_wine_file {artifact}", script)
 
-    def test_bilibili_runtime_contract_uses_the_cn_toggle(self) -> None:
+        self.assertIn(
+            '"$stage" == ace || "$stage" == cef || "$stage" == combined', script
+        )
+        self.assertIn("overlay_wine_file lib/wine/x86_64-windows/ntdll.dll", script)
+
+    def test_cef_and_cn_runtime_contracts_use_separate_toggles(self) -> None:
         root = Path(__file__).resolve().parents[1]
         texts = [
             (root / "runtime.lock.json").read_text(encoding="utf-8"),
             (root / "scripts" / "build-canary.sh").read_text(encoding="utf-8"),
             (
-                root
-                / "patches"
-                / "wine"
-                / "cn"
-                / "cef"
-                / "0001-ntdll-bilibili-cef-80-stackbase.patch"
+                root / "patches" / "wine" / "cef" / "0001-ntdll-cef-compatibility.patch"
             ).read_text(encoding="utf-8"),
             (
                 root
@@ -54,10 +54,19 @@ class BuildCLIContractTests(unittest.TestCase):
             ).read_text(encoding="utf-8"),
         ]
 
-        for text in texts[2:]:
-            self.assertIn("ARKNIGHTS_RUNTIME_CN_COMPAT", text)
-            self.assertNotIn("ARKNIGHTS_RUNTIME_ACE_COMPACT", text)
-            self.assertNotIn("MESSAGE(", text)
+        cef_patch, windowing_patch = texts[2:]
+        self.assertIn("ARKNIGHTS_RUNTIME_CEF_COMPAT", cef_patch)
+        self.assertIn("ARKNIGHTS_RUNTIME_CN_COMPAT", cef_patch)
+        self.assertIn("struct arknights_cef_descriptor", cef_patch)
+        self.assertIn("ARKNIGHTS_CEF_COMPAT_LEGACY_CN", cef_patch)
+        self.assertIn("ARKNIGHTS_CEF_REGION_CN", cef_patch)
+        self.assertIn("arknights_apply_cef_descriptor", cef_patch)
+        self.assertNotIn("ARKNIGHTS_RUNTIME_ACE_COMPACT", cef_patch)
+        self.assertNotIn("MESSAGE(", cef_patch)
+        self.assertIn("ARKNIGHTS_RUNTIME_CN_COMPAT", windowing_patch)
+        self.assertNotIn("ARKNIGHTS_RUNTIME_CEF_COMPAT", windowing_patch)
+        self.assertNotIn("ARKNIGHTS_RUNTIME_ACE_COMPACT", windowing_patch)
+        self.assertNotIn("MESSAGE(", windowing_patch)
         for text in texts:
             self.assertNotIn("ARKNIGHTS_RUNTIME_BILIBILI_", text)
         for required in (

@@ -6,9 +6,9 @@ set -euo pipefail
 stage="${1:-combined}"
 build_mode="${2:-overlay}"
 case "$stage" in
-	base|audio|cursor|performance|ace|cn|combined) ;;
+	base|audio|cursor|performance|ace|cef|cn|combined) ;;
 	*)
-		echo "error: expected base, audio, cursor, performance, ace, cn, or combined" >&2
+		echo "error: expected base, audio, cursor, performance, ace, cef, cn, or combined" >&2
 		exit 2
 		;;
 esac
@@ -174,7 +174,7 @@ mkdir -p "$wine_build"
 	make -j"$(sysctl -n hw.logicalcpu)"
 )
 
-if [[ "$stage" == audio || "$stage" == ace || "$stage" == cn || "$stage" == combined ]]; then
+if [[ "$stage" == audio || "$stage" == ace || "$stage" == cef || "$stage" == cn || "$stage" == combined ]]; then
 	staging="$stage_root/wine-staging"
 	make -C "$wine_build" -j"$(sysctl -n hw.logicalcpu)" install-lib DESTDIR="$staging"
 	wine_install="$staging/opt/whiskywine"
@@ -215,18 +215,21 @@ if [[ "$stage" == audio || "$stage" == ace || "$stage" == cn || "$stage" == comb
 		overlay_wine_file lib/wine/x86_64-unix/winecoreaudio.so
 		patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/winecoreaudio.so")
 	fi
+	if [[ "$stage" == ace || "$stage" == cef || "$stage" == combined ]]; then
+		overlay_wine_file lib/wine/x86_64-windows/ntdll.dll
+		x86_64-w64-mingw32-strip --strip-debug \
+			"$candidate/Wine/lib/wine/x86_64-windows/ntdll.dll"
+	fi
 	if [[ "$stage" == ace || "$stage" == combined ]]; then
 		overlay_wine_file lib/wine/x86_64-unix/winemac.so
 		patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/winemac.so")
 		overlay_wine_file lib/wine/x86_64-unix/ntdll.so
 		patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/ntdll.so")
 		overlay_wine_file lib/wine/x86_64-windows/kernel32.dll
-		overlay_wine_file lib/wine/x86_64-windows/ntdll.dll
 		overlay_wine_file lib/wine/x86_64-windows/ntoskrnl.exe
 		overlay_wine_file lib/wine/i386-windows/ntoskrnl.exe
 		x86_64-w64-mingw32-strip --strip-debug \
 			"$candidate/Wine/lib/wine/x86_64-windows/kernel32.dll" \
-			"$candidate/Wine/lib/wine/x86_64-windows/ntdll.dll" \
 			"$candidate/Wine/lib/wine/x86_64-windows/ntoskrnl.exe"
 		i686-w64-mingw32-strip --strip-debug \
 			"$candidate/Wine/lib/wine/i386-windows/ntoskrnl.exe"
@@ -237,8 +240,6 @@ if [[ "$stage" == audio || "$stage" == ace || "$stage" == cn || "$stage" == comb
 		if [[ "$stage" == cn ]]; then
 			overlay_wine_file lib/wine/x86_64-unix/winemac.so
 			patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/winemac.so")
-			overlay_wine_file lib/wine/x86_64-unix/ntdll.so
-			patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/ntdll.so")
 		fi
 	fi
 

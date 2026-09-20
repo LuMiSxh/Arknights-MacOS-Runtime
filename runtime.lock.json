@@ -125,11 +125,11 @@
       "sha256": "1c9c0964cb4257e29164d0868c3ba3a670bac852842d558162886b1be945e4ca"
     },
     {
-      "id": "wine-cn-bilibili-cef80-stackbase",
+      "id": "wine-cef-bilibili-stackbase",
       "component": "wine",
-      "family": "cn",
-      "path": "patches/wine/cn/cef/0001-ntdll-bilibili-cef-80-stackbase.patch",
-      "sha256": "02a8fea36a07d64deabd3d9cefab677d9b2c92b8807a24024f7c35e870a0ade6"
+      "family": "cef",
+      "path": "patches/wine/cef/0001-ntdll-cef-compatibility.patch",
+      "sha256": "5e79f311c7386ab1dba8d16a264a790310388c7cce13a2e732305809cf4a6370"
     },
     {
       "id": "wine-cn-bilibili-layered-child",

@@ -91,15 +91,29 @@ LGPL-2.1-or-later. Hash verification and clean application are required for ever
 | [`wine-ace-rosetta-workarounds`](../patches/wine/ace/rosetta/0001-macos-rosetta-ace-workarounds.patch) | Bounded NOP and ACE privileged-instruction handling under Rosetta. | ACE gate; existing CrossOver CET/XGETBV handling is untouched.        | Endfield FineWine port; compile and exercise inactive/enabled routes.                                          |
 | [`wine-ace-relative-wait`](../patches/wine/ace/timing/0001-ntdll-ace-qpc-relative-wait.patch)          | Relative `NtDelayExecution` timing route.                          | ACE gate and negative relative waits only; other waits are unchanged. | Endfield FineWine port; focused wait tests.                                                                    |
 
+## CEF
+
+The CEF family uses the exact `ARKNIGHTS_RUNTIME_CEF_COMPAT=1` gate. An absent, `0`, or invalid value
+keeps Wine's normal route. If the explicit CEF variable is absent, `ARKNIGHTS_RUNTIME_CN_COMPAT=1`
+preserves the legacy Bilibili behavior. It targets WineCX `e1b410a5fdd96a32722a5f2617b5068bd385b7db`
+and retains Wine's LGPL-2.1-or-later.
+
+| Patch                                                                                   | What and why                                                                                | Scope / preflight                                                                                                                                                            | Provenance and verification                                                                                           |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| [`wine-cef-bilibili-stackbase`](../patches/wine/cef/0001-ntdll-cef-compatibility.patch) | Descriptor-driven CEF loader compatibility with the proven Bilibili CEF 80.1.15 descriptor. | Explicit CEF gate; legacy CN fallback only when CEF is absent. The descriptor requires the `libcef.dll` basename and all three expected RVA byte sequences before any write. | Original runtime change; see [provenance](../patches/wine/cef/provenance.md), apply check, and x86_64 loader compile. |
+
+The generic dispatcher is ready for additional regional descriptors, but no descriptor is added without
+reverse-engineering evidence for its complete hash/RVA/byte contract. The CN windowing route remains in
+the separate CN family below.
+
 ## CN
 
-The Bilibili patches use the one exact gate `ARKNIGHTS_RUNTIME_CN_COMPAT=1`; missing, `0`, or any other
-value keeps Wine's normal route. They target WineCX `e1b410a5fdd96a32722a5f2617b5068bd385b7db` and retain
-Wine's LGPL-2.1-or-later.
+The CN family contains only the Bilibili windowing patch and uses the exact
+`ARKNIGHTS_RUNTIME_CN_COMPAT=1` gate. Missing, `0`, or any other value keeps Wine's normal route. It targets
+WineCX `e1b410a5fdd96a32722a5f2617b5068bd385b7db` and retains Wine's LGPL-2.1-or-later.
 
 | Patch                                                                                                             | What and why                                                                         | Scope / preflight                                                                                                                                                                                                                                                                                                     | Provenance and verification                                                                                                    |
 | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| [`wine-cn-bilibili-cef80-stackbase`](../patches/wine/cn/cef/0001-ntdll-bilibili-cef-80-stackbase.patch)           | CEF 80.1.15 reads Windows `StackBase` directly on macOS.                             | CN gate; runtime preflight is `libcef.dll` basename plus all three expected RVA byte sequences before any write. SHA-256 `183c8db291fc41227b4a2fb91ca982a4e78e46c743874436f4f84d6ab09c3043` identifies the proven binary; it is not rehashed at runtime.                                                              | Original runtime change; apply check, x86_64 loader compile, and multi-process Bilibili login.                                 |
 | [`wine-cn-bilibili-layered-child`](../patches/wine/cn/windowing/0001-win32u-winemac-bilibili-layered-child.patch) | Keeps Chromium's browser-process layered proxy drawable inside the root Wine window. | CN gate; `PCGamePlatform.exe`, `CMyWebViewDlg` root, `Chrome_WidgetWin_0`, and `Chrome.WindowTranslucent` property. Each matching layered descendant has an in-root view with independent color/shape images, source alpha, `SourceConstantAlpha`, root-client geometry, reparent/hide cleanup, and USER hit testing. | Original runtime change; apply check, focused `win32u`/`winemac` compile, Bilibili captcha, and translucent error-toast check. |
 
 Remove a patch when the pinned WineCX source supplies the equivalent behavior or the corresponding
