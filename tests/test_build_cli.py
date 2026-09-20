@@ -108,6 +108,28 @@ class BuildCLIContractTests(unittest.TestCase):
         self.assertIn("@ stdcall KeCapturePersistentThreadState", patch)
         self.assertIn("if (!arknights_runtime_ace_compact_enabled())", patch)
 
+    def test_ace_ntoskrnl_exports_callable_audit_parameter_routine(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        patch = (
+            root
+            / "patches"
+            / "wine"
+            / "ace"
+            / "ntoskrnl"
+            / "0001-ntoskrnl-compatibility-surface.patch"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "NTSTATUS WINAPI SeSetAuditParameter(void *audit_parameters, LONG type, ULONG index, void *data)",
+            patch,
+        )
+        self.assertIn("@ stdcall SeSetAuditParameter(ptr long long ptr)", patch)
+        self.assertIn(
+            "if (!arknights_runtime_ace_compact_enabled()) return STATUS_NOT_IMPLEMENTED;",
+            patch,
+        )
+        self.assertIn("return STATUS_SUCCESS;", patch)
+
 
 if __name__ == "__main__":
     unittest.main()

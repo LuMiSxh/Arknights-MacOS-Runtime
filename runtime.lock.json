@@ -101,7 +101,7 @@
       "component": "wine",
       "family": "ace",
       "path": "patches/wine/ace/ntoskrnl/0001-ntoskrnl-compatibility-surface.patch",
-      "sha256": "3dc02958abaf4020a5f7598b65b2c0943d171cd45d601ce6a14b1342610a8e38"
+      "sha256": "e51dc89090e691f73559969ba54311821f7b692670c24e7c3ea3968b2ac10f79"
     },
     {
       "id": "wine-ace-dispatcher-spoof",
