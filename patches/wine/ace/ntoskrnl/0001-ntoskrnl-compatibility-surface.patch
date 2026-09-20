@@ -131,7 +131,7 @@ index a701041d..88400863 100644
 + */
 +const char *WINAPI PsGetProcessImageFileName( PEPROCESS process )
 +{
-+    if (!arknights_runtime_ace_compact_enabled()) return NULL;
++    if (!process) return NULL;
 +    TRACE("%p -> %s\n", process, debugstr_an(process->imageName, sizeof(process->imageName)));
 +    return process->imageName;
 +}

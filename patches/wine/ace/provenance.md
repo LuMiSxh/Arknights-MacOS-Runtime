@@ -17,7 +17,8 @@ authors. These files port selected changes to this exact WineCX pin.
 
 Carries the non-X11 kernel surface required by the ACE client: process session,
 creation time, image name, primary token, thread process/context accessors,
-current-thread process and process-ID accessors,
+current-thread process and process-ID accessors, and an unconditional safe image-name
+accessor for valid process objects,
 guarded bug-check callback registration stubs, the
 `KeCapturePersistentThreadState` export stub, the callable
 `SeSetAuditParameter` no-op, physical-memory compatibility stubs, and
