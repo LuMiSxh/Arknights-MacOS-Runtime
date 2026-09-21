@@ -16,7 +16,8 @@ class BuildCLIContractTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 2)
         self.assertIn(
-            "expected base, audio, cursor, performance, cn, or combined", result.stderr
+            "expected base, audio, cursor, performance, ace, cef, cn, or combined",
+            result.stderr,
         )
 
     def test_combined_overlay_replaces_bilibili_renderer_artifacts(self) -> None:
@@ -30,18 +31,18 @@ class BuildCLIContractTests(unittest.TestCase):
         ):
             self.assertIn(f"overlay_wine_file {artifact}", script)
 
-    def test_bilibili_runtime_contract_has_no_separate_toggle(self) -> None:
+        self.assertIn(
+            '"$stage" == ace || "$stage" == cef || "$stage" == combined', script
+        )
+        self.assertIn("overlay_wine_file lib/wine/x86_64-windows/ntdll.dll", script)
+
+    def test_cef_and_cn_runtime_contracts_use_separate_toggles(self) -> None:
         root = Path(__file__).resolve().parents[1]
         texts = [
             (root / "runtime.lock.json").read_text(encoding="utf-8"),
             (root / "scripts" / "build-canary.sh").read_text(encoding="utf-8"),
             (
-                root
-                / "patches"
-                / "wine"
-                / "cn"
-                / "cef"
-                / "0001-ntdll-bilibili-cef-80-stackbase.patch"
+                root / "patches" / "wine" / "cef" / "0001-ntdll-cef-compatibility.patch"
             ).read_text(encoding="utf-8"),
             (
                 root
@@ -53,9 +54,19 @@ class BuildCLIContractTests(unittest.TestCase):
             ).read_text(encoding="utf-8"),
         ]
 
-        for text in texts[2:]:
-            self.assertIn("ARKNIGHTS_RUNTIME_CN_COMPAT", text)
-            self.assertNotIn("MESSAGE(", text)
+        cef_patch, windowing_patch = texts[2:]
+        self.assertIn("ARKNIGHTS_RUNTIME_CEF_COMPAT", cef_patch)
+        self.assertIn("ARKNIGHTS_RUNTIME_CN_COMPAT", cef_patch)
+        self.assertIn("struct arknights_cef_descriptor", cef_patch)
+        self.assertIn("ARKNIGHTS_CEF_COMPAT_LEGACY_CN", cef_patch)
+        self.assertIn("ARKNIGHTS_CEF_REGION_CN", cef_patch)
+        self.assertIn("arknights_apply_cef_descriptor", cef_patch)
+        self.assertNotIn("ARKNIGHTS_RUNTIME_ACE_COMPACT", cef_patch)
+        self.assertNotIn("MESSAGE(", cef_patch)
+        self.assertIn("ARKNIGHTS_RUNTIME_CN_COMPAT", windowing_patch)
+        self.assertNotIn("ARKNIGHTS_RUNTIME_CEF_COMPAT", windowing_patch)
+        self.assertNotIn("ARKNIGHTS_RUNTIME_ACE_COMPACT", windowing_patch)
+        self.assertNotIn("MESSAGE(", windowing_patch)
         for text in texts:
             self.assertNotIn("ARKNIGHTS_RUNTIME_BILIBILI_", text)
         for required in (
@@ -69,6 +80,126 @@ class BuildCLIContractTests(unittest.TestCase):
             "macdrv_release_view(layered_view)",
         ):
             self.assertIn(required, texts[3])
+
+    def test_ace_runtime_contract_uses_the_ace_toggle(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        texts = [
+            path.read_text(encoding="utf-8")
+            for path in sorted((root / "patches" / "wine" / "ace").rglob("*.patch"))
+        ]
+
+        self.assertEqual(len(texts), 4)
+        for text in texts:
+            self.assertIn("ARKNIGHTS_RUNTIME_ACE_COMPACT", text)
+            self.assertNotIn("ARKNIGHTS_RUNTIME_CN_COMPAT", text)
+
+    def test_ace_ntoskrnl_exports_capture_persistent_thread_state(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        patch = (
+            root
+            / "patches"
+            / "wine"
+            / "ace"
+            / "ntoskrnl"
+            / "0001-ntoskrnl-compatibility-surface.patch"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("KeCapturePersistentThreadState", patch)
+        self.assertIn("@ stdcall KeCapturePersistentThreadState", patch)
+        self.assertIn("if (!arknights_runtime_ace_compact_enabled())", patch)
+
+    def test_ace_ntoskrnl_exports_callable_audit_parameter_routine(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        patch = (
+            root
+            / "patches"
+            / "wine"
+            / "ace"
+            / "ntoskrnl"
+            / "0001-ntoskrnl-compatibility-surface.patch"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "NTSTATUS WINAPI SeSetAuditParameter(void *audit_parameters, LONG type, ULONG index, void *data)",
+            patch,
+        )
+        self.assertIn("@ stdcall SeSetAuditParameter(ptr long long ptr)", patch)
+        self.assertIn(
+            "if (!arknights_runtime_ace_compact_enabled()) return STATUS_NOT_IMPLEMENTED;",
+            patch,
+        )
+        self.assertIn("return STATUS_SUCCESS;", patch)
+
+    def test_ace_ntoskrnl_process_image_name_is_unconditional_for_valid_processes(
+        self,
+    ) -> None:
+        root = Path(__file__).resolve().parents[1]
+        patch = (
+            root
+            / "patches"
+            / "wine"
+            / "ace"
+            / "ntoskrnl"
+            / "0001-ntoskrnl-compatibility-surface.patch"
+        ).read_text(encoding="utf-8")
+        function = patch.split(
+            "const char *WINAPI PsGetProcessImageFileName( PEPROCESS process )", 1
+        )[1].split(
+            "/*********************************************************************", 1
+        )[0]
+
+        self.assertIn("if (!process) return NULL;", function)
+        self.assertIn("return process->imageName;", function)
+        self.assertNotIn("arknights_runtime_ace_compact_enabled", function)
+
+    def test_ace_ntoskrnl_process_exit_status_is_an_unconditional_accessor(
+        self,
+    ) -> None:
+        root = Path(__file__).resolve().parents[1]
+        patch = (
+            root
+            / "patches"
+            / "wine"
+            / "ace"
+            / "ntoskrnl"
+            / "0001-ntoskrnl-compatibility-surface.patch"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "NTSTATUS WINAPI PsGetProcessExitStatus( PEPROCESS process )", patch
+        )
+        function = patch.split(
+            "NTSTATUS WINAPI PsGetProcessExitStatus( PEPROCESS process )", 1
+        )[1].split(
+            "/*********************************************************************", 1
+        )[0]
+
+        self.assertIn("return process->info.ExitStatus;", function)
+        self.assertNotIn("arknights_runtime_ace_compact_enabled", function)
+        self.assertIn("@ stdcall PsGetProcessExitStatus(ptr)", patch)
+
+    def test_ace_ntoskrnl_exports_current_thread_process_accessors(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        patch = (
+            root
+            / "patches"
+            / "wine"
+            / "ace"
+            / "ntoskrnl"
+            / "0001-ntoskrnl-compatibility-surface.patch"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "PEPROCESS WINAPI PsGetCurrentThreadProcess(void)",
+            patch,
+        )
+        self.assertIn("return PsGetCurrentProcess();", patch)
+        self.assertIn(
+            "HANDLE WINAPI PsGetCurrentThreadProcessId(void)",
+            patch,
+        )
+        self.assertIn("return PsGetCurrentProcessId();", patch)
+        self.assertIn("@ stdcall PsGetCurrentThreadProcess()", patch)
+        self.assertIn("@ stdcall PsGetCurrentThreadProcessId()", patch)
 
 
 if __name__ == "__main__":

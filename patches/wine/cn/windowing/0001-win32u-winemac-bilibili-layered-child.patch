@@ -10,7 +10,7 @@ index 687e4e79..60c099d5 100644
  
  #include "ntstatus.h"
  #include "ntgdi_private.h"
-@@ -57,6 +58,62 @@ static void *client_objects[MAX_USER_HANDLES];
+@@ -57,6 +58,71 @@ static void *client_objects[MAX_USER_HANDLES];
  static volatile unsigned int startup_info_flags;
  static unsigned int startup_show_window;
  
@@ -29,16 +29,26 @@ index 687e4e79..60c099d5 100644
 +    return value;
 +}
 +
++static BOOL has_bilibili_webview_ancestor( HWND hwnd )
++{
++    static const WCHAR webviewW[] = {'C','M','y','W','e','b','V','i','e','w','D','l','g',0};
++    WCHAR class_name[MAX_ATOM_LEN] = {0};
++    UNICODE_STRING name = {.Buffer = class_name, .MaximumLength = sizeof(class_name)};
++
++    while (hwnd)
++    {
++        if (NtUserGetClassName( hwnd, FALSE, &name ) && !wcscmp( class_name, webviewW )) return TRUE;
++        hwnd = NtUserGetAncestor( hwnd, GA_PARENT );
++    }
++    return FALSE;
++}
++
 +static BOOL is_bilibili_layered_proxy_candidate( const UNICODE_STRING *class_name, HWND parent )
 +{
 +    static const WCHAR platformW[] = {'P','C','G','a','m','e','P','l','a','t','f','o','r','m','.','e','x','e',0};
 +    static const WCHAR chrome_widgetW[] = {'C','h','r','o','m','e','_','W','i','d','g','e','t','W','i','n','_','0',0};
-+    static const WCHAR webviewW[] = {'C','M','y','W','e','b','V','i','e','w','D','l','g',0};
-+    WCHAR root_class[MAX_ATOM_LEN] = {0};
-+    UNICODE_STRING root_class_name = {.Buffer = root_class, .MaximumLength = sizeof(root_class)};
 +    const WCHAR *path = NtCurrentTeb()->Peb->ProcessParameters->ImagePathName.Buffer;
 +    const WCHAR *name, *separator;
-+    HWND root;
 +
 +    if (!arknights_runtime_cn_compat_enabled() || !path || !class_name || !class_name->Buffer ||
 +        class_name->Length != sizeof(chrome_widgetW) - sizeof(WCHAR) ||
@@ -50,8 +60,7 @@ index 687e4e79..60c099d5 100644
 +    if ((separator = wcsrchr( name, '/' ))) name = separator + 1;
 +    if (wcsicmp( name, platformW )) return FALSE;
 +
-+    root = NtUserGetAncestor( parent, GA_ROOT );
-+    return root && NtUserGetClassName( root, FALSE, &root_class_name ) && !wcscmp( root_class, webviewW );
++    return has_bilibili_webview_ancestor( parent );
 +}
 +
 +static BOOL is_bilibili_layered_proxy_window( HWND hwnd )
@@ -73,7 +82,7 @@ index 687e4e79..60c099d5 100644
  static unsigned int set_startup_info_flags( unsigned int mask, unsigned int flags )
  {
      unsigned int prev, new;
-@@ -2713,6 +2770,8 @@ BOOL WINAPI NtUserUpdateLayeredWindow( HWND hwnd, HDC hdc_dst, const POINT *pts_
+@@ -2713,6 +2780,8 @@ BOOL WINAPI NtUserUpdateLayeredWindow( HWND hwnd, HDC hdc_dst, const POINT *pts_
  
      get_window_rects( hwnd, COORDS_PARENT, &new_rects, get_thread_dpi() );
  
@@ -82,7 +91,7 @@ index 687e4e79..60c099d5 100644
      if (pts_dst)
      {
          offset.cx = pts_dst->x - new_rects.window.left;
-@@ -5922,6 +5981,7 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
+@@ -5922,6 +5991,7 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
      RECT surface_rect;
      UINT context;
      WND *win;
@@ -90,7 +99,7 @@ index 687e4e79..60c099d5 100644
  
      TRACE( "ex_style %#x, class_name %s, version %s, window_name %s, style %#x, x %u, y %u, cx %u, cy %u, "
             "parent %p, menu %p, class_instance %p, params %p, flags %#x, instance %p, class %s, ansi %u\n",
-@@ -6006,6 +6066,7 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
+@@ -6006,6 +6076,7 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
  
      fix_cs_coordinates( &cs, &sw );
      cs.dwExStyle = fix_exstyle( cs.style, cs.dwExStyle );
@@ -98,7 +107,7 @@ index 687e4e79..60c099d5 100644
  
      /* Create the window structure */
  
-@@ -6041,6 +6102,13 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
+@@ -6041,6 +6112,13 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
  
      release_win_ptr( win );
  
@@ -485,7 +494,7 @@ index 75346483..0852bf48 100644
  
  /***********************************************************************
   *              sync_window_min_max_info
-@@ -846,6 +854,65 @@ static BOOL running_image_is(const char *exe_name)
+@@ -846,6 +854,74 @@ static BOOL running_image_is(const char *exe_name)
      return !*appname && !*exe_name;
  }
  
@@ -529,29 +538,38 @@ index 75346483..0852bf48 100644
 +    return enabled;
 +}
 +
-+BOOL macdrv_is_bilibili_layered_child(HWND hwnd)
++static BOOL has_bilibili_webview_ancestor( HWND hwnd )
 +{
 +    static const WCHAR webviewW[] = {'C','M','y','W','e','b','V','i','e','w','D','l','g',0};
++    WCHAR class_name[MAX_ATOM_LEN] = {0};
++    UNICODE_STRING name = {.Buffer = class_name, .MaximumLength = sizeof(class_name)};
++
++    while (hwnd)
++    {
++        if (NtUserGetClassName( hwnd, FALSE, &name ) && !wcscmp( class_name, webviewW )) return TRUE;
++        hwnd = NtUserGetAncestor( hwnd, GA_PARENT );
++    }
++    return FALSE;
++}
++
++BOOL macdrv_is_bilibili_layered_child(HWND hwnd)
++{
 +    static const WCHAR chrome_widgetW[] = {'C','h','r','o','m','e','_','W','i','d','g','e','t','W','i','n','_','0',0};
 +    static const WCHAR translucentW[] = {'C','h','r','o','m','e','.','W','i','n','d','o','w','T','r','a','n','s','l','u','c','e','n','t',0};
-+    WCHAR root_class[MAX_ATOM_LEN] = {0};
 +    WCHAR class[MAX_ATOM_LEN] = {0};
-+    UNICODE_STRING class_name = {.Buffer = root_class, .MaximumLength = sizeof(root_class)};
 +    UNICODE_STRING name = {.Buffer = class, .MaximumLength = sizeof(class)};
-+    HWND root;
 +
 +    if (!arknights_runtime_cn_compat_enabled() || !running_image_is("PCGamePlatform.exe") ||
 +        !NtUserGetProp(hwnd, translucentW) || !NtUserGetClassName(hwnd, FALSE, &name) ||
 +        wcscmp(class, chrome_widgetW))
 +        return FALSE;
-+    root = NtUserGetAncestor(hwnd, GA_ROOT);
-+    return root && root != hwnd && NtUserGetClassName(root, FALSE, &class_name) && !wcscmp(root_class, webviewW);
++    return has_bilibili_webview_ancestor( NtUserGetAncestor( hwnd, GA_PARENT ));
 +}
 +
  static void set_app_icon(void)
  {
      CFArrayRef images = create_app_icon_images();
-@@ -1224,6 +1291,57 @@ static BOOL get_hosted_rects(HWND hwnd, HWND toplevel, RECT *container, RECT *fr
+@@ -1224,6 +1301,57 @@ static BOOL get_hosted_rects(HWND hwnd, HWND toplevel, RECT *container, RECT *fr
      return !IsRectEmpty(container);
  }
  
@@ -609,7 +627,7 @@ index 75346483..0852bf48 100644
  static void macdrv_client_surface_update(struct client_surface *client)
  {
      struct macdrv_client_surface *surface = impl_from_client_surface(client);
-@@ -1497,7 +1615,9 @@ void macdrv_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alpha, DWOR
+@@ -1497,7 +1625,9 @@ void macdrv_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alpha, DWOR
      {
          data->layered = TRUE;
          data->ulw_layered = FALSE;
@@ -620,7 +638,7 @@ index 75346483..0852bf48 100644
          {
              sync_window_opacity(data, alpha, FALSE, flags);
              /* since layered attributes are now set, can now show the window */
-@@ -1517,12 +1637,13 @@ void macdrv_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alpha, DWOR
+@@ -1517,12 +1647,13 @@ void macdrv_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alpha, DWOR
  void macdrv_SetParent(HWND hwnd, HWND parent, HWND old_parent)
  {
      struct macdrv_win_data *data;
@@ -635,7 +653,7 @@ index 75346483..0852bf48 100644
      if (parent != NtUserGetDesktopWindow()) /* a child window */
      {
          if (old_parent == NtUserGetDesktopWindow())
-@@ -1536,6 +1657,11 @@ void macdrv_SetParent(HWND hwnd, HWND parent, HWND old_parent)
+@@ -1536,6 +1667,11 @@ void macdrv_SetParent(HWND hwnd, HWND parent, HWND old_parent)
          create_cocoa_window(data);
      }
      release_win_data(data);
@@ -647,7 +665,7 @@ index 75346483..0852bf48 100644
  }
  
  
-@@ -1712,7 +1838,10 @@ void macdrv_UpdateLayeredWindow(HWND hwnd, BYTE alpha, UINT flags)
+@@ -1712,7 +1848,10 @@ void macdrv_UpdateLayeredWindow(HWND hwnd, BYTE alpha, UINT flags)
              show_window(data);
  
          /* The ULW flags are a superset of the LWA flags. */
@@ -659,7 +677,7 @@ index 75346483..0852bf48 100644
          release_win_data(data);
      }
  }
-@@ -1855,11 +1984,12 @@ void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT
+@@ -1855,11 +1994,12 @@ void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT
      BOOL fullscreen = swp_flags & WINE_SWP_FULLSCREEN;
      struct macdrv_thread_data *thread_data;
      struct macdrv_win_data *data;
@@ -673,7 +691,7 @@ index 75346483..0852bf48 100644
      thread_data = macdrv_thread_data();
  
      old_rects = data->rects;
-@@ -1910,6 +2040,11 @@ void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT
+@@ -1910,6 +2050,11 @@ void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT
  
  done:
      release_win_data(data);

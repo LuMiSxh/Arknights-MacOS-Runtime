@@ -10,7 +10,7 @@
 2. `just monitor`: verifies every pinned upstream commit and reports newer repository heads without
    changing the lock.
 3. `just prepare base`: verifies the unmodified source pins.
-4. `just prepare audio`, `cursor`, `performance`, and `cn`: applies each family independently without fuzz.
+4. `just prepare audio`, `cursor`, `performance`, `ace`, `cef`, and `cn`: applies each family independently without fuzz.
 5. `just build combined`: builds an isolated overlay canary for iteration; it is not a release
    build.
 6. `just verify`: checks archive paths, file types, DXMT native-loader markers, dependency references,
@@ -29,20 +29,36 @@ or missing pin fails the monitor without opening or mutating issues.
 Do not skip the current-runtime control or Arknights macOS Runtime base comparison. Record the runtime
 commit, lock, Mac, macOS version, prefix history, display, and audio devices.
 
+## Frametime capture
+
+On macOS 27, start the client and navigate to the fixed scene manually. Warm up the scene first, then
+run `just frametime-record CASE SECONDS` and begin the fixed scene when instructed. The harness never
+launches Wine, the client, or the game; it stores the raw `.atrc` traces, timeline overviews, and
+manifest under `.build/frametimes/`.
+
+Restart the game before every comparison. First capture same-binary A/A runs to establish normal
+variation, then use the same scene, settings, warm-up, and duration for the A/B runtime comparison.
+
 ## Hardware canary
 
 - Audio: switch built-in, wired, Bluetooth, and HDMI defaults during playback; test disconnect,
   reconnect, mute, volume, sleep/wake, browser audio, and a long session.
 - Cursor: compare frame latency 3, 2, and 1 at identical graphics settings, VSync modes, refresh
   rates, and capture method; record FPS, frame pacing, stutter, crashes, and cursor latency.
-- Performance: compare `ARKNIGHTS_RUNTIME_PERFORMANCE=0` and `1` after restarting the game, using
-  the same scene, graphics settings, and capture duration. Record ColorSync CPU samples, total CPU,
-  GPU activity, and frame times separately. Exercise profile changes, display reconnect, sleep/wake,
-  SDR/HDR changes, and multiple displays; HDR/EDR must remain live. A cache has a one-second expiry
-  bound if macOS delays or drops a profile notification. Check startup with the flag both disabled
-  and enabled; the device-initialization correction applies in both cases.
-- CN: compare the absent, `0`, invalid, and `1` control values in an isolated test prefix; record
-  launcher startup, login, ACE initialization, gameplay, and clean shutdown. For Bilibili, complete a
-  captcha and verify both its renderer and a translucent error toast.
+- Performance: apply the performance stage and run a startup and rendering smoke test after
+  restarting the game. Record crashes, missing effects, and frame times. The device-initialization
+  correction is unconditional and has no runtime flag. The release statistics gate is compile-time
+  only: debug builds retain the HUD and aggregation, while release builds retain frame counters and
+  synchronization. Verify the release candidate with the same game settings and fixed scene used for
+  the preceding control.
+- ACE: compare the absent, `0`, invalid, and `1` control values in an isolated test prefix; record
+  launcher startup, ACE initialization, gameplay, and clean shutdown.
+- CEF: compare the absent, `0`, invalid, and `1` control values in an isolated test prefix. Verify
+  that explicit CEF control takes precedence over the legacy CN fallback; exercise the Bilibili
+  descriptor only with its matching module and bytes.
+- CN: compare the absent, `0`, invalid, and `1` control values in an isolated test prefix; for Bilibili,
+  complete a captcha and verify its layered renderer and a translucent error toast. Include nested
+  dialogs with a `CMyWebViewDlg` parent-chain match where available. The issue #79 payment flow remains
+  an explicit follow-up and is not considered verified by the captcha check.
 - Combined: test all flags absent, each family independently, and all enabled together; cover clean
   shutdown and both fresh and existing test prefixes.

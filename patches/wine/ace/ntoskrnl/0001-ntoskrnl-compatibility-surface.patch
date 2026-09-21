@@ -1,5 +1,5 @@
 diff --git a/dlls/ntoskrnl.exe/ntoskrnl.c b/dlls/ntoskrnl.exe/ntoskrnl.c
-index a701041d..8e153f76 100644
+index a701041d..88400863 100644
 --- a/dlls/ntoskrnl.exe/ntoskrnl.c
 +++ b/dlls/ntoskrnl.exe/ntoskrnl.c
 @@ -2513,23 +2513,98 @@ NTSTATUS WINAPI FsRtlRegisterUncProvider(PHANDLE MupHandle, PUNICODE_STRING Redi
@@ -19,7 +19,7 @@ index a701041d..8e153f76 100644
      process->header.Type = 3;
      process->header.WaitListHead.Blink = INVALID_HANDLE_VALUE; /* mark as kernel object */
      NtQueryInformationProcess( handle, ProcessBasicInformation, &process->info, sizeof(process->info), NULL );
-+    if (arknights_runtime_cn_compat_enabled())
++    if (arknights_runtime_ace_compact_enabled())
 +    {
 +        NtQueryInformationProcess( handle, ProcessSessionInformation, &process->session_id, sizeof(process->session_id), NULL );
 +        NtQueryInformationProcess( handle, ProcessTimes, &process->times, sizeof(process->times), NULL );
@@ -77,7 +77,7 @@ index a701041d..8e153f76 100644
 +{
 +    PEPROCESS process = obj;
 +
-+    if (arknights_runtime_cn_compat_enabled() && process->token)
++    if (arknights_runtime_ace_compact_enabled() && process->token)
 +        ObDereferenceObject(process->token);
 +
 +    process->token = NULL;
@@ -102,7 +102,7 @@ index a701041d..8e153f76 100644
  };
  
  POBJECT_TYPE PsProcessType = &process_type;
-@@ -2581,6 +2656,47 @@ HANDLE WINAPI PsGetProcessInheritedFromUniqueProcessId( PEPROCESS process )
+@@ -2581,6 +2656,55 @@ HANDLE WINAPI PsGetProcessInheritedFromUniqueProcessId( PEPROCESS process )
      return id;
  }
  
@@ -111,7 +111,7 @@ index a701041d..8e153f76 100644
 + */
 +ULONG WINAPI PsGetProcessSessionId( PEPROCESS process )
 +{
-+    if (!arknights_runtime_cn_compat_enabled()) return 0;
++    if (!arknights_runtime_ace_compact_enabled()) return 0;
 +    TRACE("%p -> %lu", process, process->session_id);
 +    return process->session_id;
 +}
@@ -121,7 +121,7 @@ index a701041d..8e153f76 100644
 + */
 +LONGLONG WINAPI PsGetProcessCreateTimeQuadPart( PEPROCESS process )
 +{
-+    if (!arknights_runtime_cn_compat_enabled()) return 0;
++    if (!arknights_runtime_ace_compact_enabled()) return 0;
 +    TRACE("%p -> %I64x\n", process, process->times.CreateTime.QuadPart);
 +    return process->times.CreateTime.QuadPart;
 +}
@@ -131,9 +131,17 @@ index a701041d..8e153f76 100644
 + */
 +const char *WINAPI PsGetProcessImageFileName( PEPROCESS process )
 +{
-+    if (!arknights_runtime_cn_compat_enabled()) return NULL;
++    if (!process) return NULL;
 +    TRACE("%p -> %s\n", process, debugstr_an(process->imageName, sizeof(process->imageName)));
 +    return process->imageName;
++}
++
++/*********************************************************************
++ *           PsGetProcessExitStatus    (NTOSKRNL.@)
++ */
++NTSTATUS WINAPI PsGetProcessExitStatus( PEPROCESS process )
++{
++    return process->info.ExitStatus;
 +}
 +
 +/*********************************************************************
@@ -141,7 +149,7 @@ index a701041d..8e153f76 100644
 + */
 +PACCESS_TOKEN WINAPI PsReferencePrimaryToken( PEPROCESS process )
 +{
-+    if (!arknights_runtime_cn_compat_enabled()) return NULL;
++    if (!arknights_runtime_ace_compact_enabled()) return NULL;
 +    TRACE("%p -> %p\n", process, process->token);
 +    if (process->token) ObReferenceObject(process->token);
 +    return process->token;
@@ -159,7 +167,7 @@ index a701041d..8e153f76 100644
 + */
 +PEPROCESS WINAPI PsGetThreadProcess(PETHREAD thread)
 +{
-+    if (!arknights_runtime_cn_compat_enabled()) return NULL;
++    if (!arknights_runtime_ace_compact_enabled()) return NULL;
 +    TRACE("%p -> %p\n", thread, thread->kthread.process);
 +    return thread->kthread.process;
 +}
@@ -179,7 +187,7 @@ index a701041d..8e153f76 100644
 +    NTSTATUS status;
 +    HANDLE handle, id;
 +
-+    if (!arknights_runtime_cn_compat_enabled()) return STATUS_NOT_IMPLEMENTED;
++    if (!arknights_runtime_ace_compact_enabled()) return STATUS_NOT_IMPLEMENTED;
 +
 +    id = PsGetThreadId(thread);
 +    if (!(handle = OpenThread(THREAD_ALL_ACCESS, FALSE, HandleToUlong(id))))
@@ -203,7 +211,7 @@ index a701041d..8e153f76 100644
 +BOOL WINAPI KeRegisterBugCheckCallback(void *record, void *routine,
 +                                       void *buffer, ULONG length, char *component)
 +{
-+    if (!arknights_runtime_cn_compat_enabled()) return FALSE;
++    if (!arknights_runtime_ace_compact_enabled()) return FALSE;
 +    FIXME("%p %p %p %lu %s stub!\n", record, routine, buffer, length, debugstr_a(component));
 +
 +    return TRUE;
@@ -214,7 +222,7 @@ index a701041d..8e153f76 100644
 + */
 +BOOL WINAPI KeRegisterBugCheckReasonCallback(void *record, void *routine, ULONG reason, char *component)
 +{
-+    if (!arknights_runtime_cn_compat_enabled()) return FALSE;
++    if (!arknights_runtime_ace_compact_enabled()) return FALSE;
 +    FIXME("%p %p %lu %s stub!\n", record, routine, reason, debugstr_a(component));
 +
 +    return TRUE;
@@ -225,7 +233,7 @@ index a701041d..8e153f76 100644
 + */
 +BOOL WINAPI KeDeregisterBugCheckReasonCallback(void *record)
 +{
-+    if (!arknights_runtime_cn_compat_enabled()) return FALSE;
++    if (!arknights_runtime_ace_compact_enabled()) return FALSE;
 +    FIXME("%p stub!\n", record);
 +
 +    return TRUE;
@@ -244,7 +252,7 @@ index a701041d..8e153f76 100644
 +    static PHYSICAL_MEMORY_RANGE range;
 +    SYSTEM_BASIC_INFORMATION info = {0};
 +
-+    if (!arknights_runtime_cn_compat_enabled()) return NULL;
++    if (!arknights_runtime_ace_compact_enabled()) return NULL;
 +    TRACE("\n");
 +
 +    if (!InterlockedCompareExchange(&once, 1, 0))
@@ -266,7 +274,7 @@ index a701041d..8e153f76 100644
 + */
 +void *WINAPI MmGetVirtualForPhysical(PHYSICAL_ADDRESS addr)
 +{
-+    if (!arknights_runtime_cn_compat_enabled()) return NULL;
++    if (!arknights_runtime_ace_compact_enabled()) return NULL;
 +    ULONG_PTR ret = addr.QuadPart;
 +    FIXME("(%p): semi-stub!\n", (void *)ret);
 +    return (void *)ret;
@@ -275,7 +283,45 @@ index a701041d..8e153f76 100644
  /***********************************************************************
   *           MmMapIoSpace   (NTOSKRNL.EXE.@)
   */
-@@ -4419,9 +4632,58 @@ BOOLEAN WINAPI SePrivilegeCheck(PRIVILEGE_SET *privileges, SECURITY_SUBJECT_CONT
+@@ -3270,6 +3483,22 @@ HANDLE WINAPI PsGetCurrentProcessId(void)
+     return KeGetCurrentThread()->id.UniqueProcess;
+ }
+ 
++/***********************************************************************
++ *           PsGetCurrentThreadProcess   (NTOSKRNL.EXE.@)
++ */
++PEPROCESS WINAPI PsGetCurrentThreadProcess(void)
++{
++    return PsGetCurrentProcess();
++}
++
++/***********************************************************************
++ *           PsGetCurrentThreadProcessId   (NTOSKRNL.EXE.@)
++ */
++HANDLE WINAPI PsGetCurrentThreadProcessId(void)
++{
++    return PsGetCurrentProcessId();
++}
++
+ /***********************************************************************
+  *           PsGetCurrentProcessSessionId   (NTOSKRNL.EXE.@)
+  */
+@@ -4414,14 +4643,73 @@ BOOLEAN WINAPI SePrivilegeCheck(PRIVILEGE_SET *privileges, SECURITY_SUBJECT_CONT
+     return TRUE;
+ }
+ 
++/*********************************************************************
++ *           SeSetAuditParameter    (NTOSKRNL.@)
++ */
++NTSTATUS WINAPI SeSetAuditParameter(void *audit_parameters, LONG type, ULONG index, void *data)
++{
++    FIXME("%p %ld %lu %p\n", audit_parameters, type, index, data);
++    if (!arknights_runtime_ace_compact_enabled()) return STATUS_NOT_IMPLEMENTED;
++    return STATUS_SUCCESS;
++}
++
+ /*********************************************************************
+  *           SeLocateProcessImageName    (NTOSKRNL.@)
   */
  NTSTATUS WINAPI SeLocateProcessImageName(PEPROCESS process, UNICODE_STRING **image_name)
  {
@@ -289,7 +335,7 @@ index a701041d..8e153f76 100644
 +    TRACE("%p %p\n", process, image_name);
 +
 +    if (!image_name) return STATUS_INVALID_PARAMETER;
-+    if (!arknights_runtime_cn_compat_enabled())
++    if (!arknights_runtime_ace_compact_enabled())
 +    {
 +        *image_name = NULL;
 +        return STATUS_NOT_IMPLEMENTED;
@@ -337,11 +383,33 @@ index a701041d..8e153f76 100644
  }
  
  /*********************************************************************
+@@ -4760,6 +5048,14 @@ void WINAPI KeUnstackDetachProcess(KAPC_STATE *apc_state)
+     FIXME("apc_state %p stub.\n", apc_state);
+ }
+ 
++NTSTATUS WINAPI KeCapturePersistentThreadState(CONTEXT *context, PKTHREAD thread, ULONG code,
++                                               ULONG param1, ULONG param2, ULONG param3, ULONG param4, void *addr)
++{
++    FIXME("%p %p %lu %lu %lu %lu %lu %p", context, thread, code, param1, param2, param3, param4, addr);
++
++    return STATUS_NOT_IMPLEMENTED;
++}
++
+ NTSTATUS WINAPI KdChangeOption(ULONG option, ULONG in_size, PVOID in_buffer,
+                                ULONG out_size, PVOID out_buffer, PULONG ret_size)
+ {
 diff --git a/dlls/ntoskrnl.exe/ntoskrnl.exe.spec b/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
-index 3a9c6897..c2d299c0 100644
+index 3a9c6897..b4acd4ca 100644
 --- a/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
 +++ b/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
-@@ -556,7 +556,7 @@
+@@ -550,13 +550,13 @@
+ @ stdcall KeBugCheck(long)
+ @ stdcall KeBugCheckEx(long long long long long)
+ @ stdcall KeCancelTimer(ptr)
+-@ stub KeCapturePersistentThreadState
++@ stdcall KeCapturePersistentThreadState(ptr ptr long long long long long ptr)
+ @ stdcall KeClearEvent(ptr)
+ @ stub KeConnectInterrupt
  @ stub KeDcacheFlushCount
  @ stdcall KeDelayExecutionThread(long long ptr)
  @ stub KeDeregisterBugCheckCallback
@@ -373,7 +441,7 @@ index 3a9c6897..c2d299c0 100644
  @ stub MmGrowKernelStack
  @ stub MmHighestUserAddress
  @ stdcall MmIsAddressValid(ptr)
-@@ -911,7 +911,7 @@
+@@ -911,39 +911,41 @@
  @ stub PsDereferencePrimaryToken
  @ stub PsDisableImpersonation
  @ stub PsEstablishWin32Callouts
@@ -382,7 +450,13 @@ index 3a9c6897..c2d299c0 100644
  @ stdcall PsGetCurrentProcess() IoGetCurrentProcess
  @ stdcall PsGetCurrentProcessId()
  @ stdcall PsGetCurrentProcessSessionId()
-@@ -923,27 +923,27 @@
+ @ stdcall PsGetCurrentThread() KeGetCurrentThread
+ @ stdcall PsGetCurrentThreadId()
++@ stdcall PsGetCurrentThreadProcess()
++@ stdcall PsGetCurrentThreadProcessId()
+ @ stub PsGetCurrentThreadPreviousMode
+ @ stub PsGetCurrentThreadStackBase
+ @ stub PsGetCurrentThreadStackLimit
  @ stub PsGetJobLock
  @ stub PsGetJobSessionId
  @ stub PsGetJobUIRestrictionsClass
@@ -390,7 +464,8 @@ index 3a9c6897..c2d299c0 100644
 +@ stdcall PsGetProcessCreateTimeQuadPart(ptr)
  @ stub PsGetProcessDebugPort
  @ stub PsGetProcessExitProcessCalled
- @ stub PsGetProcessExitStatus
+-@ stub PsGetProcessExitStatus
++@ stdcall PsGetProcessExitStatus(ptr)
  @ stub PsGetProcessExitTime
  @ stdcall PsGetProcessId(ptr)
 -@ stub PsGetProcessImageFileName
@@ -414,7 +489,7 @@ index 3a9c6897..c2d299c0 100644
  @ stdcall PsGetThreadProcessId(ptr)
  @ stub PsGetThreadSessionId
  @ stub PsGetThreadTeb
-@@ -961,7 +961,7 @@
+@@ -961,7 +963,7 @@
  @ stdcall PsLookupThreadByThreadId(ptr ptr)
  @ extern PsProcessType
  @ stub PsReferenceImpersonationToken
@@ -423,17 +498,25 @@ index 3a9c6897..c2d299c0 100644
  @ stdcall PsReferenceProcessFilePointer(ptr ptr)
  @ stdcall PsReleaseProcessExitSynchronization(ptr)
  @ stdcall PsRemoveCreateThreadNotifyRoutine(ptr)
+@@ -1375,6 +1377,7 @@
+ @ stub SeReleaseSecurityDescriptor
+ @ stub SeReleaseSubjectContext
+ @ stub SeSetAccessStateGenericMapping
++@ stdcall SeSetAuditParameter(ptr long long ptr)
+ @ stub SeSetSecurityDescriptorInfo
+ @ stub SeSetSecurityDescriptorInfoEx
+ @ stdcall SeSinglePrivilegeCheck(int64 long)
 diff --git a/dlls/ntoskrnl.exe/ntoskrnl_private.h b/dlls/ntoskrnl.exe/ntoskrnl_private.h
-index 79a12467..a90fe767 100644
+index 79a12467..562a53d6 100644
 --- a/dlls/ntoskrnl.exe/ntoskrnl_private.h
 +++ b/dlls/ntoskrnl.exe/ntoskrnl_private.h
 @@ -39,6 +39,22 @@
  #include "wine/list.h"
  #include "wine/rbtree.h"
  
-+/* The CN compatibility surface is opt-in. Keep the default path byte-for-byte
++/* The ACE compact compatibility surface is opt-in. Keep the default path byte-for-byte
 + * equivalent to the unpatched Wine behavior when the control is disabled. */
-+static inline BOOL arknights_runtime_cn_compat_enabled(void)
++static inline BOOL arknights_runtime_ace_compact_enabled(void)
 +{
 +    static LONG state = -1;
 +    LONG value = state;
@@ -441,7 +524,7 @@ index 79a12467..a90fe767 100644
 +
 +    if (value == -1)
 +    {
-+        value = GetEnvironmentVariableA("ARKNIGHTS_RUNTIME_CN_COMPAT", flag, sizeof(flag)) == 1 && flag[0] == '1';
++        value = GetEnvironmentVariableA("ARKNIGHTS_RUNTIME_ACE_COMPACT", flag, sizeof(flag)) == 1 && flag[0] == '1';
 +        InterlockedCompareExchange(&state, value, -1);
 +    }
 +    return value;
