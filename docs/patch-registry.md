@@ -11,7 +11,7 @@ corresponding-source, notice, and redistribution review required for a runtime b
 | ----------------- | ------------------------------------------------------------------------------------- |
 | ID                | `wine-audio-default-output`                                                           |
 | File              | `patches/wine/audio/0001-winecoreaudio-default-output.patch`                          |
-| Component/base    | WineCX `e1b410a5fdd96a32722a5f2617b5068bd385b7db` (Wine 11.16)                        |
+| Component/base    | WineCX `e0aa380780b73e20fabcfe78fd42713b94929a53` (Wine 11.17)                        |
 | Source/author     | Wine draft MR 11370, commits `4d143f4c` and `65140f31`, Rhodri Richards               |
 | License           | LGPL-2.1-or-later                                                                     |
 | Gate              | `ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT=1`, parsed once per process            |
@@ -28,14 +28,18 @@ The carried MR is a draft. Capture and exclusive streams are deliberately unchan
 | ----------------- | ------------------------------------------------------------------------------------- |
 | ID                | `dxmt-cursor-frame-latency`                                                           |
 | File              | `patches/dxmt/cursor/0001-dxmt-command-queue-configurable-frame-latency.patch`        |
-| Component/base    | DXMT `4ddb20e54672c0cb56115ce80d6db1beef94ae28` (`v0.80-213-g4ddb20e`)                |
+| Component/base    | DXMT `7c8dee1c2d73415301ceb7d1fa810861cef4cd67` (`v0.80-244-g7c8dee1`)                |
 | Source/author     | Original Arknights macOS Runtime experiment, Arknights macOS Runtime maintainers      |
 | License           | LGPL-2.1-or-later, matching the pinned DXMT revision                                  |
-| Gate              | `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY=1..3`, read once on first command queue     |
+| Gate              | `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY=0..3`, read once on first command queue     |
 | Inactive behavior | Missing or invalid input retains upstream maximum `3`                                 |
 | Automated gate    | Hash, clean `git apply --check`, and both DXMT architectures compile                  |
-| Manual gate       | Controlled FPS/frame-pacing/cursor comparison at values 3, 2, and 1                   |
+| Manual gate       | Controlled FPS/frame-pacing/cursor comparison at values 3, 2, 1, and 0                |
 | Removal           | Drop if DXMT gains an equivalent supported control or evidence rejects the experiment |
+
+Value `0` is an Arknights extension that waits for the current frame completion fence after
+commit. It means no completed GPU frame remains queued; it does not use DXGI's device-level
+zero-as-default semantics and can substantially reduce throughput or smoothness.
 
 ## Performance
 
@@ -43,7 +47,7 @@ The carried MR is a draft. Capture and exclusive streams are deliberately unchan
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
 | ID                | `dxmt-command-context-device-initialization`                                                              |
 | File              | `patches/dxmt/performance/0001-dxmt-initialize-device-before-command-helpers.patch`                       |
-| Component/base    | DXMT `4ddb20e54672c0cb56115ce80d6db1beef94ae28`                                                           |
+| Component/base    | DXMT `7c8dee1c2d73415301ceb7d1fa810861cef4cd67`                                                           |
 | Source/author     | Original Arknights macOS Runtime correction, Arknights macOS Runtime maintainers                          |
 | License           | LGPL-2.1-or-later, matching the pinned DXMT revision                                                      |
 | Gate              | Unconditional initialization-correctness prerequisite in the performance build; no runtime query          |
@@ -64,7 +68,7 @@ dependency without a hot-path check. This is a correctness fix, not an FPS claim
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | ID                | `dxmt-skip-release-present-statistics`                                                                                              |
 | File              | `patches/dxmt/performance/0002-dxmt-skip-release-present-statistics.patch`                                                          |
-| Component/base    | DXMT `4ddb20e54672c0cb56115ce80d6db1beef94ae28`                                                                                     |
+| Component/base    | DXMT `7c8dee1c2d73415301ceb7d1fa810861cef4cd67`                                                                                     |
 | Source/author     | Original Arknights macOS Runtime optimization, Arknights macOS Runtime maintainers                                                  |
 | License           | LGPL-2.1-or-later, matching DXMT                                                                                                    |
 | Gate              | `DXMT_DEBUG`; debug builds retain present statistics aggregation and HUD updates, release builds skip both release-dead paths       |
@@ -81,7 +85,7 @@ the underlying frame counters and synchronization behavior.
 ## ACE
 
 All ACE patches use the one exact gate `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`; missing, `0`, or any other value
-keeps Wine's normal route. They target WineCX `e1b410a5fdd96a32722a5f2617b5068bd385b7db` and retain Wine's
+keeps Wine's normal route. They target WineCX `e0aa380780b73e20fabcfe78fd42713b94929a53` and retain Wine's
 LGPL-2.1-or-later. Hash verification and clean application are required for every row.
 
 | Patch                                                                                                  | What and why                                                                                                                                                                               | Scope / preflight                                                                                                                                                                                              | Provenance and verification                                                                                                                    |
@@ -95,7 +99,7 @@ LGPL-2.1-or-later. Hash verification and clean application are required for ever
 
 The CEF family uses the exact `ARKNIGHTS_RUNTIME_CEF_COMPAT=1` gate. An absent, `0`, or invalid value
 keeps Wine's normal route. If the explicit CEF variable is absent, `ARKNIGHTS_RUNTIME_CN_COMPAT=1`
-preserves the legacy Bilibili behavior. It targets WineCX `e1b410a5fdd96a32722a5f2617b5068bd385b7db`
+preserves the legacy Bilibili behavior. It targets WineCX `e0aa380780b73e20fabcfe78fd42713b94929a53`
 and retains Wine's LGPL-2.1-or-later.
 
 | Patch                                                                                   | What and why                                                                                | Scope / preflight                                                                                                                                                            | Provenance and verification                                                                                           |
@@ -110,7 +114,7 @@ the separate CN family below.
 
 The CN family contains only the Bilibili windowing patch and uses the exact
 `ARKNIGHTS_RUNTIME_CN_COMPAT=1` gate. Missing, `0`, or any other value keeps Wine's normal route. It targets
-WineCX `e1b410a5fdd96a32722a5f2617b5068bd385b7db` and retains Wine's LGPL-2.1-or-later.
+WineCX `e0aa380780b73e20fabcfe78fd42713b94929a53` and retains Wine's LGPL-2.1-or-later.
 
 | Patch                                                                                                             | What and why                                                                         | Scope / preflight                                                                                                                                                                                                                                                                                                                                               | Provenance and verification                                                                                                    |
 | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |

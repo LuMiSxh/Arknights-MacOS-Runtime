@@ -6,6 +6,19 @@ from pathlib import Path
 
 
 class BuildCLIContractTests(unittest.TestCase):
+    def test_cursor_patch_accepts_zero_frame_queue_depth(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        patch = (
+            root
+            / "patches"
+            / "dxmt"
+            / "cursor"
+            / "0001-dxmt-command-queue-configurable-frame-latency.patch"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("configured.front() >= '0'", patch)
+        self.assertIn("Values 0 through 3", patch)
+
     def test_rejects_an_unknown_stage_before_doing_work(self) -> None:
         root = Path(__file__).resolve().parents[1]
         result = subprocess.run(

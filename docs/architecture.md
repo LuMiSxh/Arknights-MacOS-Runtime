@@ -22,7 +22,7 @@ x64/x32 DXMT payloads expected by the launcher.
 
 Runtime flags are parsed inside their owning component. `ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT`,
 `ARKNIGHTS_RUNTIME_ACE_COMPACT`, `ARKNIGHTS_RUNTIME_CEF_COMPAT`, and `ARKNIGHTS_RUNTIME_CN_COMPAT` accept only `0` or `1`;
-`ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY` accepts only `1` through `3`. Absent or invalid values preserve
+`ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY` accepts only `0` through `3`. Absent or invalid values preserve
 the documented defaults. The ACE gate owns the kernel, dispatcher, Rosetta, and timing routes; the CEF gate
 owns descriptor-driven CEF loader preflights, with the CN gate as a legacy fallback only when CEF is absent;
 the CN gate also owns the Bilibili window preflights documented in the [patch registry](patch-registry.md#cn).

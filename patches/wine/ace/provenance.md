@@ -3,7 +3,7 @@
 ## Source pins
 
 - Wine base: `dappermint/winecx`
-- Wine commit: `e1b410a5fdd96a32722a5f2617b5068bd385b7db` (Wine 11.16)
+- Wine commit: `e0aa380780b73e20fabcfe78fd42713b94929a53` (Wine 11.17)
 - Candidate reference: [`stoicswe/Endfield_FineWine`](https://github.com/stoicswe/Endfield_FineWine)
 - Reference checkout: `e5d4ccad235eefe32d912733e57e4c0bb53a5b58`
 - Reference patch families: `stage1-macos` and `stage2-dwproton`
@@ -15,22 +15,23 @@ authors. These files port selected changes to this exact WineCX pin.
 
 ### `ntoskrnl`
 
-Carries the non-X11 kernel surface required by the ACE client: process session,
-creation time, image name, primary token, thread process/context accessors,
-current-thread process and process-ID accessors, and unconditional image-name and exit-status
-accessors for valid process objects,
-guarded bug-check callback registration stubs, the
-`KeCapturePersistentThreadState` export stub, the callable
-`SeSetAuditParameter` no-op, physical-memory compatibility stubs, and
-process-object metadata lifetime handling. The capture function logs its
-arguments and returns `STATUS_NOT_IMPLEMENTED` without dereferencing or
-writing through any pointer. `SeSetAuditParameter` logs its arguments and
-returns `STATUS_SUCCESS` only when `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`; it never
-dereferences or writes through its pointer arguments. The original Wine stub
-behavior remains active otherwise. The current-thread process accessors are
-unconditional aliases of the corresponding current-process functions. The
-process image-name and exit-status accessors are unconditional for valid
-process objects; their `_In_` process parameters are not NULL-checked.
+Carries the non-X11 kernel surface required by the ACE client: process image
+name and primary-token support, thread process/context accessors, current-thread
+process and process-ID accessors, and unconditional image-name and exit-status
+accessors for valid process objects; the `KeCapturePersistentThreadState`
+export stub; the callable `SeSetAuditParameter` no-op; physical-memory
+compatibility stubs; and process-object metadata lifetime handling. The capture
+function logs its arguments and returns `STATUS_NOT_IMPLEMENTED` without
+dereferencing or writing through any pointer. `SeSetAuditParameter` logs its
+arguments and returns `STATUS_SUCCESS` only when
+`ARKNIGHTS_RUNTIME_ACE_COMPACT=1`; it never dereferences or writes through its
+pointer arguments. The original Wine stub behavior remains active otherwise.
+Wine 11.17 already provides the process session and creation-time accessors and
+bug-check callback exports, so this patch no longer carries those definitions.
+The current-thread process accessors are unconditional aliases of the
+corresponding current-process functions. The process image-name and exit-status
+accessors are unconditional for valid process objects; their `_In_` process
+parameters are not NULL-checked.
 
 ### `dispatcher`
 

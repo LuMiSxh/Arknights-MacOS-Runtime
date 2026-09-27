@@ -21,7 +21,7 @@ Use the Runtime problem template and include the client and runtime versions, Ma
 region, Wine-prefix history, runtime settings, and reproduction steps. Attach logs only when a
 maintainer requests a specific file.
 
-The current baseline is dappermint runtime 4.6.8 with WineCX 11.16. Cursor, Performance, and combined stages
+The current baseline is dappermint runtime 4.6.8 with WineCX 11.17. Cursor, Performance, and combined stages
 additionally build a pinned post-0.80 DXMT revision. The clean release tree contains newly built Wine
 and DXMT, the pinned Nix media/library closure, and the pinned MoltenVK payload. Candidate baselines
 also record their Wine Gecko input. All repository-controlled source, archive, recipe, and patch
@@ -29,14 +29,14 @@ inputs are pinned by commit and/or checksum.
 
 ## Patch families
 
-| Family      | Purpose                                                                                                                                               | Runtime default                                       |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Audio       | Follow the current macOS default output without restarting the game ([client issue #59](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/59)) | Wine's normal routing unless enabled                  |
-| Cursor      | Provide a bounded DXMT frame queue control for cursor latency ([client issue #34](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/34))       | Upstream maximum `3`; values `1` through `3` accepted |
-| Performance | Initialize DXMT command helpers safely and skip release-dead present statistics                                                                           | Compile-time changes; statistics gate follows `DXMT_DEBUG` |
-| ACE         | Provide the opt-in kernel, dispatcher, Rosetta, and timing routes required by ACE-protected clients                                                   | Inactive unless explicitly enabled                    |
-| CEF         | Provide descriptor-driven CEF compatibility with the proven Bilibili loader path                                                                       | Inactive unless explicitly enabled                    |
-| CN          | Provide the narrowly preflighted Bilibili layered-renderer path                                                                                        | Inactive unless explicitly enabled                    |
+| Family      | Purpose                                                                                                                                               | Runtime default                                            |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Audio       | Follow the current macOS default output without restarting the game ([client issue #59](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/59)) | Wine's normal routing unless enabled                       |
+| Cursor      | Provide a bounded DXMT frame queue control for cursor latency ([client issue #34](https://github.com/LuMiSxh/Arknights-MacOS-Client/issues/34))       | Upstream maximum `3`; values `0` through `3` accepted      |
+| Performance | Initialize DXMT command helpers safely and skip release-dead present statistics                                                                       | Compile-time changes; statistics gate follows `DXMT_DEBUG` |
+| ACE         | Provide the opt-in kernel, dispatcher, Rosetta, and timing routes required by ACE-protected clients                                                   | Inactive unless explicitly enabled                         |
+| CEF         | Provide descriptor-driven CEF compatibility with the proven Bilibili loader path                                                                      | Inactive unless explicitly enabled                         |
+| CN          | Provide the narrowly preflighted Bilibili layered-renderer path                                                                                       | Inactive unless explicitly enabled                         |
 
 The complete artifact contains all six families. Missing or invalid control values preserve the
 defaults listed above.
@@ -46,7 +46,7 @@ defaults listed above.
 | Variable                                        | Accepted values | Missing or invalid value |
 | ----------------------------------------------- | --------------- | ------------------------ |
 | `ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT` | `0`, `1`        | Wine's normal routing    |
-| `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY`      | `1` through `3` | Upstream value `3`       |
+| `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY`      | `0` through `3` | Upstream value `3`       |
 | `ARKNIGHTS_RUNTIME_ACE_COMPACT`                 | `0`, `1`        | Inactive                 |
 | `ARKNIGHTS_RUNTIME_CEF_COMPAT`                  | `0`, `1`        | Inactive                 |
 | `ARKNIGHTS_RUNTIME_CN_COMPAT`                   | `0`, `1`        | Inactive                 |
