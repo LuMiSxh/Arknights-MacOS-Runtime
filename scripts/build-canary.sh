@@ -6,9 +6,9 @@ set -euo pipefail
 stage="${1:-combined}"
 build_mode="${2:-overlay}"
 case "$stage" in
-	base|audio|cursor|performance|ace|cef|cn|combined) ;;
+	base|audio|cursor|hardware-cursor|performance|ace|cef|cn|combined) ;;
 	*)
-		echo "error: expected base, audio, cursor, performance, ace, cef, cn, or combined" >&2
+		echo "error: expected base, audio, cursor, hardware-cursor, performance, ace, cef, cn, or combined" >&2
 		exit 2
 		;;
 esac
@@ -107,13 +107,18 @@ for output in $nix_tools; do
 done
 
 nix_outputs=""
-for package in freetype gnutls libpng zlib brotli bzip2 nettle libtasn1 libidn2 p11-kit libunistring gmp vulkan-headers ffmpeg-headless glib orc gst_all_1.gstreamer gst_all_1.gst-plugins-base gst_all_1.gst-plugins-good gst_all_1.gst-plugins-bad gst_all_1.gst-libav; do
-	for output_name in dev out lib; do
-		if output="$(nix build --no-link --print-out-paths "$nixpkgs#legacyPackages.x86_64-darwin.$package.$output_name" 2>/dev/null)"; then
-			nix_outputs="$nix_outputs $output"
-		fi
+wine_configure_flags=()
+if [[ "$stage" == hardware-cursor ]]; then
+	wine_configure_flags+=(--without-ffmpeg --without-gstreamer)
+else
+	for package in freetype gnutls libpng zlib brotli bzip2 nettle libtasn1 libidn2 p11-kit libunistring gmp vulkan-headers ffmpeg-headless glib orc gst_all_1.gstreamer gst_all_1.gst-plugins-base gst_all_1.gst-plugins-good gst_all_1.gst-plugins-bad gst_all_1.gst-libav; do
+		for output_name in dev out lib; do
+			if output="$(nix build --no-link --print-out-paths "$nixpkgs#legacyPackages.x86_64-darwin.$package.$output_name" 2>/dev/null)"; then
+				nix_outputs="$nix_outputs $output"
+			fi
+		done
 	done
-done
+fi
 
 pkg_config_path=""
 include_flags=""
@@ -168,81 +173,94 @@ mkdir -p "$wine_build"
 		--without-x --without-wayland --without-oss --without-alsa --without-pulse \
 		--without-sane --without-usb --without-v4l2 --without-pcap --without-capi \
 		--without-opencl --without-cups \
+		"${wine_configure_flags[@]}" \
 		--prefix=/opt/whiskywine
-	grep -q '^#define HAVE_FFMPEG 1' include/config.h
-	grep -qE '^GSTREAMER_LIBS *= *.+' Makefile
-	make -j"$(sysctl -n hw.logicalcpu)"
+	if [[ "$stage" != hardware-cursor ]]; then
+		grep -q '^#define HAVE_FFMPEG 1' include/config.h
+		grep -qE '^GSTREAMER_LIBS *= *.+' Makefile
+	fi
+	if [[ "$stage" == hardware-cursor ]]; then
+		make -j"$(sysctl -n hw.logicalcpu)" dlls/ntdll/ntdll.so
+	else
+		make -j"$(sysctl -n hw.logicalcpu)"
+	fi
 )
 
-if [[ "$stage" == audio || "$stage" == ace || "$stage" == cef || "$stage" == cn || "$stage" == combined ]]; then
-	staging="$stage_root/wine-staging"
-	make -C "$wine_build" -j"$(sysctl -n hw.logicalcpu)" install-lib DESTDIR="$staging"
-	wine_install="$staging/opt/whiskywine"
+if [[ "$stage" == hardware-cursor || "$stage" == audio || "$stage" == ace || "$stage" == cef || "$stage" == cn || "$stage" == combined ]]; then
 	patched_machos=()
+	if [[ "$stage" == hardware-cursor ]]; then
+		mkdir -p "$candidate/Wine/lib/wine/x86_64-unix"
+		cp "$wine_build/dlls/ntdll/ntdll.so" "$candidate/Wine/lib/wine/x86_64-unix/ntdll.so"
+		patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/ntdll.so")
+	else
+		staging="$stage_root/wine-staging"
+		make -C "$wine_build" -j"$(sysctl -n hw.logicalcpu)" install-lib DESTDIR="$staging"
+		wine_install="$staging/opt/whiskywine"
 
-	if [[ "$build_mode" == "--clean-release" ]]; then
-		mkdir -p "$candidate/Wine"
-		cp -R "$wine_install/bin" "$wine_install/lib" "$wine_install/share" "$candidate/Wine/"
-		loader="$candidate/Wine/lib/wine/x86_64-unix/wine"
-		[[ -x "$loader" ]] || {
-			echo "error: clean Wine install has no loader: $loader" >&2
-			exit 1
-		}
-		for name in wine wine64 wineloader; do
-			ln -sf ../lib/wine/x86_64-unix/wine "$candidate/Wine/bin/$name"
-		done
-		ln -sf wine64 "$candidate/Wine/bin/Arknights"
-		for library in libMoltenVK.dylib; do
-			base_library="$stage_root/base/Libraries/Wine/lib/$library"
-			[[ -f "$base_library" ]] || {
-				echo "error: pinned base is missing required payload: Wine/lib/$library" >&2
+		if [[ "$build_mode" == "--clean-release" ]]; then
+			mkdir -p "$candidate/Wine"
+			cp -R "$wine_install/bin" "$wine_install/lib" "$wine_install/share" "$candidate/Wine/"
+			loader="$candidate/Wine/lib/wine/x86_64-unix/wine"
+			[[ -x "$loader" ]] || {
+				echo "error: clean Wine install has no loader: $loader" >&2
 				exit 1
 			}
-			cp "$base_library" "$candidate/Wine/lib/$library"
-		done
-	fi
+			for name in wine wine64 wineloader; do
+				ln -sf ../lib/wine/x86_64-unix/wine "$candidate/Wine/bin/$name"
+			done
+			ln -sf wine64 "$candidate/Wine/bin/Arknights"
+			for library in libMoltenVK.dylib; do
+				base_library="$stage_root/base/Libraries/Wine/lib/$library"
+				[[ -f "$base_library" ]] || {
+					echo "error: pinned base is missing required payload: Wine/lib/$library" >&2
+					exit 1
+				}
+				cp "$base_library" "$candidate/Wine/lib/$library"
+			done
+		fi
 
-	overlay_wine_file() {
-		local relative="$1"
-		[[ -f "$wine_install/$relative" ]] || {
-			echo "error: patched Wine output is missing: $relative" >&2
-			exit 1
+		overlay_wine_file() {
+			local relative="$1"
+			[[ -f "$wine_install/$relative" ]] || {
+				echo "error: patched Wine output is missing: $relative" >&2
+				exit 1
+			}
+			cp "$wine_install/$relative" "$candidate/Wine/$relative"
 		}
-		cp "$wine_install/$relative" "$candidate/Wine/$relative"
-	}
 
-	if [[ "$stage" == audio || "$stage" == combined ]]; then
-		overlay_wine_file lib/wine/x86_64-unix/winecoreaudio.so
-		patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/winecoreaudio.so")
-	fi
-	if [[ "$stage" == ace || "$stage" == cef || "$stage" == combined ]]; then
-		overlay_wine_file lib/wine/x86_64-windows/ntdll.dll
-		x86_64-w64-mingw32-strip --strip-debug \
-			"$candidate/Wine/lib/wine/x86_64-windows/ntdll.dll"
-	fi
-	if [[ "$stage" == ace || "$stage" == combined ]]; then
-		overlay_wine_file lib/wine/x86_64-unix/winemac.so
-		patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/winemac.so")
-		overlay_wine_file lib/wine/x86_64-unix/ntdll.so
-		patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/ntdll.so")
-		overlay_wine_file lib/wine/x86_64-windows/kernel32.dll
-		overlay_wine_file lib/wine/x86_64-windows/ntoskrnl.exe
-		overlay_wine_file lib/wine/i386-windows/ntoskrnl.exe
-		x86_64-w64-mingw32-strip --strip-debug \
-			"$candidate/Wine/lib/wine/x86_64-windows/kernel32.dll" \
-			"$candidate/Wine/lib/wine/x86_64-windows/ntoskrnl.exe"
-		i686-w64-mingw32-strip --strip-debug \
-			"$candidate/Wine/lib/wine/i386-windows/ntoskrnl.exe"
-	fi
-	if [[ "$stage" == cn || "$stage" == combined ]]; then
-		overlay_wine_file lib/wine/x86_64-unix/win32u.so
-		patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/win32u.so")
-		if [[ "$stage" == cn ]]; then
+		if [[ "$stage" == audio || "$stage" == combined ]]; then
+			overlay_wine_file lib/wine/x86_64-unix/winecoreaudio.so
+			patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/winecoreaudio.so")
+		fi
+		if [[ "$stage" == ace || "$stage" == cef || "$stage" == combined ]]; then
+			overlay_wine_file lib/wine/x86_64-windows/ntdll.dll
+			x86_64-w64-mingw32-strip --strip-debug \
+				"$candidate/Wine/lib/wine/x86_64-windows/ntdll.dll"
+		fi
+		if [[ "$stage" == ace || "$stage" == combined ]]; then
 			overlay_wine_file lib/wine/x86_64-unix/winemac.so
 			patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/winemac.so")
+			overlay_wine_file lib/wine/x86_64-unix/ntdll.so
+			patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/ntdll.so")
+			overlay_wine_file lib/wine/x86_64-windows/kernel32.dll
+			overlay_wine_file lib/wine/x86_64-windows/ntoskrnl.exe
+			overlay_wine_file lib/wine/i386-windows/ntoskrnl.exe
+			x86_64-w64-mingw32-strip --strip-debug \
+				"$candidate/Wine/lib/wine/x86_64-windows/kernel32.dll" \
+				"$candidate/Wine/lib/wine/x86_64-windows/ntoskrnl.exe"
+			i686-w64-mingw32-strip --strip-debug \
+				"$candidate/Wine/lib/wine/i386-windows/ntoskrnl.exe"
 		fi
-	fi
+		if [[ "$stage" == cn || "$stage" == combined ]]; then
+			overlay_wine_file lib/wine/x86_64-unix/win32u.so
+			patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/win32u.so")
+			if [[ "$stage" == cn ]]; then
+				overlay_wine_file lib/wine/x86_64-unix/winemac.so
+				patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/winemac.so")
+			fi
+		fi
 
+	fi
 	for binary in "${patched_machos[@]}"; do
 		while IFS= read -r reference; do
 			dependency="$candidate/Wine/lib/$(basename "$reference")"

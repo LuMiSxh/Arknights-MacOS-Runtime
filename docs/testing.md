@@ -10,7 +10,7 @@
 2. `just monitor`: verifies every pinned upstream commit and reports newer repository heads without
    changing the lock.
 3. `just prepare base`: verifies the unmodified source pins.
-4. `just prepare audio`, `cursor`, `performance`, `ace`, `cef`, and `cn`: applies each family independently without fuzz.
+4. `just prepare audio`, `cursor`, `hardware-cursor`, `performance`, `ace`, `cef`, and `cn`: applies each family independently without fuzz.
 5. `just build combined`: builds an isolated overlay canary for iteration; it is not a release
    build.
 6. `just verify`: checks archive paths, file types, DXMT native-loader markers, dependency references,
@@ -45,6 +45,9 @@ variation, then use the same scene, settings, warm-up, and duration for the A/B 
   reconnect, mute, volume, sleep/wake, browser audio, and a long session.
 - Cursor: compare frame latency 3, 2, and 1 at identical graphics settings, VSync modes, refresh
   rates, and capture method; record FPS, frame pacing, stutter, crashes, and cursor latency.
+- Hardware Cursor: compare the absent, `0`, invalid, and `1` values; confirm only the exact
+  `a9d41799f1af1868f2db495671227cd4.bin` asset is hidden, and verify the game continues to show and
+  move the macOS pointer. The runtime never edits or replaces game files.
 - Performance: apply the performance stage and run a startup and rendering smoke test after
   restarting the game. Record crashes, missing effects, and frame times. The device-initialization
   correction is unconditional and has no runtime flag. The release statistics gate is compile-time

@@ -28,6 +28,7 @@ STAGES = (
     "base",
     "audio",
     "cursor",
+    "hardware-cursor",
     "performance",
     "ace",
     "cef",
@@ -177,7 +178,15 @@ def load_lock(
         seen_ids.add(patch_id)
         if component not in sources:
             raise LockError(f"unknown patch component: {component}")
-        if family not in ("audio", "cursor", "performance", "ace", "cef", "cn"):
+        if family not in (
+            "audio",
+            "cursor",
+            "hardware-cursor",
+            "performance",
+            "ace",
+            "cef",
+            "cn",
+        ):
             raise LockError(f"unknown patch family: {family}")
         if HASH_PATTERN.fullmatch(expected) is None:
             raise LockError(f"patch {patch_id} has an invalid SHA-256 hash")

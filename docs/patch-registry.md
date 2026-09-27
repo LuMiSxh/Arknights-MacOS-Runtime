@@ -41,6 +41,28 @@ Value `0` is an Arknights extension that waits for the current frame completion 
 commit. It means no completed GPU frame remains queued; it does not use DXGI's device-level
 zero-as-default semantics and can substantially reduce throughput or smoothness.
 
+## Hardware Cursor
+
+| Field             | Value                                                                                                                                                                                        |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ID                | `wine-hardware-cursor-suppression`                                                                                                                                                           |
+| File              | `patches/wine/hardware-cursor/0001-ntdll-hide-software-cursor-asset.patch`                                                                                                                   |
+| Component/base    | WineCX `e0aa380780b73e20fabcfe78fd42713b94929a53` (Wine 11.17)                                                                                                                               |
+| Source/author     | Original Arknights macOS Runtime change; motivated by the [reported PC cursor stutter](https://www.reddit.com/r/arknights/comments/1vorlzp/pc_client_fix_for_the_annoying_mouse_stuttering/) |
+| License           | LGPL-2.1-or-later, matching Wine                                                                                                                                                             |
+| Gate              | Exact `ARKNIGHTS_RUNTIME_HARDWARE_CURSOR=1`, checked during shared file-name resolution                                                                                                      |
+| Inactive behavior | Wine resolves the game asset normally when the variable is absent, `0`, or invalid                                                                                                           |
+| Automated gate    | Hash, clean `git apply --check`, focused `ntdll.so` build, and Wine test-object compilation for exact/case variants and attribute APIs                                                       |
+| Manual gate       | Compare the game's software sprite with the macOS pointer using the exact asset present                                                                                                      |
+| Removal           | Drop if the client no longer uses this asset or Wine provides an equivalent supported control                                                                                                |
+
+The filter matches only the case-insensitive final basename `a9d41799f1af1868f2db495671227cd4.bin`.
+It converts both successful lookups and `STATUS_NO_SUCH_FILE` into
+`STATUS_OBJECT_NAME_NOT_FOUND`, clears the resolved Unix path, and therefore prevents
+create-if-missing paths from recreating the file. Placing the filter in shared name resolution makes
+`NtCreateFile`, `NtQueryAttributesFile`, and `NtQueryFullAttributesFile` observe the same hidden
+asset. No game asset is copied or modified.
+
 ## Performance
 
 | Field             | Value                                                                                                     |

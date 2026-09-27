@@ -83,6 +83,13 @@
       "sha256": "fca46f29fc586576e99cd9f518180a0dcdde4ff1205153a273de1a4755d02ae5"
     },
     {
+      "id": "wine-hardware-cursor-suppression",
+      "component": "wine",
+      "family": "hardware-cursor",
+      "path": "patches/wine/hardware-cursor/0001-ntdll-hide-software-cursor-asset.patch",
+      "sha256": "91af0383e4a5351ab9e1f992096609f211b384e6473e00701fd2c316aecbf8ec"
+    },
+    {
       "id": "dxmt-command-context-device-initialization",
       "component": "dxmt",
       "family": "performance",
