@@ -21,9 +21,9 @@ libidn2, p11-kit, libunistring, GMP, Vulkan-Headers, FFmpeg, GLib, ORC, GStreame
 gst-plugins-base, gst-plugins-good, gst-plugins-bad, and gst-libav. The build follows Mach-O
 references and records the additional transitive libraries in the generated inventory.
 
-The opt-in Hardware Cursor Wine patch filters one exact Arknights asset basename during file-name
-resolution. It does not contain, redistribute, or modify game assets; the game installation remains
-user-owned and unchanged.
+The opt-in Hardware Cursor Wine patch filters the exact region-specific Arknights cursor asset
+basename during file-name resolution. It does not contain, redistribute, or modify game assets; the
+game installation remains user-owned and unchanged.
 
 ## Generated release inventory
 

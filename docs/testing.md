@@ -46,8 +46,9 @@ variation, then use the same scene, settings, warm-up, and duration for the A/B 
 - Cursor: compare frame latency 3, 2, and 1 at identical graphics settings, VSync modes, refresh
   rates, and capture method; record FPS, frame pacing, stutter, crashes, and cursor latency.
 - Hardware Cursor: compare the absent, `0`, invalid, and `1` values; confirm only the exact
-  `a9d41799f1af1868f2db495671227cd4.bin` asset is hidden, and verify the game continues to show and
-  move the macOS pointer. The runtime never edits or replaces game files.
+  `a9d41799f1af1868f2db495671227cd4.bin` (Yostar/TW) or
+  `f7bcd64480c4566f25d65d642f5fba95.bin` (CN) asset is hidden, and verify the game continues to show
+  and move the macOS pointer. The runtime never edits or replaces game files.
 - Performance: apply the performance stage and run a startup and rendering smoke test after
   restarting the game. Record crashes, missing effects, and frame times. The device-initialization
   correction is unconditional and has no runtime flag. The release statistics gate is compile-time

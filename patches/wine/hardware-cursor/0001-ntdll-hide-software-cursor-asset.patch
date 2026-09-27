@@ -10,7 +10,7 @@ index cb9a0d98..cb359370 100644
  
  #include "ntstatus.h"
  /* Define WIN32_NO_STATUS so MSVC does not give us duplicate macro
-@@ -5085,6 +5086,88 @@ static void test_NtCreateFile(void)
+@@ -5085,6 +5086,92 @@ static void test_NtCreateFile(void)
      RemoveDirectoryW( path );
  }
  
@@ -20,8 +20,12 @@ index cb9a0d98..cb359370 100644
 +    {
 +        "a9d41799f1af1868f2db495671227cd4.bin",
 +        "A9D41799F1AF1868F2DB495671227CD4.BIN",
++        "f7bcd64480c4566f25d65d642f5fba95.bin",
++        "F7BCD64480C4566F25D65D642F5FBA95.BIN",
 +        "prefix-a9d41799f1af1868f2db495671227cd4.bin",
 +        "a9d41799f1af1868f2db495671227cd4.bin.extra",
++        "prefix-f7bcd64480c4566f25d65d642f5fba95.bin",
++        "f7bcd64480c4566f25d65d642f5fba95.bin.extra",
 +        "other.bin"
 +    };
 +    char env[16], dir[MAX_PATH], path[MAX_PATH];
@@ -52,7 +56,7 @@ index cb9a0d98..cb359370 100644
 +        FILE_BASIC_INFORMATION basic;
 +        FILE_NETWORK_OPEN_INFORMATION full;
 +        WCHAR pathW[MAX_PATH];
-+        BOOL blocked = enabled && i < 2;
++        BOOL blocked = enabled && i < 4;
 +
 +        lstrcpyA( path, dir );
 +        lstrcatA( path, "\\" );
@@ -99,7 +103,7 @@ index cb9a0d98..cb359370 100644
  static void test_read_write(void)
  {
      static const char contents[14] = "1234567890abcd";
-@@ -7603,6 +7686,7 @@ START_TEST(file)
+@@ -7603,6 +7690,7 @@ START_TEST(file)
  
      test_read_write();
      test_NtCreateFile();
@@ -142,7 +146,7 @@ index 55a0ddac..30c0fa9a 100644
  /***********************************************************************
   *           get_nt_and_unix_names
   *
-@@ -4435,6 +4452,20 @@ NTSTATUS get_nt_and_unix_names( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *nt_name
+@@ -4435,6 +4452,22 @@ NTSTATUS get_nt_and_unix_names( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *nt_name
          status = nt_to_unix_file_name( attr, nt_name, unix_name_ret, disposition, open_reparse );
      }
  
@@ -150,9 +154,11 @@ index 55a0ddac..30c0fa9a 100644
 +    {
 +        const char *basename = strrchr( *unix_name_ret, '/' );
 +
++        const char *name = basename ? basename + 1 : *unix_name_ret;
++
 +        if (arknights_runtime_hardware_cursor_enabled() &&
-+            !strcasecmp( basename ? basename + 1 : *unix_name_ret,
-+                         "a9d41799f1af1868f2db495671227cd4.bin" ))
++            (!strcasecmp( name, "a9d41799f1af1868f2db495671227cd4.bin" ) ||
++             !strcasecmp( name, "f7bcd64480c4566f25d65d642f5fba95.bin" )))
 +        {
 +            free( *unix_name_ret );
 +            *unix_name_ret = NULL;

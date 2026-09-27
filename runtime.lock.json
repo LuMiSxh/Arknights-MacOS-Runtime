@@ -87,7 +87,7 @@
       "component": "wine",
       "family": "hardware-cursor",
       "path": "patches/wine/hardware-cursor/0001-ntdll-hide-software-cursor-asset.patch",
-      "sha256": "91af0383e4a5351ab9e1f992096609f211b384e6473e00701fd2c316aecbf8ec"
+      "sha256": "ce4c5416840a23a1a526a8273abd1373fc36507e1a1d97b97fdade6bf9a1347d"
     },
     {
       "id": "dxmt-command-context-device-initialization",

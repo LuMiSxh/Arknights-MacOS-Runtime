@@ -27,8 +27,9 @@ and `ARKNIGHTS_RUNTIME_CN_COMPAT` accept only `0` or `1`;
 the documented defaults. The ACE gate owns the kernel, dispatcher, Rosetta, and timing routes; the CEF gate
 owns descriptor-driven CEF loader preflights, with the CN gate as a legacy fallback only when CEF is absent;
 the CN gate also owns the Bilibili window preflights documented in the [patch registry](patch-registry.md#cn).
-The hardware-cursor gate hides only the exact cursor asset basename during shared Wine path resolution,
-so open and attribute queries observe the same result and create-if-missing calls cannot recreate it.
+The hardware-cursor gate hides the exact Yostar/TW or Bilibili CN cursor asset basename during shared
+Wine path resolution, so open and attribute queries observe the same result and create-if-missing
+calls cannot recreate either asset.
 The performance family contains the unconditional DXMT command-context initialization correction and
 a `DXMT_DEBUG`-gated release hot-path reduction for presentation statistics. These changes preserve
 debug HUD output and release frame counters; neither changes rendering policy. The launcher selects the remaining flags from the active

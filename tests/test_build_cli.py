@@ -66,6 +66,7 @@ class BuildCLIContractTests(unittest.TestCase):
 
         self.assertIn("ARKNIGHTS_RUNTIME_HARDWARE_CURSOR", patch)
         self.assertIn("a9d41799f1af1868f2db495671227cd4.bin", patch)
+        self.assertIn("f7bcd64480c4566f25d65d642f5fba95.bin", patch)
         self.assertIn(
             "status == STATUS_SUCCESS || status == STATUS_NO_SUCH_FILE", patch
         )
@@ -76,6 +77,30 @@ class BuildCLIContractTests(unittest.TestCase):
         self.assertIn("test_hardware_cursor_filter", patch)
         self.assertIn("pNtQueryAttributesFile", patch)
         self.assertIn("pNtQueryFullAttributesFile", patch)
+
+    def test_hardware_cursor_patch_matches_yostar_and_cn_assets_under_explicit_gate(
+        self,
+    ) -> None:
+        root = Path(__file__).resolve().parents[1]
+        patch = (
+            root
+            / "patches"
+            / "wine"
+            / "hardware-cursor"
+            / "0001-ntdll-hide-software-cursor-asset.patch"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('enabled = setting && !strcmp( setting, "1" );', patch)
+        self.assertIn('enabled = env_len == 1 && !strcmp( env, "1" );', patch)
+        self.assertIn(
+            '"a9d41799f1af1868f2db495671227cd4.bin" ) ||\n+'
+            '             !strcasecmp( name, "f7bcd64480c4566f25d65d642f5fba95.bin" )',
+            patch,
+        )
+        self.assertIn("BOOL blocked = enabled && i < 4;", patch)
+        self.assertNotIn("arknights_runtime_hardware_cursor_targets_game", patch)
+        self.assertNotIn("ProcessParameters->ImagePathName.Buffer", patch)
+        self.assertNotIn("Arknights.exe", patch)
 
     def test_combined_overlay_replaces_bilibili_renderer_artifacts(self) -> None:
         root = Path(__file__).resolve().parents[1]
