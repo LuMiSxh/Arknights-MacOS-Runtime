@@ -62,7 +62,11 @@ variation, then use the same scene, settings, warm-up, and duration for the A/B 
   descriptor only with its matching module and bytes.
 - CN: compare the absent, `0`, invalid, and `1` control values in an isolated test prefix; for Bilibili,
   complete a captcha and verify its layered renderer and a translucent error toast. Include nested
-  dialogs with a `CMyWebViewDlg` parent-chain match where available. The issue #79 payment flow remains
-  an explicit follow-up and is not considered verified by the captcha check.
+  dialogs with a `CMyWebViewDlg` parent-chain match where available. The issue #79 payment candidate
+  is limited to a `Chrome_WidgetWin_0` `WS_CHILD` non-popup directly parented by `CefBrowserWindow`,
+  rooted through parent links at a non-child `CPayDlg_P_<suffix>` window, with the same Windows PID
+  for the renderer, parent, and root. The driver must still observe `Chrome.WindowTranslucent` and a
+  layered surface. Offline tests cover the captured tree and wrong parent/root/style/PID, owner-only,
+  and missing-property cases; manual payment rendering remains required.
 - Combined: test all flags absent, each family independently, and all enabled together; cover clean
   shutdown and both fresh and existing test prefixes.
