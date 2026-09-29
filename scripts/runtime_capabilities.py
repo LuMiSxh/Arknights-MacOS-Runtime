@@ -8,7 +8,7 @@ import json
 import os
 import re
 import stat
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any
 
 MAXIMUM_CAPABILITY_MANIFEST_BYTES = 4 * 1_024
@@ -31,11 +31,18 @@ class CapabilityContractError(ValueError):
 def read_capability_manifest_bytes(path: Path) -> bytes:
     if path.is_symlink():
         raise CapabilityContractError("capability manifest must not be a symlink")
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
     try:
         descriptor = os.open(path, flags)
     except OSError as error:
-        raise CapabilityContractError(f"cannot read capability manifest: {error}") from error
+        raise CapabilityContractError(
+            f"cannot read capability manifest: {error}"
+        ) from error
     try:
         with os.fdopen(descriptor, "rb") as source:
             status = os.fstat(source.fileno())
@@ -44,13 +51,19 @@ def read_capability_manifest_bytes(path: Path) -> bytes:
                     "capability manifest must be a regular file"
                 )
             if status.st_size < 0 or status.st_size > MAXIMUM_CAPABILITY_MANIFEST_BYTES:
-                raise CapabilityContractError("capability manifest exceeds the size limit")
+                raise CapabilityContractError(
+                    "capability manifest exceeds the size limit"
+                )
             data = source.read(MAXIMUM_CAPABILITY_MANIFEST_BYTES + 1)
             if len(data) > MAXIMUM_CAPABILITY_MANIFEST_BYTES:
-                raise CapabilityContractError("capability manifest exceeds the size limit")
+                raise CapabilityContractError(
+                    "capability manifest exceeds the size limit"
+                )
             return data
     except OSError as error:
-        raise CapabilityContractError(f"cannot read capability manifest: {error}") from error
+        raise CapabilityContractError(
+            f"cannot read capability manifest: {error}"
+        ) from error
 
 
 def load_capability_manifest(path: Path) -> dict[str, Any]:
@@ -58,13 +71,17 @@ def load_capability_manifest(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(data)
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise CapabilityContractError(f"cannot decode capability manifest: {error}") from error
+        raise CapabilityContractError(
+            f"cannot decode capability manifest: {error}"
+        ) from error
     return validate_manifest_shape(value)
 
 
 def validate_manifest_shape(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != {"schemaVersion", "capabilities"}:
-        raise CapabilityContractError("manifest must contain only schemaVersion and capabilities")
+        raise CapabilityContractError(
+            "manifest must contain only schemaVersion and capabilities"
+        )
     schema_version = value["schemaVersion"]
     if type(schema_version) is not int or schema_version != 1:
         raise CapabilityContractError("capability manifest schemaVersion must be 1")
@@ -89,7 +106,9 @@ def validate_manifest_shape(value: Any) -> dict[str, Any]:
         or default != 3
         or not minimum <= default <= maximum
     ):
-        raise CapabilityContractError("frame latency range must include default 3 within 0..3")
+        raise CapabilityContractError(
+            "frame latency range must include default 3 within 0..3"
+        )
     if type(capabilities["hardwareCursor"]) is not bool:
         raise CapabilityContractError("hardwareCursor capability must be a boolean")
     return value
@@ -134,17 +153,24 @@ def validate_capability_contract(
             )
 
 
+def _manifest_filename(value: object) -> str:
+    if (
+        not isinstance(value, str)
+        or not value
+        or value in (".", "..")
+        or any(separator in value for separator in ("/", "\\", "\0"))
+    ):
+        raise CapabilityContractError(
+            "runtime capability path must be a safe single filename"
+        )
+    return value
+
+
 def _manifest_path(lock: dict[str, Any]) -> str:
     interface = lock.get("interface")
     if not isinstance(interface, dict):
         raise CapabilityContractError("runtime lock has no interface object")
-    value = interface.get("runtimeCapabilities")
-    if not isinstance(value, str) or not value:
-        raise CapabilityContractError("runtime lock has no runtimeCapabilities path")
-    path = PurePosixPath(value)
-    if path.is_absolute() or any(part in ("", ".", "..") for part in path.parts):
-        raise CapabilityContractError("runtimeCapabilities path must be safe and relative")
-    return value
+    return _manifest_filename(interface.get("runtimeCapabilities"))
 
 
 def validate_source_capability_contract(
@@ -168,14 +194,16 @@ def validate_source_capability_contract(
             )
         by_family[family] = matches[0]
     try:
-        latency_patch = (
-            repository_root / by_family["cursor"]["path"]
-        ).read_text(encoding="utf-8")
+        latency_patch = (repository_root / by_family["cursor"]["path"]).read_text(
+            encoding="utf-8"
+        )
         hardware_cursor_patch = (
             repository_root / by_family["hardware-cursor"]["path"]
         ).read_text(encoding="utf-8")
     except (KeyError, OSError, TypeError) as error:
-        raise CapabilityContractError(f"cannot read pinned capability patch: {error}") from error
+        raise CapabilityContractError(
+            f"cannot read pinned capability patch: {error}"
+        ) from error
     validate_capability_contract(
         manifest,
         latency_patch=latency_patch,
@@ -191,15 +219,13 @@ def validate_packaged_capability_manifest(
     source_manifest: dict[str, Any],
     required: bool,
 ) -> None:
-    relative_path = PurePosixPath(manifest_path)
-    if relative_path.is_absolute() or any(
-        part in ("", ".", "..") for part in relative_path.parts
-    ):
-        raise CapabilityContractError("runtime capability path must be safe and relative")
-    package_path = runtime_root.joinpath(*relative_path.parts)
+    filename = _manifest_filename(manifest_path)
+    package_path = runtime_root / filename
     if not package_path.exists() and not package_path.is_symlink():
         if required:
-            raise CapabilityContractError("runtime package is missing its capability manifest")
+            raise CapabilityContractError(
+                "runtime package is missing its capability manifest"
+            )
         return
     manifest = load_capability_manifest(package_path)
     if manifest != source_manifest:

@@ -203,13 +203,28 @@ class ReleaseVerificationTests(unittest.TestCase):
             path.write_text(content, encoding="utf-8")
 
     def _write_runtime_archive(
-        self, manifest: bytes | None, *, include_manifest: bool = True
+        self,
+        manifest: bytes | None,
+        *,
+        include_manifest: bool = True,
+        aliases: tuple[tuple[str, bytes | None], ...] = (),
     ) -> None:
         with tarfile.open(self.archive, "w:gz") as archive:
+            root = tarfile.TarInfo("Libraries")
+            root.type = tarfile.DIRTYPE
+            archive.addfile(root)
             if include_manifest:
                 member = tarfile.TarInfo("Libraries/runtime-capabilities.json")
                 member.size = len(manifest or b"")
                 archive.addfile(member, io.BytesIO(manifest or b""))
+            for name, contents in aliases:
+                member = tarfile.TarInfo(name)
+                if contents is None:
+                    member.type = tarfile.DIRTYPE
+                    archive.addfile(member)
+                else:
+                    member.size = len(contents)
+                    archive.addfile(member, io.BytesIO(contents))
 
     @staticmethod
     def _write_checksum(artifact: Path, checksum: Path) -> None:
@@ -309,12 +324,48 @@ class ReleaseVerificationTests(unittest.TestCase):
         source_manifest = (self.root / "runtime-capabilities.json").read_bytes()
         for contents, include_manifest in ((source_manifest, False), (b"{}", True)):
             with self.subTest(include_manifest=include_manifest):
-                self._write_runtime_archive(
-                    contents, include_manifest=include_manifest
-                )
+                self._write_runtime_archive(contents, include_manifest=include_manifest)
                 self._write_checksum(self.archive, self.checksum)
 
-                with self.assertRaisesRegex(ReleaseValidationError, "capability manifest"):
+                with self.assertRaisesRegex(
+                    ReleaseValidationError, "capability manifest"
+                ):
+                    self._verify()
+
+    def test_rejects_runtime_and_source_manifest_archive_aliases(self) -> None:
+        expected = (self.root / "runtime-capabilities.json").read_bytes()
+        mutations = (
+            ("runtime", "Libraries/./runtime-capabilities.json", b"{}"),
+            ("runtime", "Libraries/.", None),
+            ("source", "runtime-capabilities.json/.", None),
+        )
+        for artifact, alias, contents in mutations:
+            with self.subTest(artifact=artifact, alias=alias):
+                if artifact == "runtime":
+                    self._write_runtime_archive(
+                        expected,
+                        aliases=((alias, contents),),
+                    )
+                    self._write_checksum(self.archive, self.checksum)
+                else:
+                    with tarfile.open(self.source_archive, "w:gz") as archive:
+                        for name in ("wine-combined", "dxmt-combined"):
+                            archive.add(self.source_root / name, arcname=name)
+                        archive.add(
+                            self.component_inventory,
+                            arcname="runtime-component-inventory.tsv",
+                        )
+                        archive.add(
+                            self.root / "runtime-capabilities.json",
+                            arcname="runtime-capabilities.json",
+                        )
+                        member = tarfile.TarInfo(alias)
+                        member.type = tarfile.DIRTYPE
+                        archive.addfile(member)
+                    self._write_checksum(self.source_archive, self.source_checksum)
+                with self.assertRaisesRegex(
+                    ReleaseValidationError, "capability manifest"
+                ):
                     self._verify()
 
     def test_rejects_unsafe_source_archive_member(self) -> None:

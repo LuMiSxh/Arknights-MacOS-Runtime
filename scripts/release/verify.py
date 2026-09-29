@@ -174,9 +174,47 @@ def _validate_source_archive(path: Path, checksum: Path) -> str:
 
 
 def _read_archive_member(path: Path, member_name: str, description: str) -> bytes:
+    target = PurePosixPath(member_name)
+    if target.is_absolute() or not target.parts or ".." in target.parts:
+        raise ReleaseValidationError("capability manifest path is not safe")
+    target_parts = target.parts
+    canonical_name = "/".join(target_parts)
     try:
         with tarfile.open(path, mode="r:gz") as archive:
-            matches = [member for member in archive.getmembers() if member.name == member_name]
+            matches = []
+            for member in archive.getmembers():
+                raw_name = member.name
+                normalized = PurePosixPath(raw_name.lstrip("/"))
+                if not normalized.parts or normalized.parts[0] != target_parts[0]:
+                    continue
+                if normalized.is_absolute() or ".." in normalized.parts:
+                    raise ReleaseValidationError(
+                        f"{description} contains an unsafe capability manifest path: {raw_name}"
+                    )
+                if normalized.parts == target_parts:
+                    if raw_name != canonical_name:
+                        raise ReleaseValidationError(
+                            f"{description} contains a non-canonical capability manifest alias: {raw_name}"
+                        )
+                    matches.append(member)
+                    continue
+                if (
+                    len(normalized.parts) < len(target_parts)
+                    and target_parts[: len(normalized.parts)] == normalized.parts
+                ):
+                    canonical_parent = "/".join(normalized.parts)
+                    if (
+                        raw_name not in (canonical_parent, f"{canonical_parent}/")
+                        or not member.isdir()
+                    ):
+                        raise ReleaseValidationError(
+                            f"{description} contains a capability manifest parent alias: {raw_name}"
+                        )
+                    continue
+                if normalized.parts[: len(target_parts)] == target_parts:
+                    raise ReleaseValidationError(
+                        f"{description} contains a capability manifest child alias: {raw_name}"
+                    )
             if len(matches) != 1 or not matches[0].isfile():
                 raise ReleaseValidationError(
                     f"{description} is missing a regular capability manifest: {member_name}"
