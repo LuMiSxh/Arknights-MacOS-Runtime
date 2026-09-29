@@ -16,5 +16,8 @@ licenses, and the documented manual compatibility checks.
    the exact built SHA. It explicitly leaves the release non-latest and unpublished.
 4. Inspect and test those exact assets; never substitute a local rebuild. Publish the unchanged draft
    only after the corresponding-source, notice, and manual compatibility review.
-5. A failed retry cannot reuse a version after a tag or release exists; corrections receive a new
+5. Treat the runtime archive, corresponding source archive, lock, and capability manifest as one
+   immutable versioned contract. Build the producer manifest into `Libraries/` before creating the
+   draft; update consumer pins only after the exact published artifacts and checksums are available.
+6. A failed retry cannot reuse a version after a tag or release exists; corrections receive a new
    version. Consumers roll back by restoring the previous immutable artifact URL and checksum.

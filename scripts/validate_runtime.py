@@ -16,9 +16,19 @@ from pathlib import Path
 if __package__:
     from .lib.console import error, success
     from .runtime import BUILD_ROOT, LOCK_PATH, load_lock
+    from .runtime_capabilities import (
+        CapabilityContractError,
+        validate_packaged_capability_manifest,
+        validate_source_capability_contract,
+    )
 else:
     from lib.console import error, success
     from runtime import BUILD_ROOT, LOCK_PATH, load_lock
+    from runtime_capabilities import (
+        CapabilityContractError,
+        validate_packaged_capability_manifest,
+        validate_source_capability_contract,
+    )
 
 
 MINOS_PATTERN = re.compile(r"\bminos\s+([0-9]+(?:\.[0-9]+){1,2})")
@@ -159,6 +169,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("runtime", type=Path)
     parser.add_argument("--baseline", type=Path)
+    parser.add_argument("--require-capabilities", action="store_true")
     arguments = parser.parse_args()
     lock = load_lock(LOCK_PATH)
     required_paths = [
@@ -166,6 +177,13 @@ def main() -> int:
         *lock["interface"]["requiredFiles"],
     ]
     try:
+        source_manifest = validate_source_capability_contract(lock, LOCK_PATH.parent)
+        validate_packaged_capability_manifest(
+            arguments.runtime,
+            manifest_path=lock["interface"]["runtimeCapabilities"],
+            source_manifest=source_manifest,
+            required=arguments.require_capabilities,
+        )
         validate_structure(arguments.runtime, required_paths)
         architecture_count = validate_required_architectures(
             arguments.runtime, required_paths
@@ -175,6 +193,7 @@ def main() -> int:
         )
     except (
         RuntimeValidationError,
+        CapabilityContractError,
         OSError,
         subprocess.CalledProcessError,
     ) as caught_error:

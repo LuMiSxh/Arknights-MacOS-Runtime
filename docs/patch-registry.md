@@ -64,6 +64,14 @@ create-if-missing paths from recreating the file. Placing the filter in shared n
 `NtCreateFile`, `NtQueryAttributesFile`, and `NtQueryFullAttributesFile` observe the same hidden
 asset. No game asset is copied or modified.
 
+## Runtime capability manifest
+
+`Libraries/runtime-capabilities.json` is the versioned producer contract consumed from the packaged
+runtime tree. Schema version 1 advertises the supported DXMT frame-latency range and default plus
+hardware-cursor support. Release validation checks the manifest against the pinned patch semantics
+and requires the packaged copy to match the source manifest. Legacy/custom runtime trees may omit it;
+consumers then retain conservative defaults.
+
 ## Performance
 
 | Field             | Value                                                                                                     |

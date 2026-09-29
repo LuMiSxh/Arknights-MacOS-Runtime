@@ -49,6 +49,7 @@
   "interface": {
     "wineDirectory": "Wine",
     "dxmtDirectory": "DXMT",
+    "runtimeCapabilities": "runtime-capabilities.json",
     "executables": [
       "Wine/bin/Arknights",
       "Wine/bin/wine64",

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "capabilities": {
+    "dxmtMaximumFrameLatency": {
+      "minimum": 0,
+      "maximum": 3,
+      "defaultValue": 3
+    },
+    "hardwareCursor": true
+  }
+}
