@@ -121,6 +121,7 @@ else
 		done
 	done
 fi
+wine_configure_flags+=(--prefix=/opt/whiskywine)
 
 pkg_config_path=""
 include_flags=""
@@ -175,8 +176,7 @@ mkdir -p "$wine_build"
 		--without-x --without-wayland --without-oss --without-alsa --without-pulse \
 		--without-sane --without-usb --without-v4l2 --without-pcap --without-capi \
 		--without-opencl --without-cups \
-		"${wine_configure_flags[@]}" \
-		--prefix=/opt/whiskywine
+		"${wine_configure_flags[@]}"
 	if [[ "$stage" != hardware-cursor ]]; then
 		grep -q '^#define HAVE_FFMPEG 1' include/config.h
 		grep -qE '^GSTREAMER_LIBS *= *.+' Makefile
