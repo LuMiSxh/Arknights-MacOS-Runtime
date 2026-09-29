@@ -57,11 +57,13 @@ if [[ -e "$stage_root" ]]; then
 fi
 
 run_python "$repository_root/scripts/runtime.py" validate-lock
+capability_manifest="$(run_python -c 'import json,sys; print(json.load(open(sys.argv[1]))["interface"]["runtimeCapabilities"])' "$lock")"
 base_archive="$(run_python "$repository_root/scripts/runtime.py" fetch-base)"
 mkdir -p "$stage_root/base" "$stage_root/candidate"
 tar -xzf "$base_archive" -C "$stage_root/base"
 if [[ "$build_mode" == "--clean-release" ]]; then
 	mkdir -p "$stage_root/candidate/Libraries"
+	cp "$repository_root/$capability_manifest" "$stage_root/candidate/Libraries/$capability_manifest"
 elif ! cp -cR "$stage_root/base/Libraries" "$stage_root/candidate/Libraries" 2>/dev/null; then
 	cp -R "$stage_root/base/Libraries" "$stage_root/candidate/Libraries"
 fi
@@ -399,7 +401,7 @@ if [[ "$stage" == cursor || "$stage" == performance || "$stage" == combined ]]; 
 fi
 
 if [[ "$build_mode" == "--clean-release" ]]; then
-	run_python "$repository_root/scripts/validate_runtime.py" "$candidate"
+	run_python "$repository_root/scripts/validate_runtime.py" "$candidate" --require-capabilities
 	component_inventory="$stage_root/runtime-component-inventory.tsv"
 	{
 		printf 'component\trole\tsource\n'

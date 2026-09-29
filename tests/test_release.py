@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import re
 import tarfile
@@ -23,7 +24,9 @@ class ReleaseVerificationTests(unittest.TestCase):
         self.root = Path(self.temporary_directory.name)
         self._write_repository()
         self.archive = self.root / "runtime.tar.gz"
-        self.archive.write_bytes(b"runtime")
+        self._write_runtime_archive(
+            (self.root / "runtime-capabilities.json").read_bytes()
+        )
         self.checksum = self.root / "runtime.tar.gz.sha256"
         self._write_checksum(self.archive, self.checksum)
         self.source_root = self.root / "sources"
@@ -43,6 +46,10 @@ class ReleaseVerificationTests(unittest.TestCase):
             archive.add(
                 self.component_inventory,
                 arcname="runtime-component-inventory.tsv",
+            )
+            archive.add(
+                self.root / "runtime-capabilities.json",
+                arcname="runtime-capabilities.json",
             )
         self.source_checksum = self.root / "sources.tar.gz.sha256"
         self._write_checksum(self.source_archive, self.source_checksum)
@@ -78,7 +85,27 @@ class ReleaseVerificationTests(unittest.TestCase):
         for patch_id, family in patch_definitions:
             patch = self.root / f"patches/{patch_id}.patch"
             patch.parent.mkdir(parents=True, exist_ok=True)
-            content = f"{patch_id}\n"
+            if family == "cursor":
+                content = (
+                    '+const auto configured = dxmt::env::getEnvVar("ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY");\n'
+                    "+if (configured.size() == 1 && configured.front() >= '0' && configured.front() <= '3')\n"
+                    "+  return static_cast<uint32_t>(configured.front() - '0');\n"
+                    "+return uint32_t{3};\n"
+                    "+max_latency_(configured_max_latency()),\n"
+                )
+            elif family == "hardware-cursor":
+                content = (
+                    "+static BOOL arknights_runtime_hardware_cursor_enabled(void)\n"
+                    "+{\n"
+                    '+    const char *setting = getenv( "ARKNIGHTS_RUNTIME_HARDWARE_CURSOR" );\n'
+                    '+    return setting && !strcmp( setting, "1" );\n'
+                    "+}\n"
+                    "+if (arknights_runtime_hardware_cursor_enabled() &&\n"
+                    '+    (!strcasecmp( name, "a9d41799f1af1868f2db495671227cd4.bin" ) ||\n'
+                    '+     !strcasecmp( name, "f7bcd64480c4566f25d65d642f5fba95.bin" )))\n'
+                )
+            else:
+                content = f"{patch_id}\n"
             patch.write_text(content, encoding="utf-8")
             patches.append(
                 {
@@ -137,9 +164,26 @@ class ReleaseVerificationTests(unittest.TestCase):
                     "commit": "2" * 40,
                 }
             },
+            "interface": {"runtimeCapabilities": "runtime-capabilities.json"},
             "patches": patches,
         }
         (self.root / "runtime.lock.json").write_text(json.dumps(lock), encoding="utf-8")
+        (self.root / "runtime-capabilities.json").write_text(
+            json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "capabilities": {
+                        "dxmtMaximumFrameLatency": {
+                            "minimum": 0,
+                            "maximum": 3,
+                            "defaultValue": 3,
+                        },
+                        "hardwareCursor": True,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
         for relative, content in {
             "LICENSE": "project license\n",
             "LICENSES/Wine-LGPL-2.1.txt": "wine license\n",
@@ -157,6 +201,15 @@ class ReleaseVerificationTests(unittest.TestCase):
             path = self.root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
+
+    def _write_runtime_archive(
+        self, manifest: bytes | None, *, include_manifest: bool = True
+    ) -> None:
+        with tarfile.open(self.archive, "w:gz") as archive:
+            if include_manifest:
+                member = tarfile.TarInfo("Libraries/runtime-capabilities.json")
+                member.size = len(manifest or b"")
+                archive.addfile(member, io.BytesIO(manifest or b""))
 
     @staticmethod
     def _write_checksum(artifact: Path, checksum: Path) -> None:
@@ -249,6 +302,20 @@ class ReleaseVerificationTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ReleaseValidationError, "names"):
             self._verify()
+
+    def test_rejects_release_archives_with_missing_or_mismatched_capability_manifest(
+        self,
+    ) -> None:
+        source_manifest = (self.root / "runtime-capabilities.json").read_bytes()
+        for contents, include_manifest in ((source_manifest, False), (b"{}", True)):
+            with self.subTest(include_manifest=include_manifest):
+                self._write_runtime_archive(
+                    contents, include_manifest=include_manifest
+                )
+                self._write_checksum(self.archive, self.checksum)
+
+                with self.assertRaisesRegex(ReleaseValidationError, "capability manifest"):
+                    self._verify()
 
     def test_rejects_unsafe_source_archive_member(self) -> None:
         with tarfile.open(self.source_archive, "w:gz") as archive:

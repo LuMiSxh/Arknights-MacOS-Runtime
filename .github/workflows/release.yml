@@ -122,7 +122,7 @@ jobs:
                   tar -czf "$source_archive" --exclude='.git' \
                     -C "$source_root" wine-combined dxmt-combined \
                     -C "$stage_directory" runtime-component-inventory.tsv \
-                    -C "$GITHUB_WORKSPACE" patches runtime.lock.json docs/patch-registry.md \
+                    -C "$GITHUB_WORKSPACE" patches runtime.lock.json runtime-capabilities.json docs/patch-registry.md \
                     docs/legal LICENSE LICENSES
                   (
                     cd "$RELEASE_DIRECTORY"

@@ -16,10 +16,20 @@ from typing import Any
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 if __package__:
     from ..runtime import LockError, _sha256_file, load_lock
+    from ..runtime_capabilities import (
+        CapabilityContractError,
+        read_capability_manifest_bytes,
+        validate_source_capability_contract,
+    )
 else:
     if str(REPOSITORY_ROOT) not in sys.path:
         sys.path.insert(0, str(REPOSITORY_ROOT))
     from scripts.runtime import LockError, _sha256_file, load_lock
+    from scripts.runtime_capabilities import (
+        CapabilityContractError,
+        read_capability_manifest_bytes,
+        validate_source_capability_contract,
+    )
 
 
 SEMVER_CORE_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
@@ -44,6 +54,7 @@ SOURCE_ARCHIVE_MEMBERS = (
     "wine-combined",
     "dxmt-combined",
     "runtime-component-inventory.tsv",
+    "runtime-capabilities.json",
 )
 SOURCE_DIRECTORIES = SOURCE_ARCHIVE_MEMBERS[:2]
 REQUIRED_PATCH_FAMILIES = frozenset(
@@ -160,6 +171,66 @@ def _validate_source_archive(path: Path, checksum: Path) -> str:
             "corresponding-source archive is missing: " + ", ".join(missing)
         )
     return digest
+
+
+def _read_archive_member(path: Path, member_name: str, description: str) -> bytes:
+    try:
+        with tarfile.open(path, mode="r:gz") as archive:
+            matches = [member for member in archive.getmembers() if member.name == member_name]
+            if len(matches) != 1 or not matches[0].isfile():
+                raise ReleaseValidationError(
+                    f"{description} is missing a regular capability manifest: {member_name}"
+                )
+            member = matches[0]
+            if member.size < 0 or member.size > 4 * 1_024:
+                raise ReleaseValidationError(
+                    f"{description} capability manifest exceeds the size limit"
+                )
+            stream = archive.extractfile(member)
+            if stream is None:
+                raise ReleaseValidationError(
+                    f"{description} capability manifest cannot be read"
+                )
+            contents = stream.read(4 * 1_024 + 1)
+            if len(contents) != member.size or len(contents) > 4 * 1_024:
+                raise ReleaseValidationError(
+                    f"{description} capability manifest has an invalid size"
+                )
+            return contents
+    except (OSError, tarfile.TarError) as error:
+        raise ReleaseValidationError(f"cannot inspect {description}: {path}") from error
+
+
+def _validate_capability_archives(
+    runtime_archive: Path,
+    source_archive: Path,
+    *,
+    manifest_path: str,
+    repository_root: Path,
+) -> None:
+    expected_path = repository_root / manifest_path
+    try:
+        expected = read_capability_manifest_bytes(expected_path)
+    except CapabilityContractError as error:
+        raise ReleaseValidationError(
+            f"cannot read runtime capability manifest: {error}"
+        ) from error
+    source_contents = _read_archive_member(
+        source_archive, manifest_path, "corresponding-source archive"
+    )
+    if source_contents != expected:
+        raise ReleaseValidationError(
+            "corresponding-source capability manifest does not match the pinned recipe"
+        )
+    package_contents = _read_archive_member(
+        runtime_archive,
+        f"Libraries/{manifest_path}",
+        "runtime archive",
+    )
+    if package_contents != expected:
+        raise ReleaseValidationError(
+            "runtime archive capability manifest does not match the pinned recipe"
+        )
 
 
 def _validate_source_directories(source_root: Path) -> None:
@@ -281,8 +352,18 @@ def verify_release(
         raise ReleaseValidationError(
             f"runtime lock validation failed: {error}"
         ) from error
-    _validate_notices(repository_root, lock)
+    except CapabilityContractError as error:
+        raise ReleaseValidationError(
+            f"runtime capability contract validation failed: {error}"
+        ) from error
     _validate_patch_families(lock)
+    try:
+        validate_source_capability_contract(lock, repository_root)
+    except CapabilityContractError as error:
+        raise ReleaseValidationError(
+            f"runtime capability contract validation failed: {error}"
+        ) from error
+    _validate_notices(repository_root, lock)
     inventory_text = _regular_file(
         component_inventory, "runtime component inventory"
     ).read_text(encoding="utf-8")
@@ -292,6 +373,12 @@ def verify_release(
     _validate_source_directories(source_root)
     archive_digest = _verify_checksum(archive, checksum, "runtime archive")
     source_digest = _validate_source_archive(source_archive, source_checksum)
+    _validate_capability_archives(
+        archive,
+        source_archive,
+        manifest_path=lock["interface"]["runtimeCapabilities"],
+        repository_root=repository_root,
+    )
 
     output_directory.mkdir(parents=True, exist_ok=True)
     provenance_path = output_directory / "provenance.json"

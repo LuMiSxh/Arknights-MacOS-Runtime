@@ -18,8 +18,10 @@ from urllib.parse import urlparse
 
 if __package__:
     from .lib.console import Progress, error, info, success
+    from .runtime_capabilities import validate_source_capability_contract
 else:
     from lib.console import Progress, error, info, success
+    from runtime_capabilities import validate_source_capability_contract
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCK_PATH = ROOT / "runtime.lock.json"
@@ -289,7 +291,8 @@ def main() -> int:
     arguments = parser.parse_args()
     try:
         if arguments.command == "validate-lock":
-            load_lock()
+            lock = load_lock()
+            validate_source_capability_contract(lock, ROOT)
             success("Validated runtime.lock.json")
         elif arguments.command == "prepare":
             prepare(
