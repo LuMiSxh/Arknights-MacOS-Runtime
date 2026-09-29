@@ -1,0 +1,171 @@
+diff --git a/dlls/ntdll/tests/file.c b/dlls/ntdll/tests/file.c
+index cb9a0d98..cb359370 100644
+--- a/dlls/ntdll/tests/file.c
++++ b/dlls/ntdll/tests/file.c
+@@ -26,6 +26,7 @@
+ 
+ #include <stdio.h>
+ #include <stdarg.h>
++#include <string.h>
+ 
+ #include "ntstatus.h"
+ /* Define WIN32_NO_STATUS so MSVC does not give us duplicate macro
+@@ -5085,6 +5086,92 @@ static void test_NtCreateFile(void)
+     RemoveDirectoryW( path );
+ }
+ 
++static void test_hardware_cursor_filter(void)
++{
++    static const char *const names[] =
++    {
++        "a9d41799f1af1868f2db495671227cd4.bin",
++        "A9D41799F1AF1868F2DB495671227CD4.BIN",
++        "f7bcd64480c4566f25d65d642f5fba95.bin",
++        "F7BCD64480C4566F25D65D642F5FBA95.BIN",
++        "prefix-a9d41799f1af1868f2db495671227cd4.bin",
++        "a9d41799f1af1868f2db495671227cd4.bin.extra",
++        "prefix-f7bcd64480c4566f25d65d642f5fba95.bin",
++        "f7bcd64480c4566f25d65d642f5fba95.bin.extra",
++        "other.bin"
++    };
++    char env[16], dir[MAX_PATH], path[MAX_PATH];
++    DWORD env_len;
++    BOOL enabled;
++    unsigned int i;
++
++    env_len = GetEnvironmentVariableA( "ARKNIGHTS_RUNTIME_HARDWARE_CURSOR", env, sizeof(env) );
++    enabled = env_len == 1 && !strcmp( env, "1" );
++
++    GetTempPathA( MAX_PATH, dir );
++    GetTempFileNameA( dir, "hcf", 0, path );
++    DeleteFileA( path );
++    if (!CreateDirectoryA( path, NULL ))
++    {
++        ok( FALSE, "failed to create temporary directory\n" );
++        return;
++    }
++    lstrcpyA( dir, path );
++
++    for (i = 0; i < ARRAY_SIZE(names); i++)
++    {
++        UNICODE_STRING nameW;
++        OBJECT_ATTRIBUTES attr;
++        IO_STATUS_BLOCK io;
++        HANDLE handle = 0;
++        NTSTATUS status;
++        FILE_BASIC_INFORMATION basic;
++        FILE_NETWORK_OPEN_INFORMATION full;
++        WCHAR pathW[MAX_PATH];
++        BOOL blocked = enabled && i < 4;
++
++        lstrcpyA( path, dir );
++        lstrcatA( path, "\\" );
++        lstrcatA( path, names[i] );
++        MultiByteToWideChar( CP_ACP, 0, path, -1, pathW, ARRAY_SIZE(pathW) );
++        pRtlDosPathNameToNtPathName_U( pathW, &nameW, NULL, NULL );
++        InitializeObjectAttributes( &attr, &nameW, OBJ_CASE_INSENSITIVE, 0, NULL );
++        status = pNtCreateFile( &handle, GENERIC_READ | GENERIC_WRITE, &attr, &io, NULL,
++                                FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ | FILE_SHARE_WRITE,
++                                FILE_OPEN_IF, 0, NULL, 0 );
++        ok( blocked ? status == STATUS_OBJECT_NAME_NOT_FOUND : status == STATUS_SUCCESS,
++            "%s: expected %s, got %#lx\n", names[i],
++            blocked ? "STATUS_OBJECT_NAME_NOT_FOUND" : "STATUS_SUCCESS", status );
++        if (status == STATUS_SUCCESS)
++        {
++            CloseHandle( handle );
++            status = pNtCreateFile( &handle, GENERIC_READ | GENERIC_WRITE, &attr, &io, NULL,
++                                    FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ | FILE_SHARE_WRITE,
++                                    FILE_OPEN_IF, 0, NULL, 0 );
++            ok( status == STATUS_SUCCESS, "%s: reopening file failed %#lx\n", names[i], status );
++            if (status == STATUS_SUCCESS) CloseHandle( handle );
++        }
++
++        status = pNtQueryAttributesFile( &attr, &basic );
++        ok( blocked ? status == STATUS_OBJECT_NAME_NOT_FOUND : status == STATUS_SUCCESS,
++            "%s: NtQueryAttributesFile returned %#lx\n", names[i], status );
++        status = pNtQueryFullAttributesFile( &attr, &full );
++        ok( blocked ? status == STATUS_OBJECT_NAME_NOT_FOUND : status == STATUS_SUCCESS,
++            "%s: NtQueryFullAttributesFile returned %#lx\n", names[i], status );
++
++        if (blocked)
++        {
++            DWORD attributes = GetFileAttributesA( path );
++            ok( attributes == INVALID_FILE_ATTRIBUTES && GetLastError() == ERROR_FILE_NOT_FOUND,
++                "%s unexpectedly exists after failed open\n", names[i] );
++        }
++        DeleteFileA( path );
++        pRtlFreeUnicodeString( &nameW );
++    }
++
++    RemoveDirectoryA( dir );
++}
++
+ static void test_read_write(void)
+ {
+     static const char contents[14] = "1234567890abcd";
+@@ -7603,6 +7690,7 @@ START_TEST(file)
+ 
+     test_read_write();
+     test_NtCreateFile();
++    test_hardware_cursor_filter();
+     create_file_test();
+     open_file_test();
+     delete_file_test();
+diff --git a/dlls/ntdll/unix/file.c b/dlls/ntdll/unix/file.c
+index 55a0ddac..30c0fa9a 100644
+--- a/dlls/ntdll/unix/file.c
++++ b/dlls/ntdll/unix/file.c
+@@ -43,6 +43,7 @@
+ #endif
+ #include <poll.h>
+ #include <sys/stat.h>
++#include <strings.h>
+ #ifdef HAVE_SYS_STATVFS_H
+ # include <sys/statvfs.h>
+ #endif
+@@ -4385,6 +4386,22 @@ static void remove_trailing_backslash( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *
+     nt_name->Buffer[len - 1] = 0;
+ }
+ 
++static BOOL arknights_runtime_hardware_cursor_enabled(void)
++{
++    static LONG state = -1;
++    LONG enabled = InterlockedCompareExchange( &state, -1, -1 );
++
++    if (enabled == -1)
++    {
++        const char *setting = getenv( "ARKNIGHTS_RUNTIME_HARDWARE_CURSOR" );
++
++        enabled = setting && !strcmp( setting, "1" );
++        if (InterlockedCompareExchange( &state, enabled, -1 ) != -1)
++            enabled = InterlockedCompareExchange( &state, -1, -1 );
++    }
++    return enabled;
++}
++
+ /***********************************************************************
+  *           get_nt_and_unix_names
+  *
+@@ -4435,6 +4452,22 @@ NTSTATUS get_nt_and_unix_names( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *nt_name
+         status = nt_to_unix_file_name( attr, nt_name, unix_name_ret, disposition, open_reparse );
+     }
+ 
++    if ((status == STATUS_SUCCESS || status == STATUS_NO_SUCH_FILE) && *unix_name_ret)
++    {
++        const char *basename = strrchr( *unix_name_ret, '/' );
++
++        const char *name = basename ? basename + 1 : *unix_name_ret;
++
++        if (arknights_runtime_hardware_cursor_enabled() &&
++            (!strcasecmp( name, "a9d41799f1af1868f2db495671227cd4.bin" ) ||
++             !strcasecmp( name, "f7bcd64480c4566f25d65d642f5fba95.bin" )))
++        {
++            free( *unix_name_ret );
++            *unix_name_ret = NULL;
++            status = STATUS_OBJECT_NAME_NOT_FOUND;
++        }
++    }
++
+     if (!status || status == STATUS_NO_SUCH_FILE)
+     {
+         remove_trailing_backslash( attr, nt_name );

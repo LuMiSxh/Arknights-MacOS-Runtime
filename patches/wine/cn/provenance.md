@@ -3,7 +3,7 @@
 ## Source pins
 
 - Wine base: `dappermint/winecx`
-- Wine commit: `e1b410a5fdd96a32722a5f2617b5068bd385b7db` (Wine 11.16)
+- Wine commit: `e0aa380780b73e20fabcfe78fd42713b94929a53` (Wine 11.17)
 
 The Bilibili windowing route is an original Arknights macOS Runtime change for
 the verified client window contract. It is deliberately separate from the CEF

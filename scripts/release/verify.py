@@ -46,7 +46,9 @@ SOURCE_ARCHIVE_MEMBERS = (
     "runtime-component-inventory.tsv",
 )
 SOURCE_DIRECTORIES = SOURCE_ARCHIVE_MEMBERS[:2]
-REQUIRED_PATCH_FAMILIES = frozenset(("audio", "cursor", "performance", "ace", "cn"))
+REQUIRED_PATCH_FAMILIES = frozenset(
+    ("audio", "cursor", "hardware-cursor", "performance", "ace", "cn")
+)
 
 
 class ReleaseValidationError(ValueError):

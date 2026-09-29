@@ -109,8 +109,18 @@ class RuntimeLockTests(unittest.TestCase):
         )
 
     def test_family_stage_selects_only_that_family(self) -> None:
+        hardware_cursor = dict(self.lock["patches"][0])
+        hardware_cursor.update(
+            id="wine-hardware-cursor-suppression",
+            family="hardware-cursor",
+        )
+        self.lock["patches"].append(hardware_cursor)
         loaded = load_lock(self.write_lock(), repository_root=self.root)
+
         self.assertEqual(len(patches_for_stage(loaded, "audio")), 1)
+        self.assertEqual(
+            patches_for_stage(loaded, "hardware-cursor"), [hardware_cursor]
+        )
         self.assertEqual(patches_for_stage(loaded, "ace"), [])
         self.assertEqual(patches_for_stage(loaded, "cursor"), [])
 

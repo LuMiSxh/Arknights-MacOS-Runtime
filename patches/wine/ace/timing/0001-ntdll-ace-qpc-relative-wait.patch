@@ -1,5 +1,5 @@
 diff --git a/dlls/ntdll/unix/sync.c b/dlls/ntdll/unix/sync.c
-index 8813d8f8..0d6e4042 100644
+index cdea7b21..fe914cdb 100644
 --- a/dlls/ntdll/unix/sync.c
 +++ b/dlls/ntdll/unix/sync.c
 @@ -75,6 +75,24 @@

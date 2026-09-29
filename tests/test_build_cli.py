@@ -6,6 +6,19 @@ from pathlib import Path
 
 
 class BuildCLIContractTests(unittest.TestCase):
+    def test_cursor_patch_accepts_zero_frame_queue_depth(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        patch = (
+            root
+            / "patches"
+            / "dxmt"
+            / "cursor"
+            / "0001-dxmt-command-queue-configurable-frame-latency.patch"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("configured.front() >= '0'", patch)
+        self.assertIn("Values 0 through 3", patch)
+
     def test_rejects_an_unknown_stage_before_doing_work(self) -> None:
         root = Path(__file__).resolve().parents[1]
         result = subprocess.run(
@@ -16,9 +29,78 @@ class BuildCLIContractTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 2)
         self.assertIn(
-            "expected base, audio, cursor, performance, ace, cef, cn, or combined",
+            "expected base, audio, cursor, hardware-cursor, performance, ace, cef, cn, or combined",
             result.stderr,
         )
+
+    def test_hardware_cursor_stage_only_overlays_wine_ntdll(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        script = (root / "scripts" / "build-canary.sh").read_text(encoding="utf-8")
+
+        self.assertIn("base|audio|cursor|hardware-cursor|performance", script)
+        self.assertIn('if [[ "$stage" == hardware-cursor ]]; then', script)
+        self.assertIn('prepare "$stage" --destination-root "$source_root"', script)
+        self.assertIn(
+            'if [[ "$stage" == hardware-cursor || "$stage" == audio || "$stage" == ace || "$stage" == cef || "$stage" == cn || "$stage" == combined ]]; then',
+            script,
+        )
+        self.assertIn('make -j"$(sysctl -n hw.logicalcpu)" dlls/ntdll/ntdll.so', script)
+        self.assertIn('cp "$wine_build/dlls/ntdll/ntdll.so"', script)
+        self.assertIn("overlay_wine_file lib/wine/x86_64-unix/ntdll.so", script)
+        self.assertIn(
+            'if [[ "$stage" == cursor || "$stage" == performance || "$stage" == combined ]]; then',
+            script,
+        )
+
+    def test_hardware_cursor_patch_filters_the_shared_resolution_for_all_file_apis(
+        self,
+    ) -> None:
+        root = Path(__file__).resolve().parents[1]
+        patch = (
+            root
+            / "patches"
+            / "wine"
+            / "hardware-cursor"
+            / "0001-ntdll-hide-software-cursor-asset.patch"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("ARKNIGHTS_RUNTIME_HARDWARE_CURSOR", patch)
+        self.assertIn("a9d41799f1af1868f2db495671227cd4.bin", patch)
+        self.assertIn("f7bcd64480c4566f25d65d642f5fba95.bin", patch)
+        self.assertIn(
+            "status == STATUS_SUCCESS || status == STATUS_NO_SUCH_FILE", patch
+        )
+        self.assertIn("free( *unix_name_ret )", patch)
+        self.assertIn("*unix_name_ret = NULL", patch)
+        self.assertIn("STATUS_OBJECT_NAME_NOT_FOUND", patch)
+        self.assertIn("InterlockedCompareExchange", patch)
+        self.assertIn("test_hardware_cursor_filter", patch)
+        self.assertIn("pNtQueryAttributesFile", patch)
+        self.assertIn("pNtQueryFullAttributesFile", patch)
+
+    def test_hardware_cursor_patch_matches_yostar_and_cn_assets_under_explicit_gate(
+        self,
+    ) -> None:
+        root = Path(__file__).resolve().parents[1]
+        patch = (
+            root
+            / "patches"
+            / "wine"
+            / "hardware-cursor"
+            / "0001-ntdll-hide-software-cursor-asset.patch"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('enabled = setting && !strcmp( setting, "1" );', patch)
+        self.assertIn('enabled = env_len == 1 && !strcmp( env, "1" );', patch)
+        self.assertIn(
+            '"a9d41799f1af1868f2db495671227cd4.bin" ) ||\n+'
+            '             !strcasecmp( name, "f7bcd64480c4566f25d65d642f5fba95.bin" )',
+            patch,
+        )
+        self.assertIn("BOOL blocked = enabled && i < 4;", patch)
+        self.assertNotIn("arknights_runtime_hardware_cursor_targets_game", patch)
+        self.assertNotIn("ProcessParameters->ImagePathName.Buffer", patch)
+        self.assertNotIn("Arknights.exe", patch)
 
     def test_combined_overlay_replaces_bilibili_renderer_artifacts(self) -> None:
         root = Path(__file__).resolve().parents[1]
