@@ -19,6 +19,7 @@ if __package__:
     from .runtime_capabilities import (
         CapabilityContractError,
         validate_packaged_capability_manifest,
+        validate_packaged_metalfx_support,
         validate_source_capability_contract,
     )
 else:
@@ -27,6 +28,7 @@ else:
     from runtime_capabilities import (
         CapabilityContractError,
         validate_packaged_capability_manifest,
+        validate_packaged_metalfx_support,
         validate_source_capability_contract,
     )
 
@@ -188,6 +190,7 @@ def main() -> int:
         architecture_count = validate_required_architectures(
             arguments.runtime, required_paths
         )
+        validate_packaged_metalfx_support(arguments.runtime, source_manifest)
         macho_count, inherited_count = validate_macho_targets(
             arguments.runtime, lock["deploymentTarget"], arguments.baseline
         )

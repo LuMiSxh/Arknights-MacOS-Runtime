@@ -179,6 +179,7 @@ class ReleaseVerificationTests(unittest.TestCase):
                             "defaultValue": 3,
                         },
                         "hardwareCursor": True,
+                        "metalFXSpatialUpscaling": False,
                     },
                 }
             ),

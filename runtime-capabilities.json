@@ -6,6 +6,7 @@
       "maximum": 3,
       "defaultValue": 3
     },
-    "hardwareCursor": true
+    "hardwareCursor": true,
+    "metalFXSpatialUpscaling": true
   }
 }

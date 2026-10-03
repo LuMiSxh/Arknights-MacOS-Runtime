@@ -68,9 +68,11 @@ asset. No game asset is copied or modified.
 
 `Libraries/runtime-capabilities.json` is the versioned producer contract consumed from the packaged
 runtime tree. Schema version 1 advertises the supported DXMT frame-latency range and default plus
-hardware-cursor support. Release validation checks the manifest against the pinned patch semantics
-and requires the packaged copy to match the source manifest. Legacy/custom runtime trees may omit it;
-consumers then retain conservative defaults.
+hardware-cursor and MetalFX spatial-upscaling support. Release validation checks the manifest against
+the pinned patch semantics and requires the packaged copy to match the source manifest. MetalFX
+upscaling is upstream DXMT behavior (`DXMT_METALFX_SPATIAL_SWAPCHAIN=1`) rather than a patch, so
+validation instead requires that switch in the packaged `DXMT/x64/d3d11.dll`. Legacy/custom runtime
+trees may omit the manifest; consumers then retain conservative defaults.
 
 ## Performance
 

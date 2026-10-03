@@ -12,8 +12,15 @@ from pathlib import Path
 from typing import Any
 
 MAXIMUM_CAPABILITY_MANIFEST_BYTES = 4 * 1_024
-CAPABILITY_KEYS = {"dxmtMaximumFrameLatency", "hardwareCursor"}
+CAPABILITY_KEYS = {
+    "dxmtMaximumFrameLatency",
+    "hardwareCursor",
+    "metalFXSpatialUpscaling",
+}
 LATENCY_KEYS = {"minimum", "maximum", "defaultValue"}
+# Upstream DXMT enables its MetalFX spatial swapchain when this variable is "1".
+METALFX_SWAPCHAIN_MARKER = b"DXMT_METALFX_SPATIAL_SWAPCHAIN"
+METALFX_SWAPCHAIN_LIBRARY = "DXMT/x64/d3d11.dll"
 LATENCY_PATTERN = re.compile(
     r'getEnvVar\("ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY"\).*?'
     r"configured\.size\(\)\s*==\s*1\s*&&\s*"
@@ -111,6 +118,10 @@ def validate_manifest_shape(value: Any) -> dict[str, Any]:
         )
     if type(capabilities["hardwareCursor"]) is not bool:
         raise CapabilityContractError("hardwareCursor capability must be a boolean")
+    if type(capabilities["metalFXSpatialUpscaling"]) is not bool:
+        raise CapabilityContractError(
+            "metalFXSpatialUpscaling capability must be a boolean"
+        )
     return value
 
 
@@ -231,4 +242,22 @@ def validate_packaged_capability_manifest(
     if manifest != source_manifest:
         raise CapabilityContractError(
             "packaged capability manifest does not match the pinned runtime recipe"
+        )
+
+
+def validate_packaged_metalfx_support(
+    runtime_root: Path, manifest: dict[str, Any]
+) -> None:
+    """MetalFX comes from upstream DXMT, so check the built payload, not a patch."""
+    if not manifest["capabilities"]["metalFXSpatialUpscaling"]:
+        return
+    try:
+        payload = (runtime_root / METALFX_SWAPCHAIN_LIBRARY).read_bytes()
+    except OSError as error:
+        raise CapabilityContractError(
+            f"cannot read the MetalFX swapchain library: {error}"
+        ) from error
+    if METALFX_SWAPCHAIN_MARKER not in payload:
+        raise CapabilityContractError(
+            f"{METALFX_SWAPCHAIN_LIBRARY} lacks the MetalFX swapchain switch"
         )
