@@ -1,13 +1,7 @@
 # Hardware Cursor compatibility
 
-This directory contains the opt-in Wine patch that hides the game's software cursor asset for the
-`hardware-cursor` and `combined` stages. The canonical patch contract is in the
-[Hardware Cursor patch registry](../../../docs/patch-registry.md#hardware-cursor).
+Opt-in Wine patch that hides the software cursor asset of the game, for the `hardware-cursor` and `combined` stages. See the [Hardware Cursor patch registry](../../../docs/patch-registry.md#hardware-cursor).
 
-Set `ARKNIGHTS_RUNTIME_HARDWARE_CURSOR=1` to return `STATUS_OBJECT_NAME_NOT_FOUND` for the exact
-case-insensitive final basename `a9d41799f1af1868f2db495671227cd4.bin` (Yostar Global, Japan, Korea,
-and Taiwan) or `f7bcd64480c4566f25d65d642f5fba95.bin` (China — Bilibili). Missing, `0`, or invalid
-values keep normal path handling. The filter runs during shared name resolution, covering file
-creation and both attribute-query APIs without changing the game installation.
+`ARKNIGHTS_RUNTIME_HARDWARE_CURSOR=1` returns `STATUS_OBJECT_NAME_NOT_FOUND` for the two exact cursor asset basenames in the registry. Otherwise path handling is normal. The filter runs in shared name resolution and covers file creation and both attribute-query APIs.
 
-Apply `0001-ntdll-hide-software-cursor-asset.patch` to the pinned WineCX source.
+Apply: `0001-ntdll-hide-software-cursor-asset.patch` to the pinned WineCX source.

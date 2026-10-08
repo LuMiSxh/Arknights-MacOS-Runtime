@@ -1,14 +1,5 @@
 # China client compatibility patches
 
-This directory contains the Bilibili windowing compatibility family for the
-`cn` and `combined` runtime stages. The canonical patch-by-patch description is
-the [CN patch registry](../../../docs/patch-registry.md#cn).
+Bilibili windowing family for the `cn` and `combined` stages. The only gate is `ARKNIGHTS_RUNTIME_CN_COMPAT=1`. See the [CN patch registry](../../../docs/patch-registry.md#cn). The CEF descriptor is in the [`cef` family](../cef/README.md). The ACE routes are in the [`ace` family](../ace/README.md).
 
-The windowing patch uses only `ARKNIGHTS_RUNTIME_CN_COMPAT=1`; absent, `0`, or
-any other value leaves the ordinary Wine route selected. The CEF loader
-descriptor lives in the separate [`cef` family](../cef/README.md). The
-ACE-protected client routes live in the separate [`ace` family](../ace/README.md).
-
-Apply in this order:
-
-1. `windowing/0001-win32u-winemac-bilibili-layered-child.patch`
+Apply: `windowing/0001-win32u-winemac-bilibili-layered-child.patch`

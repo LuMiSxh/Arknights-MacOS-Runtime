@@ -1,13 +1,6 @@
 # ACE compact compatibility patches
 
-This directory contains the ordered ACE compatibility family for the `ace` and
-`combined` runtime stages. The canonical patch-by-patch description is the
-[ACE patch registry](../../../docs/patch-registry.md#ace).
-
-Compatibility-only routes in the four patches use `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`; absent, `0`, or
-any other value leaves those ordinary Wine routes selected. General process accessors, including image-name
-and exit-status lookup, preserve their normal behavior regardless of the compatibility toggle. The control
-is read by each owning component once, preserving the upstream behavior by default.
+Ordered ACE family for the `ace` and `combined` stages. The gate is `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`. See the [ACE patch registry](../../../docs/patch-registry.md#ace). General process accessors ignore the gate.
 
 Apply in this order:
 
@@ -16,6 +9,4 @@ Apply in this order:
 3. `rosetta/0001-macos-rosetta-ace-workarounds.patch`
 4. `timing/0001-ntdll-ace-qpc-relative-wait.patch`
 
-These routes are intended for the ACE-protected Hypergryph clients. They are
-kept separate from the Bilibili renderer compatibility family so a future
-publisher or client can select only the capabilities it needs.
+The routes target the ACE-protected Hypergryph clients. They stay separate from the Bilibili renderer family.
