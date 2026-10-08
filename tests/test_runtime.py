@@ -49,14 +49,6 @@ class RuntimeLockTests(unittest.TestCase):
                     "repository": "https://github.com/KhronosGroup/MoltenVK.git",
                     "commit": "c" * 40,
                 },
-                "gstreamer": {
-                    "repository": "https://github.com/GStreamer/gstreamer.git",
-                    "commit": "d" * 40,
-                },
-                "ffmpeg": {
-                    "repository": "https://github.com/FFmpeg/FFmpeg.git",
-                    "commit": "e" * 40,
-                },
                 "wineGecko": {
                     "repository": "https://gitlab.winehq.org/wine/wine-gecko.git",
                     "commit": "f" * 40,
@@ -183,15 +175,13 @@ class RuntimeLockTests(unittest.TestCase):
                 "dxmt",
                 "buildRecipe",
                 "moltenvk",
-                "gstreamer",
-                "ffmpeg",
                 "wineGecko",
                 "nixpkgs",
             ],
         )
         self.assertEqual(pins[2].commit, "b" * 40)
         self.assertEqual(
-            pins[6].repository,
+            pins[4].repository,
             "https://gitlab.winehq.org/wine/wine-gecko.git",
         )
 

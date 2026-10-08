@@ -48,7 +48,6 @@ NOTICE_FILES = (
     "LICENSES/runtime/LGPL-2.1.txt",
     "LICENSES/runtime/LGPL-3.0.txt",
     "LICENSES/runtime/MIT-DXMT.txt",
-    "LICENSES/runtime/FDK-AAC.txt",
 )
 SOURCE_ARCHIVE_MEMBERS = (
     "wine-combined",

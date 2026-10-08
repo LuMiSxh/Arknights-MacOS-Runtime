@@ -110,7 +110,7 @@ def monitored_sources(lock: dict[str, Any]) -> tuple[SourcePin, ...]:
         _source_pin(artifact.get("recipe"), "baseArtifact.buildRecipe"),
     ]
     pins[-1] = SourcePin("buildRecipe", pins[-1].repository, pins[-1].commit)
-    for component in ("moltenvk", "gstreamer", "ffmpeg", "wineGecko"):
+    for component in ("moltenvk", "wineGecko"):
         pin = _source_pin(provenance.get(component), f"baseProvenance.{component}")
         pins.append(SourcePin(component, pin.repository, pin.commit))
     pin = _source_pin(build.get("nixpkgs"), "build.nixpkgs")

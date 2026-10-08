@@ -145,14 +145,6 @@ class ReleaseVerificationTests(unittest.TestCase):
                     "repository": "https://github.com/example/moltenvk.git",
                     "commit": "e" * 40,
                 },
-                "gstreamer": {
-                    "repository": "https://github.com/example/gstreamer.git",
-                    "commit": "f" * 40,
-                },
-                "ffmpeg": {
-                    "repository": "https://github.com/example/ffmpeg.git",
-                    "commit": "0" * 40,
-                },
                 "wineGecko": {
                     "repository": "https://gitlab.winehq.org/wine/wine-gecko.git",
                     "commit": "1" * 40,
@@ -197,7 +189,6 @@ class ReleaseVerificationTests(unittest.TestCase):
             "LICENSES/runtime/LGPL-2.1.txt": "lgpl21 license\n",
             "LICENSES/runtime/LGPL-3.0.txt": "lgpl3 license\n",
             "LICENSES/runtime/MIT-DXMT.txt": "mit license\n",
-            "LICENSES/runtime/FDK-AAC.txt": "fdk notice\n",
         }.items():
             path = self.root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -259,7 +250,7 @@ class ReleaseVerificationTests(unittest.TestCase):
         )
         self.assertIn("wine license", outputs["notices"].read_text(encoding="utf-8"))
         self.assertIn("apache license", outputs["notices"].read_text(encoding="utf-8"))
-        self.assertIn("fdk notice", outputs["notices"].read_text(encoding="utf-8"))
+        self.assertIn("gpl3 license", outputs["notices"].read_text(encoding="utf-8"))
         self.assertIn(
             "redistribution inventory",
             outputs["notices"].read_text(encoding="utf-8"),

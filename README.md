@@ -25,7 +25,8 @@ maintainer requests a specific file.
 The current baseline is dappermint runtime 4.6.8 with WineCX 11.17. Cursor, Performance, and combined
 stages additionally build a pinned post-0.80 DXMT revision. The `hardware-cursor` stage compiles and
 overlays only the patched `x86_64-unix/ntdll.so` from Wine. The clean release tree contains newly built
-Wine and DXMT, the pinned Nix media/library closure, and the pinned MoltenVK payload. Candidate
+64-bit Wine and DXMT (without 32-bit code or the GStreamer/FFmpeg media stack), the pinned Nix
+library closure, and the pinned MoltenVK payload. Candidate
 baselines also record their Wine Gecko input. All repository-controlled source, archive, recipe, and
 patch inputs are pinned by commit and/or checksum.
 

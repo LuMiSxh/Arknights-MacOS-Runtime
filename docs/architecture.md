@@ -18,7 +18,16 @@ runtime.lock.json -> verified source checkouts -> ordered patch families
 The release artifact contains the Audio, Cursor, Hardware Cursor, Performance, ACE, CEF, and CN patch
 families in one archive. Release validation still requires a clean build of every component. Both
 lanes must preserve archive schema 2: top-level `Wine/` and `DXMT/`, the Wine loader and server,
-macOS driver, WineMetal bridge, and x64/x32 DXMT payloads expected by the launcher.
+macOS driver, WineMetal bridge, and x64 DXMT payload expected by the launcher.
+
+Since runtime 0.7.0 the clean build is 64-bit only. Wine is configured with `--enable-archs=x86_64`,
+so the archive has no `lib/wine/i386-windows` and no `DXMT/x32`. Wine is also configured with
+`--without-gstreamer --without-ffmpeg`, so no GStreamer plugins, FFmpeg, or codec libraries are
+bundled. The bundled library closure is derived from the Mach-O references of the Wine unix modules
+rather than from a fixed list. `Wine/bin/wine64`, `wine`, and `wineloader` are symlinks to
+`lib/wine/x86_64-unix/wine`, because an x86_64-only Wine build installs a single loader; `Arknights`
+points at `wine64`. `validate_runtime.py --require-64-bit-only` enforces the absence of the removed
+payloads for clean builds; overlay candidates inherit them from the pinned base and are exempt.
 
 Runtime flags are parsed inside their owning component. `ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT`,
 `ARKNIGHTS_RUNTIME_HARDWARE_CURSOR`, `ARKNIGHTS_RUNTIME_ACE_COMPACT`, `ARKNIGHTS_RUNTIME_CEF_COMPAT`,

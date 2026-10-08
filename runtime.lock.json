@@ -27,14 +27,6 @@
       "repository": "https://github.com/KhronosGroup/MoltenVK.git",
       "commit": "db66022459ffb663aa2b50f6b018bc2e124f5edf"
     },
-    "gstreamer": {
-      "repository": "https://github.com/GStreamer/gstreamer.git",
-      "commit": "87bc0c6e949e3dcc440658f78ef52aa8088cb62f"
-    },
-    "ffmpeg": {
-      "repository": "https://github.com/FFmpeg/FFmpeg.git",
-      "commit": "db69d06eeeab4f46da15030a80d539efb4503ca8"
-    },
     "wineGecko": {
       "repository": "https://gitlab.winehq.org/wine/wine-gecko.git",
       "commit": "557ea0c2e9f9ebd621323b3dbfbdd18c2528759c"
@@ -57,15 +49,12 @@
     ],
     "requiredFiles": [
       "Wine/lib/wine/x86_64-unix/winemac.so",
+      "Wine/lib/wine/x86_64-unix/winecoreaudio.so",
       "Wine/lib/wine/x86_64-windows/winemetal.dll",
       "DXMT/x64/d3d10core.dll",
       "DXMT/x64/d3d11.dll",
       "DXMT/x64/dxgi.dll",
-      "DXMT/x64/winemetal.dll",
-      "DXMT/x32/d3d10core.dll",
-      "DXMT/x32/d3d11.dll",
-      "DXMT/x32/dxgi.dll",
-      "DXMT/x32/winemetal.dll"
+      "DXMT/x64/winemetal.dll"
     ]
   },
   "patches": [
