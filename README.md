@@ -1,6 +1,6 @@
 # Arknights macOS Runtime
 
-**Reproducible, patch-gated WineCX and DXMT builds for [Arknights Client](https://github.com/LuMiSxh/Arknights-MacOS-Client).**
+**Patch-gated WineCX and DXMT builds for [Arknights Client](https://github.com/LuMiSxh/Arknights-MacOS-Client).**
 
 This repository owns the exact WineCX, DXMT, dependency, and patch inputs of the runtime artifact. Each behavior-changing route has a safe default and a component-local control. The repository validates the archive contract and records provenance.
 
@@ -16,7 +16,9 @@ Use the Runtime problem template in the [Arknights Client issue tracker](https:/
 - dappermint runtime 4.6.8 with WineCX 11.17.
 - The Cursor, Performance, and combined stages build a pinned post-0.80 DXMT revision.
 - The `hardware-cursor` stage overlays only the patched `x86_64-unix/ntdll.so`.
-- The clean release tree contains newly built 64-bit Wine and DXMT (no GStreamer/FFmpeg), the pinned Nix library closure, and the pinned MoltenVK payload.
+- The clean release tree contains newly built 64-bit Wine and DXMT (no GStreamer/FFmpeg) and the pinned Nix library closure.
+- The MoltenVK library is not built from source. It comes from the third-party base archive, which a SHA-256 hash pins.
+- The macOS host tools (Homebrew packages, Xcode, SDK) are not pinned. The release provenance records their versions. A rebuild can differ.
 - Candidate baselines also record their Wine Gecko input.
 - Commits or checksums pin all inputs.
 
@@ -63,4 +65,10 @@ See [architecture](docs/architecture.md), [patch registry](docs/patch-registry.m
 
 ## License
 
-Original build tooling and documentation use the [Mozilla Public License 2.0](LICENSE). The modified Wine source in the Wine patches is subject to Wine's [LGPL-2.1-or-later terms](LICENSES/Wine-LGPL-2.1.txt). The modified DXMT source in the DXMT patch is subject to the pinned revision's [LGPL-2.1-or-later terms](LICENSES/DXMT-LGPL-2.1.txt). These license files and the family-level provenance records are inputs to a redistribution review. They do not by themselves claim that a complete corresponding-source or notice package is already published for a runtime binary.
+Original build tooling and documentation use the [Mozilla Public License 2.0](LICENSE). The modified Wine source in the Wine patches is subject to Wine's [LGPL-2.1-or-later terms](LICENSES/Wine-LGPL-2.1.txt).
+
+The DXMT license is LGPL-2.1-or-later at the pinned commit `7c8dee1`. The `LICENSE` file of that commit states this license. DXMT release v0.80 and older releases use the MIT License. The text of the LGPL-2.1 license is in [`LICENSES/DXMT-LGPL-2.1.txt`](LICENSES/DXMT-LGPL-2.1.txt). The MIT text for the older releases is in [`LICENSES/runtime/MIT-DXMT.txt`](LICENSES/runtime/MIT-DXMT.txt). The source archive contains the DXMT source. Vendored code and unverified submodules are listed in [`LICENSES/notices/`](LICENSES/notices/).
+
+The directory [`LICENSES/`](LICENSES/) holds the license texts and notices of all components in the runtime archive. The file [`LICENSES/index.json`](LICENSES/index.json) lists them. Run `uv run --locked scripts/release/licenses.py generate --check` to validate it. The clean build puts a copy at `Licenses/` and a `NOTICE.md` file at the root of the runtime archive. The `Libraries/` directory is unchanged.
+
+The release does not yet offer the corresponding source of the Nix libraries. This item is open.

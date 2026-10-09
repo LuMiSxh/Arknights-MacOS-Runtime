@@ -88,30 +88,30 @@ Both `Present` paths keep `UpdateStatistics` behind `DXMT_DEBUG`, which avoids i
 All ACE patches use the exact gate `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`. A missing, `0`, or other value keeps Wine's normal route. Every patch requires hash verification and clean application. All four are Endfield FineWine ports ([provenance](../patches/wine/ace/provenance.md)).
 
 - [`wine-ace-ntoskrnl-surface`](../patches/wine/ace/ntoskrnl/0001-ntoskrnl-compatibility-surface.patch)
-  - What: Kernel exports and process metadata for the ACE client: current-thread process, image-name, exit-status, audit-parameter, and persistent-thread-state surfaces.
-  - Scope: Compatibility-only routes use the ACE gate. `PsGetProcessImageFileName` and `PsGetProcessExitStatus` stay unconditional for valid process objects and follow their kernel `_In_` contract.
-  - Checks: compile both architectures; exercise gated and general routes.
+    - What: Kernel exports and process metadata for the ACE client: current-thread process, image-name, exit-status, audit-parameter, and persistent-thread-state surfaces.
+    - Scope: Compatibility-only routes use the ACE gate. `PsGetProcessImageFileName` and `PsGetProcessExitStatus` stay unconditional for valid process objects and follow their kernel `_In_` contract.
+    - Checks: compile both architectures; exercise gated and general routes.
 - [`wine-ace-dispatcher-spoof`](../patches/wine/ace/dispatcher/0001-kernel32-ace-dispatcher-spoof.patch)
-  - What: x86-64 dispatcher lookup compatibility.
-  - Scope: ACE gate and Rosetta x86-64 build only.
-  - Checks: compile; dispatcher startup.
+    - What: x86-64 dispatcher lookup compatibility.
+    - Scope: ACE gate and Rosetta x86-64 build only.
+    - Checks: compile; dispatcher startup.
 - [`wine-ace-rosetta-workarounds`](../patches/wine/ace/rosetta/0001-macos-rosetta-ace-workarounds.patch)
-  - What: Bounded NOP and ACE privileged-instruction handling under Rosetta.
-  - Scope: ACE gate; existing CrossOver CET/XGETBV handling is untouched.
-  - Checks: compile; exercise inactive and enabled routes.
+    - What: Bounded NOP and ACE privileged-instruction handling under Rosetta.
+    - Scope: ACE gate; existing CrossOver CET/XGETBV handling is untouched.
+    - Checks: compile; exercise inactive and enabled routes.
 - [`wine-ace-relative-wait`](../patches/wine/ace/timing/0001-ntdll-ace-qpc-relative-wait.patch)
-  - What: Relative `NtDelayExecution` timing route.
-  - Scope: ACE gate and negative relative waits only; other waits are unchanged.
-  - Checks: focused wait tests.
+    - What: Relative `NtDelayExecution` timing route.
+    - Scope: ACE gate and negative relative waits only; other waits are unchanged.
+    - Checks: focused wait tests.
 
 ## CEF
 
 The CEF family uses the exact gate `ARKNIGHTS_RUNTIME_CEF_COMPAT=1`. An absent, `0`, or invalid value keeps Wine's normal route. If the CEF variable is absent, `ARKNIGHTS_RUNTIME_CN_COMPAT=1` keeps the legacy Bilibili behavior.
 
 - [`wine-cef-bilibili-stackbase`](../patches/wine/cef/0001-ntdll-cef-compatibility.patch)
-  - What: Descriptor-driven CEF loader compatibility; proven Bilibili CEF 80.1.15 descriptor.
-  - Scope: Explicit CEF gate; legacy CN fallback only when CEF is absent. Before any write, the descriptor requires the `libcef.dll` basename and all three expected RVA byte sequences.
-  - Provenance and checks: Original runtime change; see [provenance](../patches/wine/cef/provenance.md), apply check, and x86_64 loader compile.
+    - What: Descriptor-driven CEF loader compatibility; proven Bilibili CEF 80.1.15 descriptor.
+    - Scope: Explicit CEF gate; legacy CN fallback only when CEF is absent. Before any write, the descriptor requires the `libcef.dll` basename and all three expected RVA byte sequences.
+    - Provenance and checks: Original runtime change; see [provenance](../patches/wine/cef/provenance.md), apply check, and x86_64 loader compile.
 
 Add a regional descriptor only with reverse-engineering evidence for its complete hash/RVA/byte contract.
 
@@ -120,8 +120,8 @@ Add a regional descriptor only with reverse-engineering evidence for its complet
 The CN family contains only the Bilibili windowing patch. It uses the exact gate `ARKNIGHTS_RUNTIME_CN_COMPAT=1`. A missing, `0`, or other value keeps Wine's normal route.
 
 - [`wine-cn-bilibili-layered-child`](../patches/wine/cn/windowing/0001-win32u-winemac-bilibili-layered-child.patch)
-  - What: Keeps Chromium's layered proxies for login and payment drawable inside the root Wine window.
-  - Scope: CN gate and `PCGamePlatform.exe`. Login keeps the `CMyWebViewDlg` parent-chain route. Payment also requires an exact `Chrome_WidgetWin_0` `WS_CHILD` non-popup with an immediate `CefBrowserWindow` parent, a non-child `GA_ROOT` of class `CPayDlg_P_` plus a nonempty suffix, and matching HWND/parent/root process IDs. Only parent links count. The driver still requires `Chrome.WindowTranslucent` and a layered surface. Each accepted child gets an in-root view with independent color/shape images, source alpha, `SourceConstantAlpha`, root-client geometry, reparent/hide cleanup, and USER hit testing.
-  - Provenance and checks: Original runtime change; hash, apply check, offline classifier/contract tests, `win32u`/`winemac` compile, Bilibili payment-window rendering check.
+    - What: Keeps Chromium's layered proxies for login and payment drawable inside the root Wine window.
+    - Scope: CN gate and `PCGamePlatform.exe`. Login keeps the `CMyWebViewDlg` parent-chain route. Payment also requires an exact `Chrome_WidgetWin_0` `WS_CHILD` non-popup with an immediate `CefBrowserWindow` parent, a non-child `GA_ROOT` of class `CPayDlg_P_` plus a nonempty suffix, and matching HWND/parent/root process IDs. Only parent links count. The driver still requires `Chrome.WindowTranslucent` and a layered surface. Each accepted child gets an in-root view with independent color/shape images, source alpha, `SourceConstantAlpha`, root-client geometry, reparent/hide cleanup, and USER hit testing.
+    - Provenance and checks: Original runtime change; hash, apply check, offline classifier/contract tests, `win32u`/`winemac` compile, Bilibili payment-window rendering check.
 
 Remove a patch when the pinned WineCX supplies the behavior or the route is no longer needed.

@@ -35,7 +35,7 @@ Test the absent, `0`, invalid, and `1` values of each control in an isolated pre
 - ACE: record launcher startup, ACE initialization, gameplay, and clean shutdown.
 - CEF: verify that an explicit CEF control takes precedence over the legacy CN fallback. Exercise the Bilibili descriptor only with its matching module and bytes.
 - CN: for Bilibili, complete a captcha. Verify the layered renderer and a translucent error toast. Include nested dialogs with a `CMyWebViewDlg` parent-chain match where available.
-  - The issue #79 payment candidate is a `Chrome_WidgetWin_0` `WS_CHILD` non-popup directly parented by `CefBrowserWindow`. Its parent links lead to a non-child `CPayDlg_P_<suffix>` root. The renderer, parent, and root share one Windows PID.
-  - The driver must still observe `Chrome.WindowTranslucent` and a layered surface.
-  - Offline tests cover the captured tree and wrong parent, root, style, PID, owner-only, and missing-property cases. Manual payment rendering is still required.
+    - The issue #79 payment candidate is a `Chrome_WidgetWin_0` `WS_CHILD` non-popup directly parented by `CefBrowserWindow`. Its parent links lead to a non-child `CPayDlg_P_<suffix>` root. The renderer, parent, and root share one Windows PID.
+    - The driver must still observe `Chrome.WindowTranslucent` and a layered surface.
+    - Offline tests cover the captured tree and wrong parent, root, style, PID, owner-only, and missing-property cases. Manual payment rendering is still required.
 - Combined: test all flags absent, each family alone, and all enabled, with clean shutdown, in fresh and existing prefixes.
