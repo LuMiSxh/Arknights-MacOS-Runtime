@@ -68,6 +68,7 @@ elif ! cp -cR "$stage_root/base/Libraries" "$stage_root/candidate/Libraries" 2>/
 	cp -R "$stage_root/base/Libraries" "$stage_root/candidate/Libraries"
 fi
 candidate="$stage_root/candidate/Libraries"
+archive_members=(Libraries)
 
 if [[ "$build_mode" == overlay && ! -e "$candidate/Wine/bin/Arknights" && ! -L "$candidate/Wine/bin/Arknights" ]]; then
 	ln -s wine64 "$candidate/Wine/bin/Arknights"
@@ -375,15 +376,19 @@ if [[ "$build_mode" == "--clean-release" ]]; then
 		printf 'component\trole\tsource\n'
 		printf 'WineCX/Wine\tWindows compatibility runtime\truntime.lock.json:sources.wine\n'
 		printf 'DXMT\tDirect3D-to-Metal payload\truntime.lock.json:sources.dxmt\n'
-		printf 'MoltenVK\tVulkan-to-Metal library\truntime.lock.json:baseProvenance.moltenvk\n'
+		printf 'MoltenVK\tVulkan-to-Metal library\truntime.lock.json:baseArtifact (SHA-256-pinned third-party base archive; not built from source)\n'
 		sort -u "$nix_inventory" | while IFS= read -r output; do
 			[[ -n "$output" ]] && printf '%s\tBundled Nix library\t%s (nixpkgs %s)\n' \
 				"$(basename "$output")" "$output" "$nixpkgs_revision"
 		done
 	} > "$component_inventory"
+	run_python "$repository_root/scripts/release/toolchain.py" "$stage_root/build-toolchain.json"
+	run_python "$repository_root/scripts/release/licenses.py" generate \
+		--inventory "$component_inventory" --output "$stage_root/candidate"
+	archive_members+=(Licenses NOTICE.md)
 else
 	run_python "$repository_root/scripts/validate_runtime.py" "$candidate" --baseline "$stage_root/base/Libraries"
 fi
-tar -czf "$stage_root/Arknights-MacOS-Runtime-$stage.tar.gz" -C "$stage_root/candidate" Libraries
+tar -czf "$stage_root/Arknights-MacOS-Runtime-$stage.tar.gz" -C "$stage_root/candidate" "${archive_members[@]}"
 (cd "$stage_root" && shasum -a 256 "Arknights-MacOS-Runtime-$stage.tar.gz" > "Arknights-MacOS-Runtime-$stage.tar.gz.sha256")
 (cd "$stage_root" && shasum -a 256 -c "Arknights-MacOS-Runtime-$stage.tar.gz.sha256")

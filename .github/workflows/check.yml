@@ -32,6 +32,7 @@ jobs:
           uv run --locked ruff check scripts tests
           uv run --locked ruff format --check scripts tests
           uv run --locked --no-dev scripts/runtime.py validate-lock
+          uv run --locked --no-dev scripts/release/licenses.py generate --check
           git diff --check
 
   patches:
@@ -40,7 +41,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        stage: [audio, cursor, performance, ace, cn, combined]
+        stage: [audio, cursor, hardware-cursor, performance, ace, cef, cn, combined]
     steps:
       - name: Check out source
         uses: actions/checkout@v7.0.1

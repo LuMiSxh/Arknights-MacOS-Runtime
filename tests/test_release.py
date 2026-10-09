@@ -40,17 +40,7 @@ class ReleaseVerificationTests(unittest.TestCase):
             encoding="utf-8",
         )
         self.source_archive = self.root / "sources.tar.gz"
-        with tarfile.open(self.source_archive, "w:gz") as archive:
-            for name in ("wine-combined", "dxmt-combined"):
-                archive.add(self.source_root / name, arcname=name)
-            archive.add(
-                self.component_inventory,
-                arcname="runtime-component-inventory.tsv",
-            )
-            archive.add(
-                self.root / "runtime-capabilities.json",
-                arcname="runtime-capabilities.json",
-            )
+        self._write_source_archive()
         self.source_checksum = self.root / "sources.tar.gz.sha256"
         self._write_checksum(self.source_archive, self.source_checksum)
         self.validation_report = self.root / "validation.json"
@@ -72,6 +62,38 @@ class ReleaseVerificationTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary_directory.cleanup()
 
+    def _write_source_archive(
+        self,
+        *,
+        omit: tuple[str, ...] = (),
+        aliases: tuple[str, ...] = (),
+    ) -> None:
+        for name in ("scripts", "Justfile", "pyproject.toml", "uv.lock"):
+            path = self.root / name
+            if name == "scripts":
+                path.mkdir(exist_ok=True)
+                (path / "runtime.py").write_text("script\n", encoding="utf-8")
+            else:
+                path.write_text("build file\n", encoding="utf-8")
+        members = {
+            "wine-combined": self.source_root / "wine-combined",
+            "dxmt-combined": self.source_root / "dxmt-combined",
+            "runtime-component-inventory.tsv": self.component_inventory,
+            "runtime-capabilities.json": self.root / "runtime-capabilities.json",
+            "scripts": self.root / "scripts",
+            "Justfile": self.root / "Justfile",
+            "pyproject.toml": self.root / "pyproject.toml",
+            "uv.lock": self.root / "uv.lock",
+        }
+        with tarfile.open(self.source_archive, "w:gz") as archive:
+            for arcname, path in members.items():
+                if arcname not in omit:
+                    archive.add(path, arcname=arcname)
+            for alias in aliases:
+                member = tarfile.TarInfo(alias)
+                member.type = tarfile.DIRTYPE
+                archive.addfile(member)
+
     def _write_repository(self) -> None:
         patch_definitions = (
             ("example-audio", "audio"),
@@ -79,6 +101,7 @@ class ReleaseVerificationTests(unittest.TestCase):
             ("example-hardware-cursor", "hardware-cursor"),
             ("example-performance", "performance"),
             ("example-ace", "ace"),
+            ("example-cef", "cef"),
             ("example-cn", "cn"),
         )
         patches = []
@@ -223,7 +246,7 @@ class ReleaseVerificationTests(unittest.TestCase):
         digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
         checksum.write_text(f"{digest}  {artifact.name}\n", encoding="utf-8")
 
-    def _verify(self) -> dict[str, Path]:
+    def _verify(self, *, build_toolchain: Path | None = None) -> dict[str, Path]:
         return verify_release(
             repository_root=self.root,
             tag="v0.1.0",
@@ -236,6 +259,7 @@ class ReleaseVerificationTests(unittest.TestCase):
             validation_report=self.validation_report,
             output_directory=self.root / "release",
             component_inventory=self.component_inventory,
+            build_toolchain=build_toolchain,
         )
 
     def test_writes_provenance_and_notices_after_all_gates_pass(self) -> None:
@@ -289,6 +313,7 @@ class ReleaseVerificationTests(unittest.TestCase):
             "hardware-cursor",
             "performance",
             "ace",
+            "cef",
             "cn",
         ):
             with self.subTest(family=family):
@@ -340,25 +365,43 @@ class ReleaseVerificationTests(unittest.TestCase):
                     )
                     self._write_checksum(self.archive, self.checksum)
                 else:
-                    with tarfile.open(self.source_archive, "w:gz") as archive:
-                        for name in ("wine-combined", "dxmt-combined"):
-                            archive.add(self.source_root / name, arcname=name)
-                        archive.add(
-                            self.component_inventory,
-                            arcname="runtime-component-inventory.tsv",
-                        )
-                        archive.add(
-                            self.root / "runtime-capabilities.json",
-                            arcname="runtime-capabilities.json",
-                        )
-                        member = tarfile.TarInfo(alias)
-                        member.type = tarfile.DIRTYPE
-                        archive.addfile(member)
+                    self._write_source_archive(aliases=(alias,))
                     self._write_checksum(self.source_archive, self.source_checksum)
                 with self.assertRaisesRegex(
                     ReleaseValidationError, "capability manifest"
                 ):
                     self._verify()
+
+    def test_rejects_a_source_archive_missing_a_build_member(self) -> None:
+        for member in ("scripts", "Justfile", "pyproject.toml", "uv.lock"):
+            with self.subTest(member=member):
+                self._write_source_archive(omit=(member,))
+                self._write_checksum(self.source_archive, self.source_checksum)
+
+                with self.assertRaisesRegex(
+                    ReleaseValidationError,
+                    f"corresponding-source archive is missing.*{member}",
+                ):
+                    self._verify()
+
+    def test_records_the_build_toolchain_in_provenance(self) -> None:
+        toolchain = self.root / "build-toolchain.json"
+        toolchain.write_text(
+            json.dumps({"brew": {"meson": "1.9.0"}, "sdkVersion": "15.5"}),
+            encoding="utf-8",
+        )
+
+        outputs = self._verify(build_toolchain=toolchain)
+
+        provenance = json.loads(outputs["provenance"].read_text(encoding="utf-8"))
+        self.assertEqual(provenance["buildToolchain"]["sdkVersion"], "15.5")
+
+    def test_rejects_a_build_toolchain_report_that_is_not_an_object(self) -> None:
+        toolchain = self.root / "build-toolchain.json"
+        toolchain.write_text("[]", encoding="utf-8")
+
+        with self.assertRaisesRegex(ReleaseValidationError, "JSON object"):
+            self._verify(build_toolchain=toolchain)
 
     def test_rejects_unsafe_source_archive_member(self) -> None:
         with tarfile.open(self.source_archive, "w:gz") as archive:
@@ -397,7 +440,8 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("--latest=false", workflow)
         self.assertNotIn("git tag ", workflow)
         self.assertNotIn("git push ", workflow)
-        self.assertGreaterEqual(workflow.count("git ls-remote"), 2)
+        self.assertGreaterEqual(workflow.count("git ls-remote"), 1)
+        self.assertGreaterEqual(workflow.count("git/ref/tags/"), 2)
         self.assertGreaterEqual(workflow.count("releases/tags/"), 2)
 
     def test_workflow_never_uses_the_overlay_builder_for_a_release(self) -> None:
@@ -423,7 +467,27 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
             Path(__file__).resolve().parents[1] / ".github/workflows/release.yml"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("docs/legal LICENSE LICENSES", workflow)
+        self.assertIn(
+            "docs/legal LICENSE LICENSES scripts Justfile pyproject.toml uv.lock",
+            workflow,
+        )
+
+    def test_workflow_separates_the_read_only_build_from_the_publish_job(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[1] / ".github/workflows/release.yml"
+        ).read_text(encoding="utf-8")
+        build, publish = workflow.split("\n    publish:\n")
+
+        self.assertIn("contents: read", build)
+        self.assertNotIn("contents: write", build)
+        self.assertNotIn("id-token", build)
+        self.assertIn("persist-credentials: false", build)
+        self.assertIn("contents: write", publish)
+        self.assertIn("id-token: write", publish)
+        self.assertIn("attestations: write", publish)
+        self.assertIn("actions/attest-build-provenance@v", publish)
+        self.assertNotIn("actions/checkout", publish)
+        self.assertNotIn("just build-release", publish)
 
     def test_workflow_uses_tagged_actions_and_minimal_write_scope(self) -> None:
         workflow = (
@@ -431,7 +495,7 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("permissions: {}", workflow)
-        self.assertIn("contents: write", workflow)
+        self.assertEqual(workflow.count("contents: write"), 1)
         self.assertTrue(
             all(
                 re.fullmatch(r"v[0-9A-Za-z.\-]+", version)

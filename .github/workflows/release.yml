@@ -15,11 +15,14 @@ concurrency:
     cancel-in-progress: false
 
 jobs:
-    draft-release:
+    build:
         runs-on: macos-15
         timeout-minutes: 360
         permissions:
-            contents: write
+            contents: read
+        outputs:
+            release_tag: ${{ steps.version.outputs.release_tag }}
+            build_commit: ${{ steps.version.outputs.build_commit }}
         env:
             RELEASE_VERSION_INPUT: ${{ inputs.version }}
             PYTHONDONTWRITEBYTECODE: "1"
@@ -29,11 +32,13 @@ jobs:
               with:
                   ref: ${{ github.event.repository.default_branch }}
                   fetch-depth: 0
+                  persist-credentials: false
 
             - name: Install uv
               uses: astral-sh/setup-uv@v10.0.1
 
             - name: Normalize release version and capture build SHA
+              id: version
               shell: bash
               run: |
                   set -euo pipefail
@@ -43,6 +48,8 @@ jobs:
                   build_commit="$(git rev-parse --verify HEAD)"
                   echo "RELEASE_TAG=$release_tag" >> "$GITHUB_ENV"
                   echo "BUILD_COMMIT=$build_commit" >> "$GITHUB_ENV"
+                  echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+                  echo "build_commit=$build_commit" >> "$GITHUB_OUTPUT"
 
             - name: Refuse an existing tag or release
               shell: bash
@@ -119,11 +126,11 @@ jobs:
                     cd "$RELEASE_DIRECTORY"
                     shasum -a 256 "$(basename "$release_archive")" > "$(basename "$release_archive").sha256"
                   )
-                  tar -czf "$source_archive" --exclude='.git' \
+                  tar -czf "$source_archive" --exclude='.git' --exclude='__pycache__' \
                     -C "$source_root" wine-combined dxmt-combined \
                     -C "$stage_directory" runtime-component-inventory.tsv \
                     -C "$GITHUB_WORKSPACE" patches runtime.lock.json runtime-capabilities.json docs/patch-registry.md \
-                    docs/legal LICENSE LICENSES
+                    docs/legal LICENSE LICENSES scripts Justfile pyproject.toml uv.lock
                   (
                     cd "$RELEASE_DIRECTORY"
                     shasum -a 256 "$(basename "$source_archive")" > "$(basename "$source_archive").sha256"
@@ -142,23 +149,54 @@ jobs:
                     --source-checksum "$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG-source.tar.gz.sha256" \
                     --validation-report .build/reports/candidate-validation.json \
                     --component-inventory .build/stages/combined/runtime-component-inventory.tsv \
+                    --build-toolchain .build/stages/combined/build-toolchain.json \
                     --output-directory "$RELEASE_DIRECTORY"
+
+            - name: Upload release assets
+              uses: actions/upload-artifact@v7.0.1
+              with:
+                  name: runtime-release-assets
+                  path: ${{ runner.temp }}/arknights-runtime-release/*
+                  if-no-files-found: error
+                  retention-days: 3
+
+    publish:
+        needs: build
+        runs-on: ubuntu-24.04
+        timeout-minutes: 15
+        permissions:
+            contents: write
+            id-token: write
+            attestations: write
+        env:
+            RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+            BUILD_COMMIT: ${{ needs.build.outputs.build_commit }}
+        steps:
+            - name: Download release assets
+              uses: actions/download-artifact@v8.0.2
+              with:
+                  name: runtime-release-assets
+                  path: ${{ runner.temp }}/arknights-runtime-release
 
             - name: Re-check the tag and release before creation
               shell: bash
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  RELEASE_DIRECTORY: ${{ runner.temp }}/arknights-runtime-release
               run: |
                   set -euo pipefail
-                  if git ls-remote --exit-code --refs origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+                  echo "RELEASE_DIRECTORY=$RELEASE_DIRECTORY" >> "$GITHUB_ENV"
+                  tag_probe="$RUNNER_TEMP/runtime-tag-probe-final"
+                  if gh api --method GET --include \
+                    "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
+                    > "$tag_probe" 2>/dev/null; then
                     echo "error: tag $RELEASE_TAG appeared during the build; refusing to mutate it" >&2
                     exit 1
-                  else
-                    tag_status=$?
-                    if [[ "$tag_status" -ne 2 ]]; then
-                      echo "error: could not re-check whether tag $RELEASE_TAG exists" >&2
-                      exit 1
-                    fi
+                  fi
+                  tag_http_status="$(awk '$1 ~ /^HTTP\// { status=$2 } END { print status }' "$tag_probe")"
+                  if [[ "$tag_http_status" != 404 ]]; then
+                    echo "error: could not prove that tag $RELEASE_TAG is still absent" >&2
+                    exit 1
                   fi
 
                   release_probe="$RUNNER_TEMP/runtime-release-probe-final"
@@ -173,6 +211,11 @@ jobs:
                     echo "error: could not prove that release $RELEASE_TAG is still absent" >&2
                     exit 1
                   fi
+
+            - name: Attest release assets
+              uses: actions/attest-build-provenance@v4.2.2
+              with:
+                  subject-path: ${{ runner.temp }}/arknights-runtime-release/*
 
             - name: Create exact tag and draft release
               shell: bash
