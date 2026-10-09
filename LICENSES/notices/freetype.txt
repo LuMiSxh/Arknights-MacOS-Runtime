@@ -1,0 +1,6 @@
+FreeType
+
+Portions of this software are copyright The FreeType Project (www.freetype.org). All rights reserved.
+
+The FreeType license asks for this credit with the year of the FreeType version in use.
+The year is not verified against the realised version.

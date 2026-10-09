@@ -1,0 +1,9 @@
+MoltenVK 1.4.2 (commit db66022459ffb663aa2b50f6b018bc2e124f5edf)
+Copyright (c) The Brenwill Workshop Ltd. and the MoltenVK contributors
+
+MoltenVK uses the Apache License, version 2.0.
+This project does not build MoltenVK. The library comes from the SHA-256-pinned base archive.
+This project has not checked whether the upstream repository has a NOTICE file.
+
+The MoltenVK binary can contain statically linked libraries (for example SPIRV-Cross, SPIRV-Tools, glslang, and cereal).
+Their licenses (Apache-2.0, BSD-3-Clause, MIT) are not verified against the pinned commit.

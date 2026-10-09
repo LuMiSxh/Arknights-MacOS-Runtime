@@ -1,0 +1,8 @@
+Wine (WineCX) 11.17
+Copyright by the Wine project authors. The AUTHORS file in the Wine source names them.
+
+The runtime contains Wine from dappermint/winecx at commit e0aa380780b73e20fabcfe78fd42713b94929a53.
+This project applies the patches that docs/patch-registry.md lists.
+Wine uses the GNU Lesser General Public License, version 2.1 or later.
+
+The source asset of the same release contains the modified Wine source tree and the build scripts.
