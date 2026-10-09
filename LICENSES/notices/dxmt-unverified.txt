@@ -1,0 +1,9 @@
+DXMT 0.80-244-g7c8dee1 unverified submodules and headers
+Source: https://github.com/3Shain/dxmt/tree/7c8dee1c2d73415301ceb7d1fa810861cef4cd67
+
+The license of the following items is not verified. Do not assume a license for them.
+- external/nvapi (NVIDIA/nvapi).
+- include/native/directx (misyltoad/mingw-directx-headers). Wine-derived headers are often
+  LGPL-2.1-or-later, but this is not verified.
+- include/native/windows.
+- Possible LLVM 15 code in the binaries (Apache-2.0 WITH LLVM-exception). This is an inference, not verified.

@@ -11,6 +11,7 @@ check:
 	{{ uv_dev }} ruff check scripts tests
 	{{ uv_dev }} ruff format --check scripts tests
 	{{ uv }} scripts/runtime.py validate-lock
+	{{ uv }} scripts/release/licenses.py generate --check
 	{{ uv_dev }} actionlint
 	git diff --check
 

@@ -8,50 +8,35 @@
 - Reference checkout: `e5d4ccad235eefe32d912733e57e4c0bb53a5b58`
 - Reference patch families: `stage1-macos` and `stage2-dwproton`
 
-The reference repository records the original dw-proton/Endfield work and its
-authors. These files port selected changes to this exact WineCX pin.
+The reference repository records the original dw-proton/Endfield work and authors. These files port selected changes to this WineCX pin.
 
 ## Ported inventory
 
 ### `ntoskrnl`
 
-Carries the non-X11 kernel surface required by the ACE client: process image
-name and primary-token support, thread process/context accessors, current-thread
-process and process-ID accessors, and unconditional image-name and exit-status
-accessors for valid process objects; the `KeCapturePersistentThreadState`
-export stub; the callable `SeSetAuditParameter` no-op; physical-memory
-compatibility stubs; and process-object metadata lifetime handling. The capture
-function logs its arguments and returns `STATUS_NOT_IMPLEMENTED` without
-dereferencing or writing through any pointer. `SeSetAuditParameter` logs its
-arguments and returns `STATUS_SUCCESS` only when
-`ARKNIGHTS_RUNTIME_ACE_COMPACT=1`; it never dereferences or writes through its
-pointer arguments. The original Wine stub behavior remains active otherwise.
-Wine 11.17 already provides the process session and creation-time accessors and
-bug-check callback exports, so this patch no longer carries those definitions.
-The current-thread process accessors are unconditional aliases of the
-corresponding current-process functions. The process image-name and exit-status
-accessors are unconditional for valid process objects; their `_In_` process
-parameters are not NULL-checked.
+Carries the non-X11 kernel surface that the ACE client needs:
+
+- process image name and primary-token support
+- thread process/context accessors
+- current-thread process and process-ID accessors (unconditional aliases of the current-process functions)
+- unconditional image-name and exit-status accessors for valid process objects, without NULL checks on their `_In_` process parameters
+- the `KeCapturePersistentThreadState` export stub: logs its arguments, returns `STATUS_NOT_IMPLEMENTED`, never dereferences or writes through a pointer
+- the callable `SeSetAuditParameter` no-op: logs its arguments, returns `STATUS_SUCCESS` only when `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`, never dereferences or writes through its pointer arguments; otherwise the original Wine stub stays active
+- physical-memory compatibility stubs
+- process-object metadata lifetime handling
+
+Wine 11.17 already provides the process session and creation-time accessors and the bug-check callback exports, so the patch omits them.
 
 ### `dispatcher`
 
-Carries the x86_64 `KiUserApcDispatcher` / `KiUserCallbackDispatcher`
-`GetProcAddress` int3-stub workaround. The route is available only when
-`ARKNIGHTS_RUNTIME_ACE_COMPACT=1`; process-name heuristics are intentionally not
-used.
+Carries the x86_64 `KiUserApcDispatcher` / `KiUserCallbackDispatcher` `GetProcAddress` int3-stub workaround. Only `ARKNIGHTS_RUNTIME_ACE_COMPACT=1` enables it. It uses no process-name heuristics.
 
 ### `rosetta`
 
-Ports the macOS-specific Rosetta workarounds needed by the ACE client: bounded
-multi-byte NOP decoding and classification of ACE's privileged-instruction
-fault when Rosetta reports it through the invalid-opcode trap. Existing
-CrossOver CET and XGETBV handling is unchanged.
+Ports the Rosetta workarounds that the ACE client needs: bounded multi-byte NOP decoding, and classification of the ACE privileged-instruction fault that Rosetta reports as an invalid-opcode trap. CrossOver CET and XGETBV handling is unchanged.
 
 ### `timing`
 
-Carries the relative `NtDelayExecution` QPC path. It is selected only for
-negative relative waits and only with the explicit ACE compact gate; absolute,
-zero, alertable, and default waits remain unchanged.
+Carries the relative `NtDelayExecution` QPC path. It applies only to negative relative waits and only with the ACE compact gate. Absolute, zero, alertable, and default waits are unchanged.
 
-Validate the inactive and enabled routes in an isolated prefix through launcher
-startup, ACE initialization, gameplay, and clean shutdown.
+Validate the inactive and enabled routes in an isolated prefix: launcher startup, ACE initialization, gameplay, clean shutdown.

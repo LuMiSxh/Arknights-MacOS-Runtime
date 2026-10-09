@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from scripts.validate_runtime import (
     RuntimeValidationError,
+    validate_64_bit_only,
     validate_link_references,
     validate_macho_targets,
     validate_required_architectures,
@@ -90,10 +91,7 @@ class RuntimeStructureTests(unittest.TestCase):
             validate_required_architectures(self.root, self.required)
 
     def test_native_dxmt_payloads_reject_wine_loader_markers(self) -> None:
-        for architecture, kind in (
-            ("x64", "PE32+ executable (DLL) x86-64"),
-            ("x32", "PE32 executable (DLL) Intel 80386"),
-        ):
+        for architecture, kind in (("x64", "PE32+ executable (DLL) x86-64"),):
             for library in ("d3d10core.dll", "d3d11.dll", "dxgi.dll"):
                 relative = f"DXMT/{architecture}/{library}"
                 path = self.root / relative
@@ -111,6 +109,32 @@ class RuntimeStructureTests(unittest.TestCase):
                             ),
                         ):
                             validate_required_architectures(self.root, [relative])
+
+    def test_64_bit_only_accepts_a_runtime_without_legacy_payloads(self) -> None:
+        self.create_required_files()
+        (self.root / "Wine/lib").mkdir(parents=True, exist_ok=True)
+        (self.root / "Wine/lib/libfreetype.6.dylib").write_bytes(b"fixture")
+
+        validate_64_bit_only(self.root)
+
+    def test_64_bit_only_rejects_legacy_and_media_payloads(self) -> None:
+        for relative in (
+            "Wine/lib/wine/i386-windows/ntoskrnl.exe",
+            "Wine/lib/gstreamer-1.0/libgstapp.dylib",
+            "DXMT/x32/d3d11.dll",
+            "Wine/lib/libavcodec.62.dylib",
+            "Wine/lib/libx264.165.dylib",
+        ):
+            with (
+                self.subTest(path=relative),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                root = Path(directory)
+                path = root / relative
+                path.parent.mkdir(parents=True)
+                path.write_bytes(b"fixture")
+                with self.assertRaisesRegex(RuntimeValidationError, "must be absent"):
+                    validate_64_bit_only(root)
 
     def test_winemetal_keeps_its_builtin_loader_marker(self) -> None:
         relative = "DXMT/x64/winemetal.dll"

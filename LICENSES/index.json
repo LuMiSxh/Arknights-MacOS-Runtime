@@ -1,0 +1,365 @@
+{
+  "schemaVersion": 1,
+  "nixpkgs": {
+    "commit": "ac62194c3917d5f474c1a844b6fd6da2db95077d"
+  },
+  "textOrigins": {
+    "runtime/MIT.txt": "https://github.com/spdx/license-list-data/blob/v3.29.0/text/MIT.txt",
+    "runtime/Zlib.txt": "https://github.com/spdx/license-list-data/blob/v3.29.0/text/Zlib.txt",
+    "runtime/libpng-2.0.txt": "https://github.com/spdx/license-list-data/blob/v3.29.0/text/libpng-2.0.txt",
+    "runtime/bzip2-1.0.6.txt": "https://github.com/spdx/license-list-data/blob/v3.29.0/text/bzip2-1.0.6.txt",
+    "runtime/FTL.txt": "https://github.com/spdx/license-list-data/blob/v3.29.0/text/FTL.txt",
+    "runtime/BSD-3-Clause.txt": "https://github.com/spdx/license-list-data/blob/v3.29.0/text/BSD-3-Clause.txt",
+    "runtime/LLVM-exception.txt": "https://github.com/spdx/license-list-data/blob/v3.29.0/text/LLVM-exception.txt",
+    "runtime/CC0-1.0.txt": "https://github.com/spdx/license-list-data/blob/v3.29.0/text/CC0-1.0.txt"
+  },
+  "components": [
+    {
+      "name": "Wine",
+      "version": "11.17",
+      "spdx": "LGPL-2.1-or-later",
+      "source": "https://github.com/dappermint/winecx/tree/e0aa380780b73e20fabcfe78fd42713b94929a53",
+      "files": [
+        "Wine-LGPL-2.1.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "notice": "notices/wine.txt",
+      "lock": "sources.wine"
+    },
+    {
+      "name": "Wine in-tree libraries and fonts",
+      "version": "11.17",
+      "spdx": "NOASSERTION",
+      "source": "https://github.com/dappermint/winecx/tree/e0aa380780b73e20fabcfe78fd42713b94929a53",
+      "files": [
+        "Wine-LGPL-2.1.txt"
+      ],
+      "status": "unverified",
+      "notice": "notices/wine-bundled.txt",
+      "candidates": [
+        "LGPL-2.1-or-later"
+      ]
+    },
+    {
+      "name": "DXMT",
+      "version": "0.80-244-g7c8dee1",
+      "spdx": "LGPL-2.1-or-later",
+      "source": "https://github.com/3Shain/dxmt/tree/7c8dee1c2d73415301ceb7d1fa810861cef4cd67",
+      "files": [
+        "DXMT-LGPL-2.1.txt",
+        "runtime/MIT-DXMT.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "notice": "notices/dxmt.txt",
+      "lock": "sources.dxmt"
+    },
+    {
+      "name": "DXMT vendored DXBCParser",
+      "version": "0.80-244-g7c8dee1",
+      "spdx": "MIT",
+      "source": "https://github.com/3Shain/dxmt/tree/7c8dee1c2d73415301ceb7d1fa810861cef4cd67/libs/DXBCParser",
+      "files": [
+        "runtime/MIT.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "notice": "notices/dxmt-vendored.txt"
+    },
+    {
+      "name": "DXMT vendored DXVK-derived code",
+      "version": "0.80-244-g7c8dee1",
+      "spdx": "Zlib",
+      "source": "https://github.com/3Shain/dxmt/tree/7c8dee1c2d73415301ceb7d1fa810861cef4cd67/src/util",
+      "files": [
+        "runtime/Zlib.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "notice": "notices/dxmt-vendored.txt"
+    },
+    {
+      "name": "DXMT vendored tl::generator header",
+      "version": "0.80-244-g7c8dee1",
+      "spdx": "CC0-1.0",
+      "source": "https://github.com/3Shain/dxmt/blob/7c8dee1c2d73415301ceb7d1fa810861cef4cd67/include/tl/generator.hpp",
+      "files": [
+        "runtime/CC0-1.0.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "notice": "notices/dxmt-vendored.txt"
+    },
+    {
+      "name": "DXMT unverified submodules and headers",
+      "version": "0.80-244-g7c8dee1",
+      "spdx": "NOASSERTION",
+      "source": "https://github.com/3Shain/dxmt/tree/7c8dee1c2d73415301ceb7d1fa810861cef4cd67",
+      "files": [
+        "notices/dxmt-unverified.txt"
+      ],
+      "status": "unverified",
+      "notice": "notices/dxmt-unverified.txt"
+    },
+    {
+      "name": "LLVM (llvmPackages_15)",
+      "version": "15 (nixpkgs llvmPackages_15)",
+      "spdx": "Apache-2.0 WITH LLVM-exception",
+      "source": "https://github.com/llvm/llvm-project",
+      "files": [
+        "runtime/Apache-2.0.txt",
+        "runtime/LLVM-exception.txt"
+      ],
+      "status": "unverified"
+    },
+    {
+      "name": "MoltenVK",
+      "version": "1.4.2",
+      "spdx": "Apache-2.0",
+      "source": "https://github.com/KhronosGroup/MoltenVK/tree/db66022459ffb663aa2b50f6b018bc2e124f5edf",
+      "files": [
+        "runtime/Apache-2.0.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "notice": "notices/moltenvk.txt",
+      "lock": "baseProvenance.moltenvk"
+    },
+    {
+      "name": "MoltenVK embedded libraries",
+      "version": "1.4.2",
+      "spdx": "NOASSERTION",
+      "source": "https://github.com/KhronosGroup/MoltenVK/tree/db66022459ffb663aa2b50f6b018bc2e124f5edf",
+      "files": [
+        "runtime/Apache-2.0.txt",
+        "runtime/BSD-3-Clause.txt",
+        "runtime/MIT.txt"
+      ],
+      "status": "unverified",
+      "notice": "notices/moltenvk.txt",
+      "candidates": [
+        "Apache-2.0",
+        "BSD-3-Clause",
+        "MIT"
+      ]
+    },
+    {
+      "name": "FreeType",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
+      "spdx": "FTL OR GPL-2.0-only",
+      "source": "https://freetype.org/",
+      "files": [
+        "runtime/FTL.txt",
+        "runtime/GPL-2.0.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "notice": "notices/freetype.txt",
+      "nixPackages": [
+        "freetype"
+      ]
+    },
+    {
+      "name": "GnuTLS",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
+      "spdx": "LGPL-2.1-or-later",
+      "source": "https://www.gnutls.org/",
+      "files": [
+        "runtime/LGPL-2.1.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "nixPackages": [
+        "gnutls"
+      ]
+    },
+    {
+      "name": "libpng",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
+      "spdx": "libpng-2.0",
+      "source": "http://www.libpng.org/pub/png/libpng.html",
+      "files": [
+        "runtime/libpng-2.0.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "nixPackages": [
+        "libpng",
+        "libpng-apng"
+      ]
+    },
+    {
+      "name": "zlib",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
+      "spdx": "Zlib",
+      "source": "https://zlib.net/",
+      "files": [
+        "runtime/Zlib.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "nixPackages": [
+        "zlib"
+      ]
+    },
+    {
+      "name": "Brotli",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
+      "spdx": "MIT",
+      "source": "https://github.com/google/brotli",
+      "files": [
+        "runtime/MIT.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "notice": "notices/brotli.txt",
+      "nixPackages": [
+        "brotli"
+      ]
+    },
+    {
+      "name": "bzip2",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
+      "spdx": "bzip2-1.0.6",
+      "source": "https://sourceware.org/bzip2/",
+      "files": [
+        "runtime/bzip2-1.0.6.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "nixPackages": [
+        "bzip2"
+      ]
+    },
+    {
+      "name": "Nettle",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
+      "spdx": "GPL-2.0-or-later OR LGPL-3.0-or-later",
+      "source": "https://www.lysator.liu.se/~nisse/nettle/",
+      "files": [
+        "runtime/GPL-2.0.txt",
+        "runtime/LGPL-3.0.txt",
+        "runtime/GPL-3.0.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "nixPackages": [
+        "nettle"
+      ]
+    },
+    {
+      "name": "libtasn1",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
+      "spdx": "LGPL-2.1-or-later",
+      "source": "https://www.gnu.org/software/libtasn1/",
+      "files": [
+        "runtime/LGPL-2.1.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "nixPackages": [
+        "libtasn1"
+      ]
+    },
+    {
+      "name": "libidn2",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
+      "spdx": "GPL-2.0-or-later OR LGPL-3.0-or-later",
+      "source": "https://www.gnu.org/software/libidn/",
+      "files": [
+        "runtime/GPL-2.0.txt",
+        "runtime/LGPL-3.0.txt",
+        "runtime/GPL-3.0.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "nixPackages": [
+        "libidn2"
+      ]
+    },
+    {
+      "name": "p11-kit",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
+      "spdx": "BSD-3-Clause",
+      "source": "https://github.com/p11-glue/p11-kit",
+      "files": [
+        "runtime/BSD-3-Clause.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "nixPackages": [
+        "p11-kit"
+      ]
+    },
+    {
+      "name": "libunistring",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
+      "spdx": "GPL-2.0-or-later OR LGPL-3.0-or-later",
+      "source": "https://www.gnu.org/software/libunistring/",
+      "files": [
+        "runtime/GPL-2.0.txt",
+        "runtime/LGPL-3.0.txt",
+        "runtime/GPL-3.0.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "nixPackages": [
+        "libunistring"
+      ]
+    },
+    {
+      "name": "GMP",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
+      "spdx": "GPL-2.0-or-later OR LGPL-3.0-or-later",
+      "source": "https://gmplib.org/",
+      "files": [
+        "runtime/GPL-2.0.txt",
+        "runtime/LGPL-3.0.txt",
+        "runtime/GPL-3.0.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "nixPackages": [
+        "gmp"
+      ]
+    },
+    {
+      "name": "libffi",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
+      "spdx": "MIT",
+      "source": "https://github.com/libffi/libffi",
+      "files": [
+        "runtime/MIT.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "nixPackages": [
+        "libffi"
+      ],
+      "transitive": true
+    },
+    {
+      "name": "Zstandard",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
+      "spdx": "BSD-3-Clause OR GPL-2.0-only",
+      "source": "https://github.com/facebook/zstd",
+      "files": [
+        "runtime/BSD-3-Clause.txt",
+        "runtime/GPL-2.0.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "nixPackages": [
+        "zstd"
+      ],
+      "transitive": true
+    }
+  ],
+  "excluded": [
+    {
+      "name": "Vulkan-Headers",
+      "reason": "Build-time headers. The runtime does not copy them."
+    }
+  ]
+}

@@ -16,6 +16,7 @@ from scripts.runtime_capabilities import (
     load_capability_manifest,
     validate_capability_contract,
     validate_packaged_capability_manifest,
+    validate_packaged_metalfx_support,
     validate_source_capability_contract,
 )
 
@@ -48,9 +49,34 @@ class RuntimeCapabilityContractTests(unittest.TestCase):
                         "defaultValue": 3,
                     },
                     "hardwareCursor": True,
+                    "metalFXSpatialUpscaling": True,
                 },
             },
         )
+
+    def test_metalfx_capability_requires_the_upstream_switch_in_the_package(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runtime_root = Path(directory)
+            library = runtime_root / "DXMT/x64/d3d11.dll"
+            library.parent.mkdir(parents=True)
+            library.write_bytes(b"MZ\0getEnvVar\0")
+
+            with self.assertRaisesRegex(CapabilityContractError, "MetalFX"):
+                validate_packaged_metalfx_support(runtime_root, self.manifest)
+
+            unsupported = {
+                **self.manifest,
+                "capabilities": {
+                    **self.manifest["capabilities"],
+                    "metalFXSpatialUpscaling": False,
+                },
+            }
+            validate_packaged_metalfx_support(runtime_root, unsupported)
+
+            library.write_bytes(b"MZ\0DXMT_METALFX_SPATIAL_SWAPCHAIN\0")
+            validate_packaged_metalfx_support(runtime_root, self.manifest)
 
     def test_manifest_cannot_claim_zero_for_a_legacy_latency_patch(self) -> None:
         legacy_patch = self.patches["dxmt-cursor-frame-latency"].replace(

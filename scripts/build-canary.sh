@@ -68,6 +68,7 @@ elif ! cp -cR "$stage_root/base/Libraries" "$stage_root/candidate/Libraries" 2>/
 	cp -R "$stage_root/base/Libraries" "$stage_root/candidate/Libraries"
 fi
 candidate="$stage_root/candidate/Libraries"
+archive_members=(Libraries)
 
 if [[ "$build_mode" == overlay && ! -e "$candidate/Wine/bin/Arknights" && ! -L "$candidate/Wine/bin/Arknights" ]]; then
 	ln -s wine64 "$candidate/Wine/bin/Arknights"
@@ -99,7 +100,6 @@ fi
 require_command clang
 require_command make
 require_command x86_64-w64-mingw32-gcc
-require_command i686-w64-mingw32-gcc
 
 nix_tools="$(nix build --no-link --print-out-paths \
 	"$nixpkgs#bison" "$nixpkgs#flex" "$nixpkgs#pkg-config")"
@@ -109,11 +109,9 @@ for output in $nix_tools; do
 done
 
 nix_outputs=""
-wine_configure_flags=()
-if [[ "$stage" == hardware-cursor ]]; then
-	wine_configure_flags+=(--without-ffmpeg --without-gstreamer)
-else
-	for package in freetype gnutls libpng zlib brotli bzip2 nettle libtasn1 libidn2 p11-kit libunistring gmp vulkan-headers ffmpeg-headless glib orc gst_all_1.gstreamer gst_all_1.gst-plugins-base gst_all_1.gst-plugins-good gst_all_1.gst-plugins-bad gst_all_1.gst-libav; do
+wine_configure_flags=(--without-ffmpeg --without-gstreamer)
+if [[ "$stage" != hardware-cursor ]]; then
+	for package in freetype gnutls libpng zlib brotli bzip2 nettle libtasn1 libidn2 p11-kit libunistring gmp vulkan-headers; do
 		for output_name in dev out lib; do
 			if output="$(nix build --no-link --print-out-paths "$nixpkgs#legacyPackages.x86_64-darwin.$package.$output_name" 2>/dev/null)"; then
 				nix_outputs="$nix_outputs $output"
@@ -171,16 +169,12 @@ mkdir -p "$wine_build"
 	cd "$wine_build"
 	"$wine_source/configure" \
 		--host=x86_64-apple-darwin24 \
-		--enable-archs=i386,x86_64 \
+		--enable-archs=x86_64 \
 		--disable-tests \
 		--without-x --without-wayland --without-oss --without-alsa --without-pulse \
 		--without-sane --without-usb --without-v4l2 --without-pcap --without-capi \
 		--without-opencl --without-cups \
 		"${wine_configure_flags[@]}"
-	if [[ "$stage" != hardware-cursor ]]; then
-		grep -q '^#define HAVE_FFMPEG 1' include/config.h
-		grep -qE '^GSTREAMER_LIBS *= *.+' Makefile
-	fi
 	if [[ "$stage" == hardware-cursor ]]; then
 		make -j"$(sysctl -n hw.logicalcpu)" dlls/ntdll/ntdll.so
 	else
@@ -246,12 +240,9 @@ if [[ "$stage" == hardware-cursor || "$stage" == audio || "$stage" == ace || "$s
 			patched_machos+=("$candidate/Wine/lib/wine/x86_64-unix/ntdll.so")
 			overlay_wine_file lib/wine/x86_64-windows/kernel32.dll
 			overlay_wine_file lib/wine/x86_64-windows/ntoskrnl.exe
-			overlay_wine_file lib/wine/i386-windows/ntoskrnl.exe
 			x86_64-w64-mingw32-strip --strip-debug \
 				"$candidate/Wine/lib/wine/x86_64-windows/kernel32.dll" \
 				"$candidate/Wine/lib/wine/x86_64-windows/ntoskrnl.exe"
-			i686-w64-mingw32-strip --strip-debug \
-				"$candidate/Wine/lib/wine/i386-windows/ntoskrnl.exe"
 		fi
 		if [[ "$stage" == cn || "$stage" == combined ]]; then
 			overlay_wine_file lib/wine/x86_64-unix/win32u.so
@@ -291,24 +282,13 @@ if [[ "$build_mode" == "--clean-release" ]]; then
 	scan_nix_references() {
 		otool -L "$1" 2>/dev/null | awk '/\/nix\/store\// {print $1}'
 	}
-	mkdir -p "$library_directory/gstreamer-1.0"
-	for output in $nix_outputs; do
-		[[ -d "$output/lib/gstreamer-1.0" ]] || continue
-		for plugin in "$output/lib/gstreamer-1.0/"*.dylib; do
-			[[ -f "$plugin" ]] || continue
-			cp -L "$plugin" "$library_directory/gstreamer-1.0/$(basename "$plugin")"
-			record_nix_output "$plugin"
-			chmod u+w "$library_directory/gstreamer-1.0/$(basename "$plugin")"
-		done
-	done
-
 	queue=""
 	for output in $nix_outputs; do
 		for library in libfreetype.6.dylib libgnutls.30.dylib; do
 			[[ -f "$output/lib/$library" ]] && queue="$queue $output/lib/$library"
 		done
 	done
-	for binary in "$candidate"/Wine/lib/wine/*-unix/*.so "$library_directory"/gstreamer-1.0/*.dylib; do
+	for binary in "$candidate"/Wine/lib/wine/*-unix/*.so; do
 		[[ -f "$binary" ]] || continue
 		queue="$queue $(scan_nix_references "$binary" | tr '\n' ' ')"
 	done
@@ -345,7 +325,7 @@ if [[ "$build_mode" == "--clean-release" ]]; then
 		done < <(scan_nix_references "$binary")
 		codesign --force --sign - "$binary" 2>/dev/null || true
 	}
-	for binary in "$library_directory"/*.dylib* "$library_directory"/gstreamer-1.0/*.dylib* "$candidate"/Wine/lib/wine/*-unix/*.so; do
+	for binary in "$library_directory"/*.dylib* "$candidate"/Wine/lib/wine/*-unix/*.so; do
 		[[ -f "$binary" ]] && fixup_macho "$binary"
 	done
 	ln -sf libfreetype.6.dylib "$library_directory/libfreetype.dylib"
@@ -371,51 +351,44 @@ if [[ "$stage" == cursor || "$stage" == performance || "$stage" == combined ]]; 
 			"$stage_root/dxmt-build64" "$dxmt_source"
 		meson compile -C "$stage_root/dxmt-build64"
 		meson install -C "$stage_root/dxmt-build64"
-		meson setup \
-			--cross-file "$dxmt_source/build-win32.txt" \
-			-Dnative_llvm_path="$llvm_path" \
-			-Dwine_build_path="$wine_build" \
-			--buildtype release --prefix "$dxmt_install" --strip \
-			"$stage_root/dxmt-build32" "$dxmt_source"
-		meson compile -C "$stage_root/dxmt-build32"
-		meson install -C "$stage_root/dxmt-build32"
 	)
 	if [[ "$build_mode" == "--clean-release" ]]; then
-		mkdir -p "$candidate/DXMT/x64" "$candidate/DXMT/x32"
+		mkdir -p "$candidate/DXMT/x64"
 	fi
 
 	for library in d3d10core.dll d3d11.dll dxgi.dll winemetal.dll; do
 		cp "$dxmt_install/x86_64-windows/$library" "$candidate/DXMT/x64/$library"
-		cp "$dxmt_install/i386-windows/$library" "$candidate/DXMT/x32/$library"
-	done
+		done
 	cp "$dxmt_install/x86_64-windows/winemetal.dll" "$candidate/Wine/lib/wine/x86_64-windows/winemetal.dll"
 	cp "$dxmt_install/x86_64-unix/winemetal.so" "$candidate/Wine/lib/wine/x86_64-unix/winemetal.so"
 	codesign --force --sign - "$candidate/Wine/lib/wine/x86_64-unix/winemetal.so"
 
-	for architecture in x64 x32; do
-		for library in d3d10core.dll d3d11.dll dxgi.dll; do
-			printf '\016\037\272\016\000\264\011\315\041\270\001\114\315\041\220\220' |
-				dd of="$candidate/DXMT/$architecture/$library" bs=1 seek=64 conv=notrunc status=none
-		done
+	for library in d3d10core.dll d3d11.dll dxgi.dll; do
+		printf '\016\037\272\016\000\264\011\315\041\270\001\114\315\041\220\220' |
+			dd of="$candidate/DXMT/x64/$library" bs=1 seek=64 conv=notrunc status=none
 	done
 fi
 
 if [[ "$build_mode" == "--clean-release" ]]; then
-	run_python "$repository_root/scripts/validate_runtime.py" "$candidate" --require-capabilities
+	run_python "$repository_root/scripts/validate_runtime.py" "$candidate" --require-capabilities --require-64-bit-only
 	component_inventory="$stage_root/runtime-component-inventory.tsv"
 	{
 		printf 'component\trole\tsource\n'
 		printf 'WineCX/Wine\tWindows compatibility runtime\truntime.lock.json:sources.wine\n'
 		printf 'DXMT\tDirect3D-to-Metal payload\truntime.lock.json:sources.dxmt\n'
-		printf 'MoltenVK\tVulkan-to-Metal library\truntime.lock.json:baseProvenance.moltenvk\n'
+		printf 'MoltenVK\tVulkan-to-Metal library\truntime.lock.json:baseArtifact (SHA-256-pinned third-party base archive; not built from source)\n'
 		sort -u "$nix_inventory" | while IFS= read -r output; do
-			[[ -n "$output" ]] && printf '%s\tBundled Nix library or plugin\t%s (nixpkgs %s)\n' \
+			[[ -n "$output" ]] && printf '%s\tBundled Nix library\t%s (nixpkgs %s)\n' \
 				"$(basename "$output")" "$output" "$nixpkgs_revision"
 		done
 	} > "$component_inventory"
+	run_python "$repository_root/scripts/release/toolchain.py" "$stage_root/build-toolchain.json"
+	run_python "$repository_root/scripts/release/licenses.py" generate \
+		--inventory "$component_inventory" --output "$stage_root/candidate"
+	archive_members+=(Licenses NOTICE.md)
 else
 	run_python "$repository_root/scripts/validate_runtime.py" "$candidate" --baseline "$stage_root/base/Libraries"
 fi
-tar -czf "$stage_root/Arknights-MacOS-Runtime-$stage.tar.gz" -C "$stage_root/candidate" Libraries
+tar -czf "$stage_root/Arknights-MacOS-Runtime-$stage.tar.gz" -C "$stage_root/candidate" "${archive_members[@]}"
 (cd "$stage_root" && shasum -a 256 "Arknights-MacOS-Runtime-$stage.tar.gz" > "Arknights-MacOS-Runtime-$stage.tar.gz.sha256")
 (cd "$stage_root" && shasum -a 256 -c "Arknights-MacOS-Runtime-$stage.tar.gz.sha256")

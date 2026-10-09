@@ -9,6 +9,7 @@
 - Treat runtime environment variables as component-local controls; absent or invalid values preserve
   each component's documented default.
 - Keep original code, documentation, patch metadata, and commits in English.
+- Write docs in ASD-STE100 Simplified Technical English: short sentences, active voice, one instruction per step, one term per concept, no filler.
 
 ## Commands
 

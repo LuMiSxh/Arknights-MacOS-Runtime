@@ -21,9 +21,21 @@ if __package__:
         read_capability_manifest_bytes,
         validate_source_capability_contract,
     )
+    from .licenses import (
+        ARCHIVE_LICENSES_DIRECTORY,
+        ARCHIVE_NOTICE,
+        INDEX_NAME,
+        REQUIRED_COMPONENTS,
+    )
 else:
     if str(REPOSITORY_ROOT) not in sys.path:
         sys.path.insert(0, str(REPOSITORY_ROOT))
+    from scripts.release.licenses import (
+        ARCHIVE_LICENSES_DIRECTORY,
+        ARCHIVE_NOTICE,
+        INDEX_NAME,
+        REQUIRED_COMPONENTS,
+    )
     from scripts.runtime import LockError, _sha256_file, load_lock
     from scripts.runtime_capabilities import (
         CapabilityContractError,
@@ -48,17 +60,20 @@ NOTICE_FILES = (
     "LICENSES/runtime/LGPL-2.1.txt",
     "LICENSES/runtime/LGPL-3.0.txt",
     "LICENSES/runtime/MIT-DXMT.txt",
-    "LICENSES/runtime/FDK-AAC.txt",
 )
 SOURCE_ARCHIVE_MEMBERS = (
     "wine-combined",
     "dxmt-combined",
     "runtime-component-inventory.tsv",
     "runtime-capabilities.json",
+    "scripts",
+    "Justfile",
+    "pyproject.toml",
+    "uv.lock",
 )
 SOURCE_DIRECTORIES = SOURCE_ARCHIVE_MEMBERS[:2]
 REQUIRED_PATCH_FAMILIES = frozenset(
-    ("audio", "cursor", "hardware-cursor", "performance", "ace", "cn")
+    ("audio", "cursor", "hardware-cursor", "performance", "ace", "cef", "cn")
 )
 
 
@@ -272,6 +287,62 @@ def _validate_capability_archives(
 
 
 def _validate_source_directories(source_root: Path) -> None:
+    pass
+
+
+def _validate_archive_licenses(archive: Path) -> str:
+    """Require the license index, the listed files, and the notice in the runtime archive.
+
+    Return the text of the archive notice."""
+
+    try:
+        with tarfile.open(archive, mode="r:gz") as tar:
+            regular = {
+                member.name: member for member in tar.getmembers() if member.isfile()
+            }
+            prefix = ARCHIVE_LICENSES_DIRECTORY
+            for name in (ARCHIVE_NOTICE, f"{prefix}/{INDEX_NAME}"):
+                if name not in regular:
+                    raise ReleaseValidationError(
+                        f"runtime archive is missing a regular file: {name}"
+                    )
+            index = json.loads(_member_text(tar, regular[f"{prefix}/{INDEX_NAME}"]))
+            components = index.get("components") if isinstance(index, dict) else None
+            if not isinstance(components, list):
+                raise ReleaseValidationError("archive license index has no components")
+            names = {item.get("name") for item in components if isinstance(item, dict)}
+            missing_components = sorted(REQUIRED_COMPONENTS - names)
+            if missing_components:
+                raise ReleaseValidationError(
+                    "archive license index is missing: " + ", ".join(missing_components)
+                )
+            for item in components:
+                for relative in (
+                    *item.get("files", []),
+                    *filter(None, [item.get("notice")]),
+                ):
+                    member = regular.get(f"{prefix}/{relative}")
+                    if member is None or member.size == 0:
+                        raise ReleaseValidationError(
+                            f"runtime archive is missing a license file: {prefix}/{relative}"
+                        )
+            return _member_text(tar, regular[ARCHIVE_NOTICE])
+    except (OSError, tarfile.TarError, ValueError, AttributeError) as error:
+        if isinstance(error, ReleaseValidationError):
+            raise
+        raise ReleaseValidationError(
+            f"cannot inspect archive licenses: {archive}"
+        ) from error
+
+
+def _member_text(tar: tarfile.TarFile, member: tarfile.TarInfo) -> str:
+    stream = tar.extractfile(member)
+    if stream is None or member.size > 1_024 * 1_024:
+        raise ReleaseValidationError(f"cannot read archive member: {member.name}")
+    return stream.read().decode("utf-8")
+
+
+def _validate_source_directories_impl(source_root: Path) -> None:
     if source_root.is_symlink() or not source_root.is_dir():
         raise ReleaseValidationError(f"source root is not a directory: {source_root}")
     for name in SOURCE_DIRECTORIES:
@@ -327,6 +398,22 @@ def _validation_report(path: Path, deployment_target: str) -> dict[str, Any]:
     return {key: value for key, value in report.items() if key != "runtime"}
 
 
+def _read_build_toolchain(path: Path | None) -> dict[str, Any] | None:
+    if path is None:
+        return None
+    try:
+        toolchain = json.loads(
+            _regular_file(path, "build toolchain report").read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError) as error:
+        raise ReleaseValidationError(
+            f"cannot read build toolchain report: {path}"
+        ) from error
+    if not isinstance(toolchain, dict):
+        raise ReleaseValidationError("build toolchain report must be a JSON object")
+    return toolchain
+
+
 def _write_notices(repository_root: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     sections = [
@@ -369,6 +456,7 @@ def verify_release(
     validation_report: Path,
     output_directory: Path,
     component_inventory: Path,
+    build_toolchain: Path | None = None,
 ) -> dict[str, Path]:
     try:
         canonical_tag = normalize_version(tag)
@@ -436,6 +524,7 @@ def verify_release(
             "sha256": source_digest,
         },
         "validation": report,
+        "buildToolchain": _read_build_toolchain(build_toolchain),
     }
     provenance_path.write_text(
         json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -459,6 +548,7 @@ def main() -> int:
     parser.add_argument("--validation-report", type=Path, required=True)
     parser.add_argument("--output-directory", type=Path, required=True)
     parser.add_argument("--component-inventory", type=Path, required=True)
+    parser.add_argument("--build-toolchain", type=Path)
     arguments = parser.parse_args()
     try:
         outputs = verify_release(
@@ -473,6 +563,7 @@ def main() -> int:
             validation_report=arguments.validation_report,
             output_directory=arguments.output_directory,
             component_inventory=arguments.component_inventory,
+            build_toolchain=arguments.build_toolchain,
         )
     except (ReleaseValidationError, OSError) as error:
         print(f"error: {error}", file=sys.stderr)

@@ -1,0 +1,6 @@
+Third-party code in the Wine source tree
+
+The Wine source tree contains libraries (libs/) and fonts (fonts/) that have their own licenses.
+The Wine source tree states these licenses in its LICENSE file and in the library directories.
+This project has not listed which of these libraries and fonts the build compiles into the runtime.
+This entry stays unverified until a maintainer lists them.

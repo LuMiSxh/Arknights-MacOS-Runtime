@@ -19,6 +19,7 @@ if __package__:
     from .runtime_capabilities import (
         CapabilityContractError,
         validate_packaged_capability_manifest,
+        validate_packaged_metalfx_support,
         validate_source_capability_contract,
     )
 else:
@@ -27,11 +28,19 @@ else:
     from runtime_capabilities import (
         CapabilityContractError,
         validate_packaged_capability_manifest,
+        validate_packaged_metalfx_support,
         validate_source_capability_contract,
     )
 
 
 MINOS_PATTERN = re.compile(r"\bminos\s+([0-9]+(?:\.[0-9]+){1,2})")
+LEGACY_PAYLOADS = (
+    "Wine/lib/wine/i386-windows",
+    "Wine/lib/wine/i386-unix",
+    "Wine/lib/gstreamer-1.0",
+    "DXMT/x32",
+)
+MEDIA_LIBRARY_PATTERNS = ("libav*", "libsw*", "libx26[45]*", "libaom*", "libSvtAv1*")
 
 
 class RuntimeValidationError(ValueError):
@@ -70,6 +79,19 @@ def _version(value: str) -> tuple[int, ...]:
     return tuple(int(component) for component in value.split("."))
 
 
+def validate_64_bit_only(root: Path) -> None:
+    """Reject the 32-bit Wine/DXMT payloads and the media stack dropped in 0.7.0."""
+
+    for relative in LEGACY_PAYLOADS:
+        if (root / relative).exists():
+            raise RuntimeValidationError(f"legacy payload must be absent: {relative}")
+    for pattern in MEDIA_LIBRARY_PATTERNS:
+        for path in (root / "Wine/lib").glob(pattern):
+            raise RuntimeValidationError(
+                f"media library must be absent: {path.relative_to(root)}"
+            )
+
+
 def validate_link_references(path: Path, output: str) -> None:
     for line in output.splitlines()[1:]:
         reference = line.strip().split(" (", 1)[0]
@@ -89,9 +111,7 @@ def validate_required_architectures(root: Path, required_paths: list[str]) -> in
         kind = subprocess.run(
             ["file", "-b", str(path)], capture_output=True, check=True, text=True
         ).stdout.strip()
-        if relative.startswith("DXMT/x32/"):
-            expected = ("PE32 executable", "Intel 80386")
-        elif relative.startswith("DXMT/x64/") or "/x86_64-windows/" in relative:
+        if relative.startswith("DXMT/x64/") or "/x86_64-windows/" in relative:
             expected = ("PE32+ executable", "x86-64")
         else:
             expected = ("Mach-O", "x86_64")
@@ -170,6 +190,11 @@ def main() -> int:
     parser.add_argument("runtime", type=Path)
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--require-capabilities", action="store_true")
+    parser.add_argument(
+        "--require-64-bit-only",
+        action="store_true",
+        help="reject i386, DXMT x32, GStreamer, and FFmpeg payloads (clean builds)",
+    )
     arguments = parser.parse_args()
     lock = load_lock(LOCK_PATH)
     required_paths = [
@@ -185,9 +210,12 @@ def main() -> int:
             required=arguments.require_capabilities,
         )
         validate_structure(arguments.runtime, required_paths)
+        if arguments.require_64_bit_only:
+            validate_64_bit_only(arguments.runtime)
         architecture_count = validate_required_architectures(
             arguments.runtime, required_paths
         )
+        validate_packaged_metalfx_support(arguments.runtime, source_manifest)
         macho_count, inherited_count = validate_macho_targets(
             arguments.runtime, lock["deploymentTarget"], arguments.baseline
         )
