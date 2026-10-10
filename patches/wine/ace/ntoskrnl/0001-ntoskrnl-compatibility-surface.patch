@@ -1,120 +1,11 @@
 diff --git a/dlls/ntoskrnl.exe/ntoskrnl.c b/dlls/ntoskrnl.exe/ntoskrnl.c
-index ffa409a7..18ab5c93 100644
+index 6738027e..506c8989 100644
 --- a/dlls/ntoskrnl.exe/ntoskrnl.c
 +++ b/dlls/ntoskrnl.exe/ntoskrnl.c
-@@ -2513,26 +2513,95 @@ NTSTATUS WINAPI FsRtlRegisterUncProvider(PHANDLE MupHandle, PUNICODE_STRING Redi
- 
- static void *create_process_object( HANDLE handle )
- {
-+    char *p;
-+    ULONG i;
-+    ULONG len;
-+    HANDLE token;
-     PEPROCESS process;
-+    ANSI_STRING fullImageNameA;
-+    UNICODE_STRING *fullImageNameW = NULL;
- 
-     if (!(process = alloc_kernel_object( PsProcessType, handle, sizeof(*process), 0 ))) return NULL;
- 
-     process->header.Type = 3;
-     process->header.WaitListHead.Blink = INVALID_HANDLE_VALUE; /* mark as kernel object */
-     NtQueryInformationProcess( handle, ProcessBasicInformation, &process->info, sizeof(process->info), NULL );
--    NtQueryInformationProcess( handle, ProcessSessionInformation, &process->session_id, sizeof(process->session_id), NULL );
--    NtQueryInformationProcess( handle, ProcessTimes, &process->times, sizeof(process->times), NULL );
-+    if (arknights_runtime_ace_compact_enabled())
-+    {
-+        /* get full image name */
-+        len = 0;
-+        NtQueryInformationProcess( handle, ProcessImageFileNameWin32, fullImageNameW, 0, &len );
-+        if (len && len <= 32768)
-+        {
-+            fullImageNameW = malloc(len + sizeof(WCHAR));
-+            if (fullImageNameW)
-+            {
-+                fullImageNameW->MaximumLength = len + sizeof(WCHAR);
-+                if (!NtQueryInformationProcess( handle, ProcessImageFileNameWin32, fullImageNameW, len, &len ))
-+                {
-+                    fullImageNameA.Length = 0;
-+                    fullImageNameA.MaximumLength = 0;
-+                    fullImageNameA.Buffer = NULL;
-+                    if (!RtlUnicodeStringToAnsiString(&fullImageNameA, fullImageNameW, TRUE) && fullImageNameA.Buffer)
-+                    {
-+                        /* generate short name */
-+                        if (fullImageNameA.Length)
-+                        {
-+                            p = fullImageNameA.Buffer;
-+                            for (i = fullImageNameA.Length; i; i--)
-+                            {
-+                                if (p[i - 1] == '\\')
-+                                {
-+                                    p += i;
-+                                    break;
-+                                }
-+                            }
-+                            memcpy(process->imageName, p, min(fullImageNameA.Buffer + fullImageNameA.Length - p,
-+                                                              sizeof(process->imageName)));
-+                        }
-+                    }
-+                    RtlFreeAnsiString(&fullImageNameA);
-+                }
-+                free(fullImageNameW);
-+            }
-+        }
-+
-+        if (!NtOpenProcessToken( handle, TOKEN_ALL_ACCESS, &token ))
-+        {
-+            ObReferenceObjectByHandle( token, 0, SeTokenObjectType, KernelMode, &process->token, NULL );
-+            NtClose(token);
-+        }
-+    }
-     IsWow64Process( handle, &process->wow64 );
- 
-     return process;
+@@ -2648,6 +2648,14 @@ const char *WINAPI PsGetProcessImageFileName( PEPROCESS process )
+     return process->image_name;
  }
  
-+void release_process_object(void *obj)
-+{
-+    PEPROCESS process = obj;
-+
-+    if (arknights_runtime_ace_compact_enabled() && process->token)
-+        ObDereferenceObject(process->token);
-+
-+    process->token = NULL;
-+
-+    SERVER_START_REQ( release_kernel_object )
-+    {
-+        req->manager  = wine_server_obj_handle( get_device_manager() );
-+        req->user_ptr = wine_server_client_ptr( obj );
-+        if (wine_server_call( req )) FIXME( "failed to release %p\n", obj );
-+    }
-+    SERVER_END_REQ;
-+}
-+
- static const WCHAR process_type_name[] = {'P','r','o','c','e','s','s',0};
- 
- static struct _OBJECT_TYPE process_type =
- {
-     process_type_name,
--    create_process_object
-+    create_process_object,
-+    release_process_object
- };
- 
- POBJECT_TYPE PsProcessType = &process_type;
-@@ -2602,6 +2671,35 @@ LONGLONG WINAPI PsGetProcessCreateTimeQuadPart( PEPROCESS process )
-     return process->times.CreateTime.QuadPart;
- }
- 
-+/*********************************************************************
-+ *           PsGetProcessImageFileName    (NTOSKRNL.@)
-+ */
-+const char *WINAPI PsGetProcessImageFileName( PEPROCESS process )
-+{
-+    if (!process) return NULL;
-+    TRACE("%p -> %s\n", process, debugstr_an(process->imageName, sizeof(process->imageName)));
-+    return process->imageName;
-+}
-+
 +/*********************************************************************
 + *           PsGetProcessExitStatus    (NTOSKRNL.@)
 + */
@@ -123,105 +14,10 @@ index ffa409a7..18ab5c93 100644
 +    return process->info.ExitStatus;
 +}
 +
-+/*********************************************************************
-+ *           PsReferencePrimaryToken    (NTOSKRNL.@)
-+ */
-+PACCESS_TOKEN WINAPI PsReferencePrimaryToken( PEPROCESS process )
-+{
-+    if (!arknights_runtime_ace_compact_enabled()) return NULL;
-+    TRACE("%p -> %p\n", process, process->token);
-+    if (process->token) ObReferenceObject(process->token);
-+    return process->token;
-+}
-+
  static void *create_thread_object( HANDLE handle )
  {
      THREAD_BASIC_INFORMATION info;
-@@ -2696,6 +2794,16 @@ HANDLE WINAPI PsGetThreadId(PETHREAD thread)
-     return thread->kthread.id.UniqueThread;
- }
- 
-+/*********************************************************************
-+ *           PsGetThreadProcess    (NTOSKRNL.@)
-+ */
-+PEPROCESS WINAPI PsGetThreadProcess(PETHREAD thread)
-+{
-+    if (!arknights_runtime_ace_compact_enabled()) return NULL;
-+    TRACE("%p -> %p\n", thread, thread->kthread.process);
-+    return thread->kthread.process;
-+}
-+
- /*********************************************************************
-  *           PsGetThreadProcessId    (NTOSKRNL.@)
-  */
-@@ -2705,6 +2813,25 @@ HANDLE WINAPI PsGetThreadProcessId( PETHREAD thread )
-     return thread->kthread.id.UniqueProcess;
- }
- 
-+/*********************************************************************
-+ *           PsGetContextThread    (NTOSKRNL.@)
-+ */
-+NTSTATUS WINAPI PsGetContextThread(PETHREAD thread, CONTEXT *context)
-+{
-+    NTSTATUS status;
-+    HANDLE handle, id;
-+
-+    if (!arknights_runtime_ace_compact_enabled()) return STATUS_NOT_IMPLEMENTED;
-+
-+    id = PsGetThreadId(thread);
-+    if (!(handle = OpenThread(THREAD_ALL_ACCESS, FALSE, HandleToUlong(id))))
-+        return STATUS_NOT_FOUND;
-+
-+    status = NtGetContextThread(handle, context);
-+    NtClose(handle);
-+    return status;
-+}
-+
- /***********************************************************************
-  *           KeInsertQueue   (NTOSKRNL.EXE.@)
-  */
-@@ -3046,6 +3173,40 @@ PHYSICAL_ADDRESS WINAPI MmGetPhysicalAddress(void *virtual_address)
-     return ret;
- }
- 
-+PHYSICAL_MEMORY_RANGE *WINAPI MmGetPhysicalMemoryRanges(void)
-+{
-+    static volatile LONG once;
-+    static PHYSICAL_MEMORY_RANGE range;
-+    SYSTEM_BASIC_INFORMATION info = {0};
-+
-+    if (!arknights_runtime_ace_compact_enabled()) return NULL;
-+    TRACE("\n");
-+
-+    if (!InterlockedCompareExchange(&once, 1, 0))
-+    {
-+        if (!NtQuerySystemInformation(SystemBasicInformation, &info, sizeof(info), NULL))
-+        {
-+            range.BaseAddress.QuadPart = info.MmLowestPhysicalPage;
-+            range.NumberOfBytes.QuadPart = info.MmNumberOfPhysicalPages * info.PageSize;
-+        }
-+        InterlockedExchange(&once, 2);
-+    }
-+    else while (once == 1) NtYieldExecution();
-+
-+    return &range;
-+}
-+
-+/***********************************************************************
-+ *           MmGetVirtualForPhysical   (NTOSKRNL.EXE.@)
-+ */
-+void *WINAPI MmGetVirtualForPhysical(PHYSICAL_ADDRESS addr)
-+{
-+    if (!arknights_runtime_ace_compact_enabled()) return NULL;
-+    ULONG_PTR ret = addr.QuadPart;
-+    FIXME("(%p): semi-stub!\n", (void *)ret);
-+    return (void *)ret;
-+}
-+
- /***********************************************************************
-  *           MmMapIoSpace   (NTOSKRNL.EXE.@)
-  */
-@@ -3331,6 +3492,22 @@ HANDLE WINAPI PsGetCurrentProcessId(void)
+@@ -3440,6 +3448,22 @@ HANDLE WINAPI PsGetCurrentProcessId(void)
      return KeGetCurrentThread()->id.UniqueProcess;
  }
  
@@ -244,7 +40,7 @@ index ffa409a7..18ab5c93 100644
  /***********************************************************************
   *           PsGetCurrentProcessSessionId   (NTOSKRNL.EXE.@)
   */
-@@ -4475,14 +4652,73 @@ BOOLEAN WINAPI SePrivilegeCheck(PRIVILEGE_SET *privileges, SECURITY_SUBJECT_CONT
+@@ -4625,11 +4649,23 @@ BOOLEAN WINAPI SePrivilegeCheck(PRIVILEGE_SET *privileges, SECURITY_SUBJECT_CONT
      return TRUE;
  }
  
@@ -263,112 +59,34 @@ index ffa409a7..18ab5c93 100644
   */
  NTSTATUS WINAPI SeLocateProcessImageName(PEPROCESS process, UNICODE_STRING **image_name)
  {
--    FIXME("stub: %p %p\n", process, image_name);
--    if (image_name) *image_name = NULL;
--    return STATUS_NOT_IMPLEMENTED;
-+    ULONG len;
-+    NTSTATUS status;
-+    HANDLE handle, id;
-+
-+    TRACE("%p %p\n", process, image_name);
-+
-+    if (!image_name) return STATUS_INVALID_PARAMETER;
-+    if (!arknights_runtime_ace_compact_enabled())
-+    {
-+        *image_name = NULL;
-+        return STATUS_NOT_IMPLEMENTED;
-+    }
-+    *image_name = NULL;
-+    id = PsGetProcessId(process);
-+
-+    if (!(handle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, HandleToUlong(id))))
-+        return STATUS_NOT_FOUND;
-+
-+    len = 0;
-+    NtQueryInformationProcess(handle, ProcessImageFileNameWin32, NULL, 0, &len);
-+
-+    if (!len || len > 32768 - sizeof(WCHAR))
-+    {
-+        NtClose(handle);
-+        return STATUS_BUFFER_TOO_SMALL;
-+    }
-+    len += sizeof(WCHAR);
-+
-+    *image_name = ExAllocatePool(PagedPool, len);
-+
-+    if (!*image_name)
-+    {
-+        NtClose(handle);
-+        return STATUS_NO_MEMORY;
-+    }
-+
-+    (*image_name)->MaximumLength = len;
-+
-+    if ((status = NtQueryInformationProcess(handle, ProcessImageFileNameWin32,
-+                                            *image_name, len - sizeof(WCHAR), &len)))
-+    {
-+        ExFreePool(*image_name);
-+        *image_name = NULL;
-+        NtClose(handle);
-+        return status;
-+    }
-+
-+    TRACE("ret: %s\n", debugstr_us(*image_name));
-+
-+    NtClose(handle);
-+
-+    return STATUS_SUCCESS;
- }
++    PROCESSINFOCLASS info_class = arknights_runtime_ace_compact_enabled() ? ProcessImageFileNameWin32
++                                                                          : ProcessImageFileName;
+     ULONG len;
+     NTSTATUS status;
+     HANDLE h;
+@@ -4644,7 +4680,7 @@ NTSTATUS WINAPI SeLocateProcessImageName(PEPROCESS process, UNICODE_STRING **ima
+         return status;
+     }
  
- /*********************************************************************
-@@ -4821,6 +5057,14 @@ void WINAPI KeUnstackDetachProcess(KAPC_STATE *apc_state)
-     FIXME("apc_state %p stub.\n", apc_state);
- }
+-    status = NtQueryInformationProcess(h, ProcessImageFileName, NULL, 0, &len);
++    status = NtQueryInformationProcess(h, info_class, NULL, 0, &len);
+     if (status != STATUS_INFO_LENGTH_MISMATCH)
+     {
+         NtClose(h);
+@@ -4659,7 +4695,7 @@ NTSTATUS WINAPI SeLocateProcessImageName(PEPROCESS process, UNICODE_STRING **ima
+         return STATUS_NO_MEMORY;
+     }
  
-+NTSTATUS WINAPI KeCapturePersistentThreadState(CONTEXT *context, PKTHREAD thread, ULONG code,
-+                                               ULONG param1, ULONG param2, ULONG param3, ULONG param4, void *addr)
-+{
-+    FIXME("%p %p %lu %lu %lu %lu %lu %p", context, thread, code, param1, param2, param3, param4, addr);
-+
-+    return STATUS_NOT_IMPLEMENTED;
-+}
-+
- NTSTATUS WINAPI KdChangeOption(ULONG option, ULONG in_size, PVOID in_buffer,
-                                ULONG out_size, PVOID out_buffer, PULONG ret_size)
- {
+-    if ((status = NtQueryInformationProcess(h, ProcessImageFileName,
++    if ((status = NtQueryInformationProcess(h, info_class,
+                                             *image_name, len - sizeof(WCHAR), &len)))
+     {
+         ExFreePool(*image_name);
 diff --git a/dlls/ntoskrnl.exe/ntoskrnl.exe.spec b/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
-index 21305dea..d7cd98b7 100644
+index d06f7325..c4326f86 100644
 --- a/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
 +++ b/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
-@@ -550,7 +550,7 @@
- @ stdcall KeBugCheck(long)
- @ stdcall KeBugCheckEx(long long long long long)
- @ stdcall KeCancelTimer(ptr)
--@ stub KeCapturePersistentThreadState
-+@ stdcall KeCapturePersistentThreadState(ptr ptr long long long long long ptr)
- @ stdcall KeClearEvent(ptr)
- @ stub KeConnectInterrupt
- @ stub KeDcacheFlushCount
-@@ -729,9 +729,9 @@
- @ stdcall MmFreeNonCachedMemory(ptr long)
- @ stub MmFreePagesFromMdl
- @ stdcall MmGetPhysicalAddress(ptr)
--@ stub MmGetPhysicalMemoryRanges
-+@ stdcall MmGetPhysicalMemoryRanges()
- @ stdcall MmGetSystemRoutineAddress(ptr)
--@ stub MmGetVirtualForPhysical
-+@ stdcall MmGetVirtualForPhysical(int64)
- @ stub MmGrowKernelStack
- @ stub MmHighestUserAddress
- @ stdcall MmIsAddressValid(ptr)
-@@ -911,12 +911,14 @@
- @ stub PsDereferencePrimaryToken
- @ stub PsDisableImpersonation
- @ stub PsEstablishWin32Callouts
--@ stub PsGetContextThread
-+@ stdcall PsGetContextThread(ptr ptr)
- @ stdcall PsGetCurrentProcess() IoGetCurrentProcess
- @ stdcall PsGetCurrentProcessId()
+@@ -917,6 +917,8 @@
  @ stdcall PsGetCurrentProcessSessionId()
  @ stdcall PsGetCurrentThread() KeGetCurrentThread
  @ stdcall PsGetCurrentThreadId()
@@ -377,7 +95,7 @@ index 21305dea..d7cd98b7 100644
  @ stub PsGetCurrentThreadPreviousMode
  @ stub PsGetCurrentThreadStackBase
  @ stub PsGetCurrentThreadStackLimit
-@@ -926,10 +928,10 @@
+@@ -926,7 +928,7 @@
  @ stdcall PsGetProcessCreateTimeQuadPart(ptr)
  @ stub PsGetProcessDebugPort
  @ stub PsGetProcessExitProcessCalled
@@ -385,29 +103,7 @@ index 21305dea..d7cd98b7 100644
 +@ stdcall PsGetProcessExitStatus(ptr)
  @ stub PsGetProcessExitTime
  @ stdcall PsGetProcessId(ptr)
--@ stub PsGetProcessImageFileName
-+@ stdcall PsGetProcessImageFileName(ptr)
- @ stdcall PsGetProcessInheritedFromUniqueProcessId(ptr)
- @ stub PsGetProcessJob
- @ stub PsGetProcessPeb
-@@ -943,7 +945,7 @@
- @ stub PsGetThreadFreezeCount
- @ stub PsGetThreadHardErrorsAreDisabled
- @ stdcall PsGetThreadId(ptr)
--@ stub PsGetThreadProcess
-+@ stdcall PsGetThreadProcess(ptr)
- @ stdcall PsGetThreadProcessId(ptr)
- @ stub PsGetThreadSessionId
- @ stub PsGetThreadTeb
-@@ -961,7 +963,7 @@
- @ stdcall PsLookupThreadByThreadId(ptr ptr)
- @ extern PsProcessType
- @ stub PsReferenceImpersonationToken
--@ stub PsReferencePrimaryToken
-+@ stdcall PsReferencePrimaryToken(ptr)
- @ stdcall PsReferenceProcessFilePointer(ptr ptr)
- @ stdcall PsReleaseProcessExitSynchronization(ptr)
- @ stdcall PsRemoveCreateThreadNotifyRoutine(ptr)
+ @ stdcall PsGetProcessImageFileName(ptr)
 @@ -1375,6 +1377,7 @@
  @ stub SeReleaseSecurityDescriptor
  @ stub SeReleaseSubjectContext
@@ -417,7 +113,7 @@ index 21305dea..d7cd98b7 100644
  @ stub SeSetSecurityDescriptorInfoEx
  @ stdcall SeSinglePrivilegeCheck(int64 long)
 diff --git a/dlls/ntoskrnl.exe/ntoskrnl_private.h b/dlls/ntoskrnl.exe/ntoskrnl_private.h
-index feb5f0ad..98365595 100644
+index 4bbf26c6..68ccfddb 100644
 --- a/dlls/ntoskrnl.exe/ntoskrnl_private.h
 +++ b/dlls/ntoskrnl.exe/ntoskrnl_private.h
 @@ -39,6 +39,22 @@
@@ -443,25 +139,3 @@ index feb5f0ad..98365595 100644
  static inline LPCSTR debugstr_us( const UNICODE_STRING *us )
  {
      if (!us) return "<null>";
-@@ -59,6 +75,8 @@ struct _EPROCESS
-     KERNEL_USER_TIMES times;
-     BOOL wow64;
-     ULONG session_id;
-+    PACCESS_TOKEN token;
-+    char imageName[15];
- };
- 
- struct _KTHREAD
-@@ -75,6 +93,12 @@ struct _ETHREAD
-     struct _KTHREAD kthread;
- };
- 
-+typedef struct _PHYSICAL_MEMORY_RANGE {
-+    PHYSICAL_ADDRESS BaseAddress;
-+    LARGE_INTEGER NumberOfBytes;
-+} PHYSICAL_MEMORY_RANGE, *PPHYSICAL_MEMORY_RANGE;
-+
-+
- void *alloc_kernel_object( POBJECT_TYPE type, HANDLE handle, SIZE_T size, LONG ref );
- NTSTATUS kernel_object_from_handle( HANDLE handle, POBJECT_TYPE type, void **ret );
- 

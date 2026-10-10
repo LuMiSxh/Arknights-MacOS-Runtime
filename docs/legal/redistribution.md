@@ -5,7 +5,7 @@ The clean release build starts with an empty `Libraries/` directory. It installs
 ## Identified components
 
 - WineCX / Wine: Windows compatibility runtime.
-    - Pinned source: <!-- pin:wine.link -->[`dappermint/winecx@e0aa380`](https://github.com/dappermint/winecx/tree/e0aa380780b73e20fabcfe78fd42713b94929a53)<!-- /pin -->
+    - Pinned source: <!-- pin:wine.link -->[`dappermint/winecx@5ee1af6`](https://github.com/dappermint/winecx/tree/5ee1af65283cf7baf162cbab545a696d29206970)<!-- /pin -->
     - License evidence: `LGPL-2.1-or-later`; [`LICENSES/Wine-LGPL-2.1.txt`](../../LICENSES/Wine-LGPL-2.1.txt)
     - Source obligation: Ship complete corresponding source for the modified build and the applicable LGPL materials.
 - DXMT: D3D10/D3D11/Metal payload and WineMetal bridge.
@@ -20,7 +20,7 @@ The clean release build starts with an empty `Libraries/` directory. It installs
     - License evidence: `Apache-2.0`; [upstream license](https://github.com/KhronosGroup/MoltenVK/blob/db66022459ffb663aa2b50f6b018bc2e124f5edf/LICENSE)
     - Source obligation: Include the Apache license and notices; retain the exact pinned source link in the inventory.
 - Pinned Nix library closure: Font, TLS, compression, and Unicode libraries copied beside Wine.
-    - Pinned source: <!-- pin:nixpkgs.link -->[`NixOS/nixpkgs@7c8764b`](https://github.com/NixOS/nixpkgs/tree/7c8764b7c7b09b34f632464276218ef9090eaa11)<!-- /pin -->
+    - Pinned source: <!-- pin:nixpkgs.link -->[`NixOS/nixpkgs@ac62194`](https://github.com/NixOS/nixpkgs/tree/ac62194c3917d5f474c1a844b6fd6da2db95077d)<!-- /pin -->
     - License evidence: Realised store outputs are recorded by the clean build; canonical GPL, LGPL, Apache, and MIT texts are under [`LICENSES/runtime/`](../../LICENSES/runtime/)
     - Source obligation: Keep the realised output inventory, exact Nixpkgs revision, canonical texts, and generated notices together in the release assets.
 

@@ -18,9 +18,9 @@ Components and their rule:
   commit is the commit of the tag `runtime-<release tag>` in dappermint/winecx-gptk.
 - nixpkgs: tip of `NIXPKGS_CHANNEL`.
 
-`NIXPKGS_CHANNEL` stays at `nixos-26.05`. This is the last NixOS release with
-x86_64-darwin support, and the runtime build needs it. Raising the channel is a manual
-decision: change the constant, then review the library closure.
+`NIXPKGS_CHANNEL` stays at `nixos-25.05`. The DXMT build needs `llvmPackages_15`, and
+nixpkgs removed it after this release. Raising the channel is a manual decision: move
+the LLVM version first, change the constant, then review the library closure.
 
 The guard keeps the current pin of wine or dxmt when a patch of that component no
 longer applies to the new commit.
@@ -62,7 +62,7 @@ else:
 
 LOCK_NAME = "runtime.lock.json"
 COMPONENTS = ("wine", "dxmt", "base", "nixpkgs")
-NIXPKGS_CHANNEL = "nixos-26.05"
+NIXPKGS_CHANNEL = "nixos-25.05"
 WINE_REPOSITORY = "dappermint/winecx"
 WINE_BRANCH = re.compile(r"wine11([0-9]+)")
 DXMT_REPOSITORY = "3Shain/dxmt"

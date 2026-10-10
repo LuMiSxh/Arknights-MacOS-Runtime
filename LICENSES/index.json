@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "nixpkgs": {
-    "commit": "7c8764b7c7b09b34f632464276218ef9090eaa11"
+    "commit": "ac62194c3917d5f474c1a844b6fd6da2db95077d"
   },
   "textOrigins": {
     "runtime/MIT.txt": "https://github.com/spdx/license-list-data/blob/v3.29.0/text/MIT.txt",
@@ -26,9 +26,9 @@
   "components": [
     {
       "name": "Wine",
-      "version": "11.17",
+      "version": "11.19",
       "spdx": "LGPL-2.1-or-later",
-      "source": "https://github.com/dappermint/winecx/tree/e0aa380780b73e20fabcfe78fd42713b94929a53",
+      "source": "https://github.com/dappermint/winecx/tree/5ee1af65283cf7baf162cbab545a696d29206970",
       "files": [
         "Wine-LGPL-2.1.txt"
       ],
@@ -39,9 +39,9 @@
     },
     {
       "name": "Wine in-tree libraries and fonts",
-      "version": "11.17",
+      "version": "11.19",
       "spdx": "LGPL-2.1-or-later AND LGPL-2.1-only AND libpng-2.0 AND Zlib AND IJG AND libtiff AND MIT AND BSD-2-Clause AND BSD-3-Clause AND NCSA AND OLDAP-2.8 AND TU-Berlin-2.0 AND Unicode-DFS-2016 AND SGI-B-2.0 AND Bitstream-Vera AND (Apache-2.0 OR MIT)",
-      "source": "https://github.com/dappermint/winecx/tree/e0aa380780b73e20fabcfe78fd42713b94929a53",
+      "source": "https://github.com/dappermint/winecx/tree/5ee1af65283cf7baf162cbab545a696d29206970",
       "files": [
         "Wine-LGPL-2.1.txt",
         "runtime/Apache-2.0.txt",
@@ -185,7 +185,7 @@
     },
     {
       "name": "FreeType",
-      "version": "unresolved (nixpkgs 7c8764b7c7b09b34f632464276218ef9090eaa11)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "FTL OR GPL-2.0-only",
       "source": "https://freetype.org/",
       "files": [
@@ -201,7 +201,7 @@
     },
     {
       "name": "GnuTLS",
-      "version": "unresolved (nixpkgs 7c8764b7c7b09b34f632464276218ef9090eaa11)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "LGPL-2.1-or-later",
       "source": "https://www.gnutls.org/",
       "files": [
@@ -215,7 +215,7 @@
     },
     {
       "name": "GNU libiconv",
-      "version": "unresolved (nixpkgs 7c8764b7c7b09b34f632464276218ef9090eaa11)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "LGPL-2.1-or-later",
       "source": "https://www.gnu.org/software/libiconv/",
       "files": [
@@ -229,7 +229,7 @@
     },
     {
       "name": "GNU gettext (libintl)",
-      "version": "unresolved (nixpkgs 7c8764b7c7b09b34f632464276218ef9090eaa11)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "LGPL-2.1-or-later",
       "source": "https://www.gnu.org/software/gettext/",
       "files": [
@@ -243,7 +243,7 @@
     },
     {
       "name": "libpng",
-      "version": "unresolved (nixpkgs 7c8764b7c7b09b34f632464276218ef9090eaa11)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "libpng-2.0",
       "source": "http://www.libpng.org/pub/png/libpng.html",
       "files": [
@@ -258,7 +258,7 @@
     },
     {
       "name": "zlib",
-      "version": "unresolved (nixpkgs 7c8764b7c7b09b34f632464276218ef9090eaa11)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "Zlib",
       "source": "https://zlib.net/",
       "files": [
@@ -272,7 +272,7 @@
     },
     {
       "name": "Brotli",
-      "version": "unresolved (nixpkgs 7c8764b7c7b09b34f632464276218ef9090eaa11)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "MIT",
       "source": "https://github.com/google/brotli",
       "files": [
@@ -287,7 +287,7 @@
     },
     {
       "name": "bzip2",
-      "version": "unresolved (nixpkgs 7c8764b7c7b09b34f632464276218ef9090eaa11)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "bzip2-1.0.6",
       "source": "https://sourceware.org/bzip2/",
       "files": [
@@ -301,7 +301,7 @@
     },
     {
       "name": "Nettle",
-      "version": "unresolved (nixpkgs 7c8764b7c7b09b34f632464276218ef9090eaa11)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "GPL-2.0-or-later OR LGPL-3.0-or-later",
       "source": "https://www.lysator.liu.se/~nisse/nettle/",
       "files": [
@@ -317,7 +317,7 @@
     },
     {
       "name": "libtasn1",
-      "version": "unresolved (nixpkgs 7c8764b7c7b09b34f632464276218ef9090eaa11)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "LGPL-2.1-or-later",
       "source": "https://www.gnu.org/software/libtasn1/",
       "files": [
@@ -331,7 +331,7 @@
     },
     {
       "name": "libidn2",
-      "version": "unresolved (nixpkgs 7c8764b7c7b09b34f632464276218ef9090eaa11)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "GPL-2.0-or-later OR LGPL-3.0-or-later",
       "source": "https://www.gnu.org/software/libidn/",
       "files": [
@@ -347,7 +347,7 @@
     },
     {
       "name": "p11-kit",
-      "version": "unresolved (nixpkgs 7c8764b7c7b09b34f632464276218ef9090eaa11)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "BSD-3-Clause",
       "source": "https://github.com/p11-glue/p11-kit",
       "files": [
@@ -361,7 +361,7 @@
     },
     {
       "name": "libunistring",
-      "version": "unresolved (nixpkgs 7c8764b7c7b09b34f632464276218ef9090eaa11)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "GPL-2.0-or-later OR LGPL-3.0-or-later",
       "source": "https://www.gnu.org/software/libunistring/",
       "files": [
@@ -377,7 +377,7 @@
     },
     {
       "name": "GMP",
-      "version": "unresolved (nixpkgs 7c8764b7c7b09b34f632464276218ef9090eaa11)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "GPL-2.0-or-later OR LGPL-3.0-or-later",
       "source": "https://gmplib.org/",
       "files": [
@@ -394,7 +394,7 @@
     },
     {
       "name": "libffi",
-      "version": "unresolved (nixpkgs 7c8764b7c7b09b34f632464276218ef9090eaa11)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "MIT",
       "source": "https://github.com/libffi/libffi",
       "files": [
@@ -409,7 +409,7 @@
     },
     {
       "name": "Zstandard",
-      "version": "unresolved (nixpkgs 7c8764b7c7b09b34f632464276218ef9090eaa11)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "BSD-3-Clause OR GPL-2.0-only",
       "source": "https://github.com/facebook/zstd",
       "files": [

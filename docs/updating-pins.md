@@ -7,15 +7,15 @@ The runtime pins four upstream inputs in [`runtime.lock.json`](../runtime.lock.j
 <!-- pin-block:table -->
 | Pin | Value |
 | --- | --- |
-| `wine.commit` | `e0aa380780b73e20fabcfe78fd42713b94929a53` |
-| `wine.version` | `11.17` |
+| `wine.commit` | `5ee1af65283cf7baf162cbab545a696d29206970` |
+| `wine.version` | `11.19` |
 | `dxmt.commit` | `e94c312f5c054263acf261cfa109edf13e757587` |
 | `dxmt.version` | `0.80-262-ge94c312` |
 | `base.tag` | `v4.7.3` |
 | `base.url` | `https://github.com/dappermint/Whisky/releases/download/v4.7.3/Libraries.tar.gz` |
 | `base.sha256` | `a4b5d63493f80698cce5cad8e7212d9a51c8292037b00c478f4652636fcfd331` |
 | `base.recipe` | `0bf3eabc2f0d95154282eb86b11205cbbaae6c65` |
-| `nixpkgs.commit` | `7c8764b7c7b09b34f632464276218ef9090eaa11` |
+| `nixpkgs.commit` | `ac62194c3917d5f474c1a844b6fd6da2db95077d` |
 <!-- /pin-block -->
 
 ## Which version each pin follows
@@ -25,7 +25,7 @@ The runtime pins four upstream inputs in [`runtime.lock.json`](../runtime.lock.j
 | Wine | Tip of the highest `wine11<N>` branch of `dappermint/winecx`. The version comes from the `VERSION` file at that commit. |
 | DXMT | Head of the default branch of `3Shain/dxmt`. The version has the `git describe` form `<tag>-<commits>-g<sha>`. |
 | Base archive | Newest `dappermint/Whisky` release with a `Libraries.tar.gz` asset. The hash comes from the digest of the asset. The recipe commit is the commit of the tag `runtime-<release tag>` in `dappermint/winecx-gptk`. |
-| nixpkgs | Tip of the channel branch `NIXPKGS_CHANNEL` in `scripts/release/pins.py`. The channel is `nixos-26.05`, the last release with x86_64-darwin support. |
+| nixpkgs | Tip of the channel branch `NIXPKGS_CHANNEL` in `scripts/release/pins.py`. The channel is `nixos-25.05`, because the DXMT build needs `llvmPackages_15`, which later releases removed. |
 
 A newer nixpkgs channel is a manual decision. Change the constant, then review the library closure.
 

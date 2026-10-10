@@ -70,7 +70,7 @@ def fixture_routes() -> dict[str, Any]:
         "/repos/dappermint/winecx-gptk/git/tags/" + "9" * 40: {
             "object": {"sha": NEW_RECIPE}
         },
-        "/repos/NixOS/nixpkgs/git/ref/heads/nixos-26.05": {
+        "/repos/NixOS/nixpkgs/git/ref/heads/nixos-25.05": {
             "object": {"sha": NEW_NIXPKGS}
         },
     }
@@ -141,7 +141,7 @@ class ResolutionTests(unittest.TestCase):
         state = pins.resolve_nixpkgs(make_fetch(fixture_routes()))
 
         self.assertEqual(state.commit, NEW_NIXPKGS)
-        self.assertEqual(pins.NIXPKGS_CHANNEL, "nixos-26.05")
+        self.assertEqual(pins.NIXPKGS_CHANNEL, "nixos-25.05")
 
 
 class PinsTestCase(unittest.TestCase):
@@ -290,7 +290,7 @@ class CheckTests(PinsTestCase):
         self.assertEqual(self.check(), [])
 
     def test_stale_marker_is_reported(self) -> None:
-        self.page.write_text(self.page.read_text().replace("11.17", "11.16"))
+        self.page.write_text(self.page.read_text().replace("11.19", "11.16"))
 
         self.assertEqual(self.check(), ["docs/page.md:1: pin:wine.version is stale"])
 
@@ -317,7 +317,7 @@ class CheckTests(PinsTestCase):
             self.check()
 
     def test_unbalanced_marker_fails(self) -> None:
-        self.page.write_text("<!-- pin:wine.version -->11.17\n")
+        self.page.write_text("<!-- pin:wine.version -->11.19\n")
 
         with self.assertRaisesRegex(pins.PinError, "unbalanced"):
             self.check()

@@ -2,13 +2,13 @@
 
 [`runtime.lock.json`](../runtime.lock.json) holds the machine-readable ordered registry. Before release, each entry must name its upstream source, author, license, gate, inactive behavior, test, and removal condition. The entries document provenance. They do not replace the corresponding-source, notice, and redistribution review that a runtime binary requires.
 
-The ACE, CEF, and CN patches target WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> and keep Wine's LGPL-2.1-or-later license.
+The ACE, CEF, and CN patches target WineCX <!-- pin:wine.commit|code -->`5ee1af65283cf7baf162cbab545a696d29206970`<!-- /pin --> and keep Wine's LGPL-2.1-or-later license.
 
 ## Audio
 
 - ID: `wine-audio-default-output`
 - File: `patches/wine/audio/0001-winecoreaudio-default-output.patch`
-- Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
+- Component/base: WineCX <!-- pin:wine.commit|code -->`5ee1af65283cf7baf162cbab545a696d29206970`<!-- /pin --> (Wine <!-- pin:wine.version -->11.19<!-- /pin -->)
 - Source/author: Wine draft MR 11370, commits `4d143f4c` and `65140f31`, Rhodri Richards
 - License: LGPL-2.1-or-later
 - Gate: `ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT=1`, parsed once per process
@@ -38,7 +38,7 @@ Value `0` is an Arknights extension. It waits for the completion fence of the cu
 
 - ID: `wine-hardware-cursor-suppression`
 - File: `patches/wine/hardware-cursor/0001-ntdll-hide-software-cursor-asset.patch`
-- Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
+- Component/base: WineCX <!-- pin:wine.commit|code -->`5ee1af65283cf7baf162cbab545a696d29206970`<!-- /pin --> (Wine <!-- pin:wine.version -->11.19<!-- /pin -->)
 - Source/author: Original runtime change; motivated by the [reported PC cursor stutter](https://www.reddit.com/r/arknights/comments/1vorlzp/pc_client_fix_for_the_annoying_mouse_stuttering/)
 - License: LGPL-2.1-or-later (Wine)
 - Gate: Exact `ARKNIGHTS_RUNTIME_HARDWARE_CURSOR=1`, checked during shared file-name resolution
@@ -75,8 +75,8 @@ Both `Present` paths keep `UpdateStatistics` behind `DXMT_DEBUG`, which avoids i
 All ACE patches use the exact gate `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`. A missing, `0`, or other value keeps Wine's normal route. Every patch requires hash verification and clean application. All four are Endfield FineWine ports ([provenance](../patches/wine/ace/provenance.md)).
 
 - [`wine-ace-ntoskrnl-surface`](../patches/wine/ace/ntoskrnl/0001-ntoskrnl-compatibility-surface.patch)
-    - What: Kernel exports and process metadata for the ACE client: current-thread process, image-name, exit-status, audit-parameter, and persistent-thread-state surfaces.
-    - Scope: Compatibility-only routes use the ACE gate. `PsGetProcessImageFileName` and `PsGetProcessExitStatus` stay unconditional for valid process objects and follow their kernel `_In_` contract.
+    - What: Kernel exports and process metadata for the ACE client: current-thread process, exit-status, audit-parameter, and image-name override surfaces.
+    - Scope: Compatibility-only routes use the ACE gate. `SeSetAuditParameter` and the `SeLocateProcessImageName` override use the gate. `PsGetProcessExitStatus` stays unconditional for valid process objects and follows its kernel `_In_` contract. With the gate off, functions that Wine 11.19 provides follow upstream.
     - Checks: compile both architectures; exercise gated and general routes.
 - [`wine-ace-dispatcher-spoof`](../patches/wine/ace/dispatcher/0001-kernel32-ace-dispatcher-spoof.patch)
     - What: x86-64 dispatcher lookup compatibility.

@@ -1,6 +1,6 @@
 Third-party code in the Wine source tree
 
-Source: https://github.com/dappermint/winecx/tree/e0aa380780b73e20fabcfe78fd42713b94929a53
+Source: https://github.com/dappermint/winecx/tree/5ee1af65283cf7baf162cbab545a696d29206970
 Evidence: The files NOTICES.md, libs/*/LICENSE, libs/*/COPYING, libs/*/COPYRIGHT, and fonts/*.sfd
 of that commit. The claims below come only from these files.
 
