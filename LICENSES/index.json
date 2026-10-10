@@ -175,6 +175,34 @@
       ]
     },
     {
+      "name": "GNU libiconv",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
+      "spdx": "LGPL-2.1-or-later",
+      "source": "https://www.gnu.org/software/libiconv/",
+      "files": [
+        "runtime/LGPL-2.1.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "nixPackages": [
+        "libiconv"
+      ]
+    },
+    {
+      "name": "GNU gettext (libintl)",
+      "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
+      "spdx": "LGPL-2.1-or-later",
+      "source": "https://www.gnu.org/software/gettext/",
+      "files": [
+        "runtime/LGPL-2.1.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "nixPackages": [
+        "gettext"
+      ]
+    },
+    {
       "name": "libpng",
       "version": "unresolved (nixpkgs ac62194c3917d5f474c1a844b6fd6da2db95077d)",
       "spdx": "libpng-2.0",
@@ -321,7 +349,8 @@
       "status": "verified",
       "basis": "upstream-declared",
       "nixPackages": [
-        "gmp"
+        "gmp",
+        "gmp-with-cxx"
       ]
     },
     {
