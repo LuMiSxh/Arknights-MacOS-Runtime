@@ -33,6 +33,7 @@ jobs:
           uv run --locked ruff format --check scripts tests
           uv run --locked --no-dev scripts/runtime.py validate-lock
           uv run --locked --no-dev scripts/release/licenses.py generate --check
+          uv run --locked --no-dev scripts/release/pins.py check
           git diff --check
 
   patches:

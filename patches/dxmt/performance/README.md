@@ -1,6 +1,6 @@
 # DXMT performance patches
 
-Target DXMT `e94c312f5c054263acf261cfa109edf13e757587` (`v0.80-262-ge94c312`, an unreleased post-0.80 canary). The patch is unconditional. It has no runtime flag.
+Target DXMT <!-- pin:dxmt.commit|code -->`e94c312f5c054263acf261cfa109edf13e757587`<!-- /pin --> (<!-- pin:dxmt.describe|code -->`v0.80-262-ge94c312`<!-- /pin -->, an unreleased post-<!-- pin:dxmt.tag -->0.80<!-- /pin --> canary). The patch is unconditional. It has no runtime flag.
 
 1. `0001-dxmt-skip-release-present-statistics.patch` puts `UpdateStatistics` and the rolling statistics aggregation behind `DXMT_DEBUG`. Release builds skip the per-present `std::format` calls and the aggregation. Frame counters and synchronization stay unchanged.
 

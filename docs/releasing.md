@@ -4,6 +4,8 @@ Nothing publishes automatically. Candidate workflows build disposable overlay ar
 
 A build is promotable only after source and patch checks, a clean full build, archive validation, complete corresponding source and licenses, and the manual compatibility checks.
 
+Before a release, move the upstream pins with `just update-pins`. See [updating pins](updating-pins.md).
+
 1. Make sure the protected default branch is clean. Dispatch the workflow with one SemVer version, such as `0.5.0`. An optional leading `v` is removed. Do not create a tag first.
 2. The workflow checks that the derived tag and GitHub Release do not exist, then builds the pinned inputs from the exact default-branch commit. The `build` job has read-only permissions and uploads the release assets as one workflow artifact. A failed build creates no tag and no release.
 3. After the clean-build, `releaseEligible`, checksum, provenance, notice, and corresponding-source gates pass, the `publish` job downloads the assets. It is the only job with write permission. It re-checks the tag and release and attests the assets. It then creates the tag and a draft release at the built SHA, non-latest and unpublished.

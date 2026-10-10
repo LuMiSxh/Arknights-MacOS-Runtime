@@ -2,13 +2,13 @@
 
 [`runtime.lock.json`](../runtime.lock.json) holds the machine-readable ordered registry. Before release, each entry must name its upstream source, author, license, gate, inactive behavior, test, and removal condition. The entries document provenance. They do not replace the corresponding-source, notice, and redistribution review that a runtime binary requires.
 
-The ACE, CEF, and CN patches target WineCX `e0aa380780b73e20fabcfe78fd42713b94929a53` and keep Wine's LGPL-2.1-or-later license.
+The ACE, CEF, and CN patches target WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> and keep Wine's LGPL-2.1-or-later license.
 
 ## Audio
 
 - ID: `wine-audio-default-output`
 - File: `patches/wine/audio/0001-winecoreaudio-default-output.patch`
-- Component/base: WineCX `e0aa380780b73e20fabcfe78fd42713b94929a53` (Wine 11.17)
+- Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Wine draft MR 11370, commits `4d143f4c` and `65140f31`, Rhodri Richards
 - License: LGPL-2.1-or-later
 - Gate: `ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT=1`, parsed once per process
@@ -23,7 +23,7 @@ The MR is a draft. Capture and exclusive streams are unchanged.
 
 - ID: `dxmt-cursor-frame-latency`
 - File: `patches/dxmt/cursor/0001-dxmt-command-queue-configurable-frame-latency.patch`
-- Component/base: DXMT `e94c312f5c054263acf261cfa109edf13e757587` (`v0.80-262-ge94c312`)
+- Component/base: DXMT <!-- pin:dxmt.commit|code -->`e94c312f5c054263acf261cfa109edf13e757587`<!-- /pin --> (<!-- pin:dxmt.describe|code -->`v0.80-262-ge94c312`<!-- /pin -->)
 - Source/author: Original runtime experiment, runtime maintainers
 - License: LGPL-2.1-or-later (DXMT)
 - Gate: `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY=0..3`, read once on first command queue
@@ -38,7 +38,7 @@ Value `0` is an Arknights extension. It waits for the completion fence of the cu
 
 - ID: `wine-hardware-cursor-suppression`
 - File: `patches/wine/hardware-cursor/0001-ntdll-hide-software-cursor-asset.patch`
-- Component/base: WineCX `e0aa380780b73e20fabcfe78fd42713b94929a53` (Wine 11.17)
+- Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Original runtime change; motivated by the [reported PC cursor stutter](https://www.reddit.com/r/arknights/comments/1vorlzp/pc_client_fix_for_the_annoying_mouse_stuttering/)
 - License: LGPL-2.1-or-later (Wine)
 - Gate: Exact `ARKNIGHTS_RUNTIME_HARDWARE_CURSOR=1`, checked during shared file-name resolution
@@ -59,7 +59,7 @@ The filter matches the case-insensitive final basename `a9d41799f1af1868f2db4956
 
 - ID: `dxmt-skip-release-present-statistics`
 - File: `patches/dxmt/performance/0001-dxmt-skip-release-present-statistics.patch`
-- Component/base: DXMT `e94c312f5c054263acf261cfa109edf13e757587`
+- Component/base: DXMT <!-- pin:dxmt.commit|code -->`e94c312f5c054263acf261cfa109edf13e757587`<!-- /pin -->
 - Source/author: Original runtime optimization, runtime maintainers
 - License: LGPL-2.1-or-later (DXMT)
 - Gate: `DXMT_DEBUG`; debug builds keep statistics aggregation and HUD updates, release builds skip both
