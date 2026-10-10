@@ -11,7 +11,17 @@
     "runtime/FTL.txt": "https://github.com/spdx/license-list-data/blob/v3.29.0/text/FTL.txt",
     "runtime/BSD-3-Clause.txt": "https://github.com/spdx/license-list-data/blob/v3.29.0/text/BSD-3-Clause.txt",
     "runtime/LLVM-exception.txt": "https://github.com/spdx/license-list-data/blob/v3.29.0/text/LLVM-exception.txt",
-    "runtime/CC0-1.0.txt": "https://github.com/spdx/license-list-data/blob/v3.29.0/text/CC0-1.0.txt"
+    "runtime/CC0-1.0.txt": "https://github.com/spdx/license-list-data/blob/v3.29.0/text/CC0-1.0.txt",
+    "runtime/BSD-2-Clause.txt": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/BSD-2-Clause.txt",
+    "runtime/IJG.txt": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/IJG.txt",
+    "runtime/libtiff.txt": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/libtiff.txt",
+    "runtime/NCSA.txt": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/NCSA.txt",
+    "runtime/OLDAP-2.8.txt": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/OLDAP-2.8.txt",
+    "runtime/TU-Berlin-2.0.txt": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/TU-Berlin-2.0.txt",
+    "runtime/Unicode-DFS-2016.txt": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/Unicode-DFS-2016.txt",
+    "runtime/SGI-B-2.0.txt": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/SGI-B-2.0.txt",
+    "runtime/Bitstream-Vera.txt": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/Bitstream-Vera.txt",
+    "runtime/Spencer-94.txt": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/Spencer-94.txt"
   },
   "components": [
     {
@@ -30,22 +40,35 @@
     {
       "name": "Wine in-tree libraries and fonts",
       "version": "11.17",
-      "spdx": "NOASSERTION",
+      "spdx": "LGPL-2.1-or-later AND LGPL-2.1-only AND libpng-2.0 AND Zlib AND IJG AND libtiff AND MIT AND BSD-2-Clause AND BSD-3-Clause AND NCSA AND OLDAP-2.8 AND TU-Berlin-2.0 AND Unicode-DFS-2016 AND SGI-B-2.0 AND Bitstream-Vera AND (Apache-2.0 OR MIT)",
       "source": "https://github.com/dappermint/winecx/tree/e0aa380780b73e20fabcfe78fd42713b94929a53",
       "files": [
-        "Wine-LGPL-2.1.txt"
+        "Wine-LGPL-2.1.txt",
+        "runtime/Apache-2.0.txt",
+        "runtime/Bitstream-Vera.txt",
+        "runtime/BSD-2-Clause.txt",
+        "runtime/BSD-3-Clause.txt",
+        "runtime/IJG.txt",
+        "runtime/libpng-2.0.txt",
+        "runtime/libtiff.txt",
+        "runtime/MIT.txt",
+        "runtime/NCSA.txt",
+        "runtime/OLDAP-2.8.txt",
+        "runtime/SGI-B-2.0.txt",
+        "runtime/TU-Berlin-2.0.txt",
+        "runtime/Unicode-DFS-2016.txt",
+        "runtime/Zlib.txt"
       ],
-      "status": "unverified",
+      "status": "verified",
+      "basis": "upstream-declared",
       "notice": "notices/wine-bundled.txt",
-      "candidates": [
-        "LGPL-2.1-or-later"
-      ]
+      "note": "Read in winecx at the pinned commit: NOTICES.md, libs/*/LICENSE|COPYING|COPYRIGHT, fonts/*.sfd. Texts of libtiff, OLDAP-2.8, and TU-Berlin-2.0 match the SPDX texts after whitespace normalisation. The texts of Zlib, BSD-2-Clause (JXR), and the IJG license body match with other holder lines. Unicode-DFS-2016 is by wording only (confidence: medium, the file is the 2022 ICU variant). Items without an SPDX text (Unicode Bidirectional Algorithm, X11/DEC, RTF Tools, ray-box article, SQLite, ICU License) are verbatim in the notice. Dual-licensed code uses the MIT terms. Which of these libraries and fonts the shipped binaries contain is inferred from the configure flags and make install-lib in scripts/build-canary.sh. It is not proven by binary inspection."
     },
     {
       "name": "DXMT",
-      "version": "0.80-244-g7c8dee1",
+      "version": "0.80-262-ge94c312",
       "spdx": "LGPL-2.1-or-later",
-      "source": "https://github.com/3Shain/dxmt/tree/7c8dee1c2d73415301ceb7d1fa810861cef4cd67",
+      "source": "https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587",
       "files": [
         "DXMT-LGPL-2.1.txt",
         "runtime/MIT-DXMT.txt"
@@ -57,9 +80,9 @@
     },
     {
       "name": "DXMT vendored DXBCParser",
-      "version": "0.80-244-g7c8dee1",
+      "version": "0.80-262-ge94c312",
       "spdx": "MIT",
-      "source": "https://github.com/3Shain/dxmt/tree/7c8dee1c2d73415301ceb7d1fa810861cef4cd67/libs/DXBCParser",
+      "source": "https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587/libs/DXBCParser",
       "files": [
         "runtime/MIT.txt"
       ],
@@ -69,9 +92,9 @@
     },
     {
       "name": "DXMT vendored DXVK-derived code",
-      "version": "0.80-244-g7c8dee1",
+      "version": "0.80-262-ge94c312",
       "spdx": "Zlib",
-      "source": "https://github.com/3Shain/dxmt/tree/7c8dee1c2d73415301ceb7d1fa810861cef4cd67/src/util",
+      "source": "https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587/src/util",
       "files": [
         "runtime/Zlib.txt"
       ],
@@ -81,9 +104,9 @@
     },
     {
       "name": "DXMT vendored tl::generator header",
-      "version": "0.80-244-g7c8dee1",
+      "version": "0.80-262-ge94c312",
       "spdx": "CC0-1.0",
-      "source": "https://github.com/3Shain/dxmt/blob/7c8dee1c2d73415301ceb7d1fa810861cef4cd67/include/tl/generator.hpp",
+      "source": "https://github.com/3Shain/dxmt/blob/e94c312f5c054263acf261cfa109edf13e757587/include/tl/generator.hpp",
       "files": [
         "runtime/CC0-1.0.txt"
       ],
@@ -92,15 +115,28 @@
       "notice": "notices/dxmt-vendored.txt"
     },
     {
-      "name": "DXMT unverified submodules and headers",
-      "version": "0.80-244-g7c8dee1",
+      "name": "DXMT mingw-directx-headers (include/native/directx)",
+      "version": "0.80-262-ge94c312",
       "spdx": "NOASSERTION",
-      "source": "https://github.com/3Shain/dxmt/tree/7c8dee1c2d73415301ceb7d1fa810861cef4cd67",
+      "source": "https://github.com/misyltoad/mingw-directx-headers/tree/9df86f2341616ef1888ae59919feaa6d4fad693d",
       "files": [
         "notices/dxmt-unverified.txt"
       ],
       "status": "unverified",
-      "notice": "notices/dxmt-unverified.txt"
+      "notice": "notices/dxmt-unverified.txt",
+      "note": "The submodule is empty in every local checkout, so no license file was read. The gitlink commit is from git ls-tree of the DXMT commit. The native DXBCParserNative library of the release build uses the headers."
+    },
+    {
+      "name": "DXMT Windows toolchain runtime (libstdc++, libgcc, mingw-w64 CRT)",
+      "version": "0.80-262-ge94c312",
+      "spdx": "NOASSERTION",
+      "source": "https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587",
+      "files": [
+        "notices/dxmt-toolchain.txt"
+      ],
+      "status": "unverified",
+      "notice": "notices/dxmt-toolchain.txt",
+      "note": "Inferred from -static in meson.build and the GCC cross compiler in build-win64.txt. The DLLs were not inspected. The Homebrew formula version is not pinned. The texts of GCC-exception-3.1 and ZPL-2.1 are not in this repository."
     },
     {
       "name": "LLVM (llvmPackages_15)",
@@ -109,9 +145,15 @@
       "source": "https://github.com/llvm/llvm-project",
       "files": [
         "runtime/Apache-2.0.txt",
-        "runtime/LLVM-exception.txt"
+        "runtime/LLVM-exception.txt",
+        "runtime/BSD-2-Clause.txt",
+        "runtime/BSD-3-Clause.txt",
+        "runtime/Spencer-94.txt"
       ],
-      "status": "unverified"
+      "status": "verified",
+      "basis": "upstream-declared",
+      "notice": "notices/llvm.txt",
+      "note": "Upstream facts, not read in a local LLVM checkout: nixpkgs builds LLVM 15.0.7 and its llvm/LICENSE.TXT states Apache-2.0 WITH LLVM-exception. The link of LLVM into winemetal.so comes from the DXMT meson files. The set of third-party files in lib/Support that winemetal.so contains is not verified. No notice text of ConvertUTF.cpp is in this repository."
     },
     {
       "name": "MoltenVK",
@@ -129,20 +171,17 @@
     {
       "name": "MoltenVK embedded libraries",
       "version": "1.4.2",
-      "spdx": "NOASSERTION",
+      "spdx": "Apache-2.0 AND BSD-3-Clause AND MIT",
       "source": "https://github.com/KhronosGroup/MoltenVK/tree/db66022459ffb663aa2b50f6b018bc2e124f5edf",
       "files": [
         "runtime/Apache-2.0.txt",
         "runtime/BSD-3-Clause.txt",
         "runtime/MIT.txt"
       ],
-      "status": "unverified",
+      "status": "verified",
+      "basis": "upstream-declared",
       "notice": "notices/moltenvk.txt",
-      "candidates": [
-        "Apache-2.0",
-        "BSD-3-Clause",
-        "MIT"
-      ]
+      "note": "Upstream pins in ExternalRevisions at the MoltenVK commit: SPIRV-Cross and SPIRV-Tools Apache-2.0, cereal BSD-3-Clause, SPIRV-Headers MIT. The MoltenVK source was not read locally, and the dylib is not built here. The commit is the claim of the base archive provider. Which libraries the dylib contains is not verified."
     },
     {
       "name": "FreeType",
@@ -389,6 +428,10 @@
     {
       "name": "Vulkan-Headers",
       "reason": "Build-time headers. The runtime does not copy them."
+    },
+    {
+      "name": "NVIDIA nvapi (DXMT external/nvapi)",
+      "reason": "The DXMT option enable_nvapi is off by default (meson.options). src/meson.build adds src/nvapi only when it is on. The release build passes no such option."
     }
   ]
 }

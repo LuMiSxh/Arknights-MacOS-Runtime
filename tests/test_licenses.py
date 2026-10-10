@@ -78,6 +78,29 @@ class LicenseIndexTests(unittest.TestCase):
         with self.assertRaisesRegex(LicenseError, "unsafe file path"):
             self.validate(index)
 
+    def test_empty_note_fails(self) -> None:
+        index = copy.deepcopy(self.index)
+        index["components"][0]["note"] = " "
+        with self.assertRaisesRegex(LicenseError, "note must be"):
+            self.validate(index)
+
+    def test_unverified_components_are_limited_to_known_gaps(self) -> None:
+        unverified = {
+            c["name"] for c in self.index["components"] if c["status"] == "unverified"
+        }
+        self.assertEqual(
+            unverified,
+            {
+                "DXMT mingw-directx-headers (include/native/directx)",
+                "DXMT Windows toolchain runtime (libstdc++, libgcc, mingw-w64 CRT)",
+            },
+        )
+
+    def test_unverified_components_explain_their_basis(self) -> None:
+        for component in self.index["components"]:
+            if component["status"] == "unverified":
+                self.assertTrue(component.get("note"), component["name"])
+
     def test_every_status_is_verified_or_unverified(self) -> None:
         statuses = {c["status"] for c in self.index["components"]}
         self.assertLessEqual(statuses, {"verified", "unverified"})

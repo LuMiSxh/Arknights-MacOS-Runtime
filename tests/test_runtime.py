@@ -144,7 +144,7 @@ class RuntimeLockTests(unittest.TestCase):
     def test_performance_stage_is_isolated_and_included_in_combined(self) -> None:
         performance = dict(self.lock["patches"][0])
         performance.update(
-            id="dxmt-command-context-device-initialization",
+            id="example-performance",
             component="dxmt",
             family="performance",
         )

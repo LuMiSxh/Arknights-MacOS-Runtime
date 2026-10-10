@@ -3,7 +3,7 @@
 ## Source pins
 
 - Wine base: `dappermint/winecx`
-- Wine commit: `e0aa380780b73e20fabcfe78fd42713b94929a53` (Wine 11.17)
+- Wine commit: <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Candidate reference: [`stoicswe/Endfield_FineWine`](https://github.com/stoicswe/Endfield_FineWine)
 - Reference checkout: `e5d4ccad235eefe32d912733e57e4c0bb53a5b58`
 - Reference patch families: `stage1-macos` and `stage2-dwproton`
@@ -25,7 +25,7 @@ Carries the non-X11 kernel surface that the ACE client needs:
 - physical-memory compatibility stubs
 - process-object metadata lifetime handling
 
-Wine 11.17 already provides the process session and creation-time accessors and the bug-check callback exports, so the patch omits them.
+Wine <!-- pin:wine.version -->11.17<!-- /pin --> already provides the process session and creation-time accessors and the bug-check callback exports, so the patch omits them.
 
 ### `dispatcher`
 

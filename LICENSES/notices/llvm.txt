@@ -1,0 +1,21 @@
+LLVM 15 (nixpkgs llvmPackages_15)
+Source: https://github.com/llvm/llvm-project
+
+DXMT links LLVM statically into winemetal.so. The DXMT build script passes the Nix output
+llvmPackages_15.llvm as -Dnative_llvm_path. The meson files src/airconv/meson.build and
+src/airconv/darwin/meson.build list the -lLLVM* libraries.
+
+License: Apache-2.0 WITH LLVM-exception. The texts are runtime/Apache-2.0.txt and runtime/LLVM-exception.txt.
+The nixpkgs package llvmPackages_15 builds LLVM 15.0.7. The file llvm/LICENSE.TXT of the tag llvmorg-15.0.7
+also has a legacy NCSA section for older code.
+
+Third-party code in llvm/lib/Support, from the upstream sources of LLVM 15. This project did not
+read the LLVM source in a local checkout. It did not inspect the winemetal.so binary either.
+The exact set of these files in winemetal.so is not verified.
+- xxhash.cpp: BSD-2-Clause. The text is runtime/BSD-2-Clause.txt.
+- COPYRIGHT.regex (regex engine by Henry Spencer): Spencer-94 and BSD-3-Clause.
+  The texts are runtime/Spencer-94.txt and runtime/BSD-3-Clause.txt.
+- ConvertUTF.cpp: The Unicode permissive notice in the header of the file.
+  This project has no copy of that notice.
+- MD5.cpp: public domain.
+- BLAKE3: CC0-1.0 OR Apache-2.0. The runtime uses the Apache-2.0 terms.

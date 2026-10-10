@@ -12,11 +12,15 @@ check:
 	{{ uv_dev }} ruff format --check scripts tests
 	{{ uv }} scripts/runtime.py validate-lock
 	{{ uv }} scripts/release/licenses.py generate --check
+	{{ uv }} scripts/release/pins.py check
 	{{ uv_dev }} actionlint
 	git diff --check
 
 validate:
 	{{ uv }} scripts/runtime.py validate-lock
+
+update-pins *args:
+	{{ uv }} scripts/release/pins.py update {{args}}
 
 monitor:
 	{{ uv }} scripts/monitor.py --output .build/reports/source-monitor.json

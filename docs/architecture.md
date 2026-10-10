@@ -29,6 +29,6 @@ Each owning component parses its own flags. Accepted values and defaults are in 
 - CN gate: Bilibili window preflights ([patch registry](patch-registry.md#cn)); legacy CEF fallback only when CEF is absent.
 - Hardware Cursor gate: Hides the exact Yostar/TW or Bilibili CN cursor asset basename in shared Wine path resolution, so open, attribute, and create-if-missing calls agree.
 
-The performance family has an unconditional DXMT command-context initialization correction and a `DXMT_DEBUG`-gated reduction of release presentation statistics. Both keep the debug HUD output and release frame counters. Neither changes rendering policy.
+The performance family has a `DXMT_DEBUG`-gated reduction of release presentation statistics. It keeps the debug HUD output and release frame counters. It does not change rendering policy.
 
 The launcher selects the remaining flags from the profile of the active client. A profile owns the publisher, distribution variant, runtime environment overrides, and the ACE warning on Play. The runtime never infers compatibility from a publisher name, so a future ACE client stays independent from the Bilibili CN routes.

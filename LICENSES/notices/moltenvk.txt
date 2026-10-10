@@ -3,7 +3,17 @@ Copyright (c) The Brenwill Workshop Ltd. and the MoltenVK contributors
 
 MoltenVK uses the Apache License, version 2.0.
 This project does not build MoltenVK. The library comes from the SHA-256-pinned base archive.
-This project has not checked whether the upstream repository has a NOTICE file.
+The commit above is the claim of the archive provider. This project did not build it.
+The MoltenVK repository has no NOTICE file at this commit.
 
-The MoltenVK binary can contain statically linked libraries (for example SPIRV-Cross, SPIRV-Tools, glslang, and cereal).
-Their licenses (Apache-2.0, BSD-3-Clause, MIT) are not verified against the pinned commit.
+The file ExternalRevisions of MoltenVK pins these libraries at this commit.
+MoltenVK builds SPIRV-Cross and SPIRV-Tools into its library.
+- SPIRV-Cross (6c09849): Apache-2.0.
+- SPIRV-Tools (0d6fd73): Apache-2.0.
+- cereal (a56bad8): BSD-3-Clause. The text is runtime/BSD-3-Clause.txt.
+- SPIRV-Headers (29981f6): MIT. The text is runtime/MIT.txt.
+- Vulkan-Headers (e3b1eec): Apache-2.0 OR MIT. These are compile-time headers.
+MoltenVK does not use volk or Vulkan-Tools itself. It has no glslang dependency.
+
+This project did not read the MoltenVK source or inspect the dylib. The library list and the
+licenses come from the upstream pins at this commit. Which libraries the dylib contains is not verified.

@@ -3,7 +3,7 @@
 ## Source pins
 
 - Wine base: `dappermint/winecx`
-- Wine commit: `e0aa380780b73e20fabcfe78fd42713b94929a53` (Wine 11.17)
+- Wine commit: <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 
 The generic CEF dispatcher is an original Arknights macOS Runtime change. It isolates regional descriptors from the loader mechanism.
 

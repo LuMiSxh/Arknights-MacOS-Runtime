@@ -10,16 +10,16 @@
     },
     "dxmt": {
       "repository": "https://github.com/3Shain/dxmt.git",
-      "commit": "7c8dee1c2d73415301ceb7d1fa810861cef4cd67",
-      "version": "0.80-244-g7c8dee1"
+      "commit": "e94c312f5c054263acf261cfa109edf13e757587",
+      "version": "0.80-262-ge94c312"
     }
   },
   "baseArtifact": {
-    "url": "https://github.com/dappermint/Whisky/releases/download/v4.6.8/Libraries.tar.gz",
-    "sha256": "19b9d7942b8cfd4871eee2a8f81abc7c849307c7858873f9b504c24c1bb6b25d",
+    "url": "https://github.com/dappermint/Whisky/releases/download/v4.7.3/Libraries.tar.gz",
+    "sha256": "a4b5d63493f80698cce5cad8e7212d9a51c8292037b00c478f4652636fcfd331",
     "recipe": {
       "repository": "https://github.com/dappermint/winecx-gptk.git",
-      "commit": "f374f5bae40631a466c03c59180ca34605091efd"
+      "commit": "0bf3eabc2f0d95154282eb86b11205cbbaae6c65"
     }
   },
   "baseProvenance": {
@@ -80,17 +80,10 @@
       "sha256": "ce4c5416840a23a1a526a8273abd1373fc36507e1a1d97b97fdade6bf9a1347d"
     },
     {
-      "id": "dxmt-command-context-device-initialization",
-      "component": "dxmt",
-      "family": "performance",
-      "path": "patches/dxmt/performance/0001-dxmt-initialize-device-before-command-helpers.patch",
-      "sha256": "0fc032978507e3ba0e5dd214fa3f74be03fa3b5795d0a826acae4018a3378df7"
-    },
-    {
       "id": "dxmt-skip-release-present-statistics",
       "component": "dxmt",
       "family": "performance",
-      "path": "patches/dxmt/performance/0002-dxmt-skip-release-present-statistics.patch",
+      "path": "patches/dxmt/performance/0001-dxmt-skip-release-present-statistics.patch",
       "sha256": "fc833832a654154645cf5ebf58e1c5de1c6b6af2d9a7d5d4ceda890384285e04"
     },
     {

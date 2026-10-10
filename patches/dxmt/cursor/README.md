@@ -1,6 +1,6 @@
 # DXMT cursor-latency patch
 
-Targets DXMT `7c8dee1c2d73415301ceb7d1fa810861cef4cd67` (`v0.80-244-g7c8dee1`, an unreleased post-0.80 canary). Adds one opt-in frame-latency override: `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY=0`, `1`, `2`, or `3`.
+Targets DXMT <!-- pin:dxmt.commit|code -->`e94c312f5c054263acf261cfa109edf13e757587`<!-- /pin --> (<!-- pin:dxmt.describe|code -->`v0.80-262-ge94c312`<!-- /pin -->, an unreleased post-<!-- pin:dxmt.tag -->0.80<!-- /pin --> canary). Adds one opt-in frame-latency override: `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY=0`, `1`, `2`, or `3`.
 
 - DXMT reads the variable once, during lazy static initialization when the first `CommandQueue` is constructed. No frame hot path, including `PresentBoundary()`, looks up or parses the environment.
 - A missing, empty, malformed, or out-of-range value uses the upstream default `3`.
