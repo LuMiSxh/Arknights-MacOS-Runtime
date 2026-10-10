@@ -1,5 +1,5 @@
-DXMT 0.80-244-g7c8dee1 vendored code
-Source: https://github.com/3Shain/dxmt/tree/7c8dee1c2d73415301ceb7d1fa810861cef4cd67
+DXMT 0.80-262-ge94c312 vendored code
+Source: https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587
 
 libs/DXBCParser: MIT License. The file headers say "Licensed under the MIT License"
 and name Microsoft as the author. The text is runtime/MIT.txt.
@@ -8,3 +8,8 @@ src/util (DXVK-derived code): zlib License. The code is derived from DXVK by
 Philip Rebohle and Joshua Ashton. The text is runtime/Zlib.txt.
 
 include/tl/generator.hpp (tl::generator by Sy Brand): CC0-1.0. The text is runtime/CC0-1.0.txt.
+
+include/native/windows: Minimal Windows headers of DXMT. They have no license headers and are part of
+the DXMT tree. Three files (poppack.h, pshpack1.h, pshpack4.h) state that they are in the Public Domain
+and that they are part of the mingw-w64 runtime package. The headers are compile-time input of the
+native build.

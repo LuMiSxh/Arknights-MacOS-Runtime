@@ -9,9 +9,10 @@ The clean release build starts with an empty `Libraries/` directory. It installs
     - License evidence: `LGPL-2.1-or-later`; [`LICENSES/Wine-LGPL-2.1.txt`](../../LICENSES/Wine-LGPL-2.1.txt)
     - Source obligation: Ship complete corresponding source for the modified build and the applicable LGPL materials.
 - DXMT: D3D10/D3D11/Metal payload and WineMetal bridge.
-    - Pinned source: [`3Shain/dxmt@7c8dee1`](https://github.com/3Shain/dxmt/tree/7c8dee1c2d73415301ceb7d1fa810861cef4cd67)
+    - Pinned source: [`3Shain/dxmt@e94c312`](https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587)
     - License evidence: `LGPL-2.1-or-later` at the pinned commit. The `LICENSE` file of that commit states the license. The LGPL-2.1 text is in [`LICENSES/DXMT-LGPL-2.1.txt`](../../LICENSES/DXMT-LGPL-2.1.txt). DXMT v0.80 and older releases use the MIT License; the MIT text is in [`LICENSES/runtime/MIT-DXMT.txt`](../../LICENSES/runtime/MIT-DXMT.txt).
-    - Vendored code: `libs/DXBCParser` is MIT. The DXVK-derived code is Zlib. `include/tl/generator.hpp` is CC0-1.0. See [`LICENSES/notices/dxmt-vendored.txt`](../../LICENSES/notices/dxmt-vendored.txt). The licenses of the submodules and some headers are not verified. See [`LICENSES/notices/dxmt-unverified.txt`](../../LICENSES/notices/dxmt-unverified.txt).
+    - Vendored code: `libs/DXBCParser` is MIT. The DXVK-derived code is Zlib. `include/tl/generator.hpp` is CC0-1.0. See [`LICENSES/notices/dxmt-vendored.txt`](../../LICENSES/notices/dxmt-vendored.txt). The license of the `include/native/directx` headers is not verified. See [`LICENSES/notices/dxmt-unverified.txt`](../../LICENSES/notices/dxmt-unverified.txt). The NVIDIA nvapi submodule is off by default and not in the release build.
+    - Linked code: DXMT links LLVM 15 (Apache-2.0 WITH LLVM-exception) into `winemetal.so`. See [`LICENSES/notices/llvm.txt`](../../LICENSES/notices/llvm.txt). The `-static` link flag probably puts libstdc++, libgcc, and the mingw-w64 runtime into the DXMT DLLs. This is an inference. The license of this code is not verified. See [`LICENSES/notices/dxmt-toolchain.txt`](../../LICENSES/notices/dxmt-toolchain.txt).
     - Source obligation: Ship complete corresponding source for the modified build and the LGPL-2.1 text. The source archive contains the DXMT source.
 - MoltenVK: Vulkan-to-Metal dynamic library.
     - Binary origin: the SHA-256-pinned third-party base archive. This project does not build MoltenVK.
@@ -19,7 +20,7 @@ The clean release build starts with an empty `Libraries/` directory. It installs
     - License evidence: `Apache-2.0`; [upstream license](https://github.com/KhronosGroup/MoltenVK/blob/db66022459ffb663aa2b50f6b018bc2e124f5edf/LICENSE)
     - Source obligation: Include the Apache license and notices; retain the exact pinned source link in the inventory.
 - Pinned Nix library closure: Font, TLS, compression, and Unicode libraries copied beside Wine.
-    - Pinned source: [`NixOS/nixpkgs@ac62194`](https://github.com/NixOS/nixpkgs/tree/ac62194c3917d5f474c1a844b6fd6da2db95077d)
+    - Pinned source: [`NixOS/nixpkgs@7c8764b`](https://github.com/NixOS/nixpkgs/tree/7c8764b7c7b09b34f632464276218ef9090eaa11)
     - License evidence: Realised store outputs are recorded by the clean build; canonical GPL, LGPL, Apache, and MIT texts are under [`LICENSES/runtime/`](../../LICENSES/runtime/)
     - Source obligation: Keep the realised output inventory, exact Nixpkgs revision, canonical texts, and generated notices together in the release assets.
 

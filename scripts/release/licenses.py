@@ -42,6 +42,8 @@ UNKNOWN_LICENSE = "NOASSERTION"
 # Each SPDX identifier maps to the files (below LICENSES/) that hold its text.
 LICENSE_TEXTS: dict[str, tuple[str, ...]] = {
     "Apache-2.0": ("runtime/Apache-2.0.txt",),
+    "Bitstream-Vera": ("runtime/Bitstream-Vera.txt",),
+    "BSD-2-Clause": ("runtime/BSD-2-Clause.txt",),
     "BSD-3-Clause": ("runtime/BSD-3-Clause.txt",),
     "bzip2-1.0.6": ("runtime/bzip2-1.0.6.txt",),
     "CC0-1.0": ("runtime/CC0-1.0.txt",),
@@ -50,6 +52,7 @@ LICENSE_TEXTS: dict[str, tuple[str, ...]] = {
     "GPL-2.0-or-later": ("runtime/GPL-2.0.txt",),
     "GPL-3.0-only": ("runtime/GPL-3.0.txt",),
     "GPL-3.0-or-later": ("runtime/GPL-3.0.txt",),
+    "IJG": ("runtime/IJG.txt",),
     "LGPL-2.1-only": ("runtime/LGPL-2.1.txt", "Wine-LGPL-2.1.txt", "DXMT-LGPL-2.1.txt"),
     "LGPL-2.1-or-later": (
         "runtime/LGPL-2.1.txt",
@@ -59,8 +62,15 @@ LICENSE_TEXTS: dict[str, tuple[str, ...]] = {
     "LGPL-3.0-only": ("runtime/LGPL-3.0.txt",),
     "LGPL-3.0-or-later": ("runtime/LGPL-3.0.txt",),
     "libpng-2.0": ("runtime/libpng-2.0.txt",),
+    "libtiff": ("runtime/libtiff.txt",),
     "LLVM-exception": ("runtime/LLVM-exception.txt",),
     "MIT": ("runtime/MIT.txt", "runtime/MIT-DXMT.txt"),
+    "NCSA": ("runtime/NCSA.txt",),
+    "OLDAP-2.8": ("runtime/OLDAP-2.8.txt",),
+    "SGI-B-2.0": ("runtime/SGI-B-2.0.txt",),
+    "Spencer-94": ("runtime/Spencer-94.txt",),
+    "TU-Berlin-2.0": ("runtime/TU-Berlin-2.0.txt",),
+    "Unicode-DFS-2016": ("runtime/Unicode-DFS-2016.txt",),
     "Zlib": ("runtime/Zlib.txt",),
 }
 # The LGPL-3.0 text refers to the GPL-3.0 text.
@@ -145,6 +155,10 @@ def _component_problems(
     ).startswith("http://"):
         problem("source must be an URL")
     status = component.get("status")
+    if "note" in component and not (
+        isinstance(component["note"], str) and component["note"].strip()
+    ):
+        problem("note must be a non-empty string")
     if isinstance(status, str) and status not in STATUSES:
         problem(f"unknown status {status!r}")
     basis = component.get("basis")

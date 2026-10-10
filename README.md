@@ -13,7 +13,7 @@ Use the Runtime problem template in the [Arknights Client issue tracker](https:/
 
 ## Baseline
 
-- dappermint runtime 4.6.8 with WineCX 11.17.
+- dappermint runtime 4.7.3 with WineCX 11.17.
 - The Cursor, Performance, and combined stages build a pinned post-0.80 DXMT revision.
 - The `hardware-cursor` stage overlays only the patched `x86_64-unix/ntdll.so`.
 - The clean release tree contains newly built 64-bit Wine and DXMT (no GStreamer/FFmpeg) and the pinned Nix library closure.
@@ -67,7 +67,7 @@ See [architecture](docs/architecture.md), [patch registry](docs/patch-registry.m
 
 Original build tooling and documentation use the [Mozilla Public License 2.0](LICENSE). The modified Wine source in the Wine patches is subject to Wine's [LGPL-2.1-or-later terms](LICENSES/Wine-LGPL-2.1.txt).
 
-The DXMT license is LGPL-2.1-or-later at the pinned commit `7c8dee1`. The `LICENSE` file of that commit states this license. DXMT release v0.80 and older releases use the MIT License. The text of the LGPL-2.1 license is in [`LICENSES/DXMT-LGPL-2.1.txt`](LICENSES/DXMT-LGPL-2.1.txt). The MIT text for the older releases is in [`LICENSES/runtime/MIT-DXMT.txt`](LICENSES/runtime/MIT-DXMT.txt). The source archive contains the DXMT source. Vendored code and unverified submodules are listed in [`LICENSES/notices/`](LICENSES/notices/).
+The DXMT license is LGPL-2.1-or-later at the pinned commit `e94c312`. The `LICENSE` file of that commit states this license. DXMT release v0.80 and older releases use the MIT License. The text of the LGPL-2.1 license is in [`LICENSES/DXMT-LGPL-2.1.txt`](LICENSES/DXMT-LGPL-2.1.txt). The MIT text for the older releases is in [`LICENSES/runtime/MIT-DXMT.txt`](LICENSES/runtime/MIT-DXMT.txt). The source archive contains the DXMT source. Vendored code and the items with an unverified license are listed in [`LICENSES/notices/`](LICENSES/notices/).
 
 The directory [`LICENSES/`](LICENSES/) holds the license texts and notices of all components in the runtime archive. The file [`LICENSES/index.json`](LICENSES/index.json) lists them. Run `uv run --locked scripts/release/licenses.py generate --check` to validate it. The clean build puts a copy at `Licenses/` and a `NOTICE.md` file at the root of the runtime archive. The `Libraries/` directory is unchanged.
 

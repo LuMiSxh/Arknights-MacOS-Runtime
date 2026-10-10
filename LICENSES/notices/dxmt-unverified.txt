@@ -1,9 +1,11 @@
-DXMT 0.80-244-g7c8dee1 unverified submodules and headers
-Source: https://github.com/3Shain/dxmt/tree/7c8dee1c2d73415301ceb7d1fa810861cef4cd67
+DXMT 0.80-262-ge94c312 headers with an unverified license
+Source: https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587
 
-The license of the following items is not verified. Do not assume a license for them.
-- external/nvapi (NVIDIA/nvapi).
-- include/native/directx (misyltoad/mingw-directx-headers). Wine-derived headers are often
-  LGPL-2.1-or-later, but this is not verified.
-- include/native/windows.
-- Possible LLVM 15 code in the binaries (Apache-2.0 WITH LLVM-exception). This is an inference, not verified.
+The license of the following item is not verified. Do not assume a license for it.
+- include/native/directx (git submodule misyltoad/mingw-directx-headers, commit 9df86f2341616ef1888ae59919feaa6d4fad693d).
+  Wine-derived headers are often LGPL-2.1-or-later, but this project did not read the submodule.
+  The submodule is empty in the local checkout of the DXMT commit.
+  The meson.build file of DXMT requires include/native/directx/d3d11.h at configure time.
+  The directory is on the include path of the native static library DXBCParserNative.
+  The release build compiles that library for macOS and links it into winemetal.so.
+  The headers are compile-time input only. They add no separate binary.

@@ -1,0 +1,18 @@
+DXMT 0.80-262-ge94c312 Windows toolchain runtime
+Source: https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587
+
+The license of the code that the Windows toolchain links into the DXMT DLLs is not verified.
+This entry is an inference from the link flags. This project did not inspect the DLLs.
+
+Evidence:
+- build-win64.txt of DXMT selects x86_64-w64-mingw32-gcc and x86_64-w64-mingw32-g++.
+  The CI workflows install them with "brew install mingw-w64". The formula version is not pinned.
+- meson.build of DXMT adds -static to the link arguments. With GCC this links libstdc++,
+  libgcc, and the mingw-w64 C runtime into d3d10core.dll, d3d11.dll, dxgi.dll, and winemetal.dll.
+
+Expected licenses, not verified against the DLLs:
+- libstdc++ and libgcc: GPL-3.0-or-later WITH GCC-exception-3.1. The libstdc++ headers of the
+  Homebrew mingw-w64 14.0.0_3 toolchain (GCC 16.2.0) on the machine of the maintainer state this.
+  The exception text (GCC Runtime Library Exception 3.1) is not in this repository.
+- mingw-w64 runtime: The COPYING file of mingw-w64 states the Zope Public License 2.1.
+  Parts are marked as public domain, BSD, or LGPL. The ZPL-2.1 text is not in this repository.
