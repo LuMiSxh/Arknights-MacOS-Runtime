@@ -1,6 +1,6 @@
 # ACE compact compatibility patches
 
-Ordered ACE family for the `ace` and `combined` stages. The gate is `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`. See the [ACE patch registry](../../../docs/patch-registry.md#ace). The unconditional accessors (`PsGetProcessExitStatus`, `PsGetCurrentThreadProcess`, `PsGetCurrentThreadProcessId`) ignore the gate.
+Ordered ACE family for the `ace` and `combined` stages. The gate is `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`. See the [ACE patch registry](../../../docs/patch-registry.md#ace). General process accessors ignore the gate.
 
 Apply in this order:
 

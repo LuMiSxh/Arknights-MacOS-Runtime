@@ -26,9 +26,9 @@
   "components": [
     {
       "name": "Wine",
-      "version": "11.19",
+      "version": "11.17",
       "spdx": "LGPL-2.1-or-later",
-      "source": "https://github.com/dappermint/winecx/tree/5ee1af65283cf7baf162cbab545a696d29206970",
+      "source": "https://github.com/dappermint/winecx/tree/e0aa380780b73e20fabcfe78fd42713b94929a53",
       "files": [
         "Wine-LGPL-2.1.txt"
       ],
@@ -39,9 +39,9 @@
     },
     {
       "name": "Wine in-tree libraries and fonts",
-      "version": "11.19",
+      "version": "11.17",
       "spdx": "LGPL-2.1-or-later AND LGPL-2.1-only AND libpng-2.0 AND Zlib AND IJG AND libtiff AND MIT AND BSD-2-Clause AND BSD-3-Clause AND NCSA AND OLDAP-2.8 AND TU-Berlin-2.0 AND Unicode-DFS-2016 AND SGI-B-2.0 AND Bitstream-Vera AND (Apache-2.0 OR MIT)",
-      "source": "https://github.com/dappermint/winecx/tree/5ee1af65283cf7baf162cbab545a696d29206970",
+      "source": "https://github.com/dappermint/winecx/tree/e0aa380780b73e20fabcfe78fd42713b94929a53",
       "files": [
         "Wine-LGPL-2.1.txt",
         "runtime/Apache-2.0.txt",

@@ -5,7 +5,7 @@ The clean release build starts with an empty `Libraries/` directory. It installs
 ## Identified components
 
 - WineCX / Wine: Windows compatibility runtime.
-    - Pinned source: <!-- pin:wine.link -->[`dappermint/winecx@5ee1af6`](https://github.com/dappermint/winecx/tree/5ee1af65283cf7baf162cbab545a696d29206970)<!-- /pin -->
+    - Pinned source: <!-- pin:wine.link -->[`dappermint/winecx@e0aa380`](https://github.com/dappermint/winecx/tree/e0aa380780b73e20fabcfe78fd42713b94929a53)<!-- /pin -->
     - License evidence: `LGPL-2.1-or-later`; [`LICENSES/Wine-LGPL-2.1.txt`](../../LICENSES/Wine-LGPL-2.1.txt)
     - Source obligation: Ship complete corresponding source for the modified build and the applicable LGPL materials.
 - DXMT: D3D10/D3D11/Metal payload and WineMetal bridge.

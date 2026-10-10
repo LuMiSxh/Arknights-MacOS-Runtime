@@ -1,5 +1,5 @@
 diff --git a/dlls/win32u/window.c b/dlls/win32u/window.c
-index 584cd928..4da01eaa 100644
+index 95f44d7e..b28565d9 100644
 --- a/dlls/win32u/window.c
 +++ b/dlls/win32u/window.c
 @@ -24,6 +24,7 @@
@@ -112,7 +112,7 @@ index 584cd928..4da01eaa 100644
  static unsigned int set_startup_info_flags( unsigned int mask, unsigned int flags )
  {
      unsigned int prev, new;
-@@ -2737,6 +2833,8 @@ BOOL WINAPI NtUserUpdateLayeredWindow( HWND hwnd, HDC hdc_dst, const POINT *pts_
+@@ -2725,6 +2821,8 @@ BOOL WINAPI NtUserUpdateLayeredWindow( HWND hwnd, HDC hdc_dst, const POINT *pts_
  
      get_window_rects( hwnd, COORDS_PARENT, &new_rects, get_thread_dpi() );
  
@@ -121,7 +121,7 @@ index 584cd928..4da01eaa 100644
      if (pts_dst)
      {
          offset.cx = pts_dst->x - new_rects.window.left;
-@@ -5946,6 +6044,7 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
+@@ -5934,6 +6032,7 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
      RECT surface_rect;
      UINT context;
      WND *win;
@@ -129,7 +129,7 @@ index 584cd928..4da01eaa 100644
  
      TRACE( "ex_style %#x, class_name %s, version %s, window_name %s, style %#x, x %u, y %u, cx %u, cy %u, "
             "parent %p, menu %p, class_instance %p, params %p, flags %#x, instance %p, class %s, ansi %u\n",
-@@ -6030,6 +6129,7 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
+@@ -6018,6 +6117,7 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
  
      fix_cs_coordinates( &cs, &sw );
      cs.dwExStyle = fix_exstyle( cs.style, cs.dwExStyle );
@@ -137,7 +137,7 @@ index 584cd928..4da01eaa 100644
  
      /* Create the window structure */
  
-@@ -6065,6 +6165,13 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
+@@ -6053,6 +6153,13 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
  
      release_win_ptr( win );
  
@@ -152,7 +152,7 @@ index 584cd928..4da01eaa 100644
      else
      {
 diff --git a/dlls/winemac.drv/cocoa_app.m b/dlls/winemac.drv/cocoa_app.m
-index c60da486..a5cddccd 100644
+index c57ca47e..e3ab4597 100644
 --- a/dlls/winemac.drv/cocoa_app.m
 +++ b/dlls/winemac.drv/cocoa_app.m
 @@ -326,6 +326,16 @@ - (void) transformProcessToForeground:(BOOL)activateIfTransformed
@@ -173,10 +173,10 @@ index c60da486..a5cddccd 100644
  
              if (activateIfTransformed)
 diff --git a/dlls/winemac.drv/cocoa_window.m b/dlls/winemac.drv/cocoa_window.m
-index afd75109..a62750c9 100644
+index af510e7a..f28da956 100644
 --- a/dlls/winemac.drv/cocoa_window.m
 +++ b/dlls/winemac.drv/cocoa_window.m
-@@ -246,6 +246,7 @@ @interface WineContentView : WineBaseView <NSTextInputClient, NSViewLayerContent
+@@ -255,6 +255,7 @@ @interface WineContentView : WineBaseView <NSTextInputClient, NSViewLayerContent
  
  @public void *d3dmetal_client_surface;   /* CW HACK 22435 */
      NSMutableDictionary<NSNumber*, CALayerHost*>* _caLayerHosts;
@@ -184,7 +184,7 @@ index afd75109..a62750c9 100644
  }
  
  @property (readonly, nonatomic) BOOL everHadGLContext;
-@@ -382,6 +383,12 @@ - (BOOL) isFlipped
+@@ -391,6 +392,12 @@ - (BOOL) isFlipped
          return YES;
      }
  
@@ -197,7 +197,7 @@ index afd75109..a62750c9 100644
      - (BOOL) wantsUpdateLayer
      {
          return YES /*!_everHadGLContext*/;
-@@ -394,7 +401,7 @@ - (void) updateLayer
+@@ -403,7 +410,7 @@ - (void) updateLayer
          CGRect imageRect;
          CALayer* layer = [self layer];
  
@@ -206,7 +206,7 @@ index afd75109..a62750c9 100644
              return;
  
          if (window.closing)
-@@ -413,15 +420,16 @@ - (void) updateLayer
+@@ -422,15 +429,16 @@ - (void) updateLayer
  
          if (image)
          {
@@ -226,7 +226,7 @@ index afd75109..a62750c9 100644
              {
                  window.shapeChangedSinceLastDraw = FALSE;
                  [window invalidateShadow];
-@@ -1120,6 +1128,9 @@ - (NSInteger) minimumLevelForActive:(BOOL)active
+@@ -1161,6 +1169,9 @@ - (NSInteger) minimumLevelForActive:(BOOL)active
      {
          NSInteger level;
  
@@ -236,54 +236,101 @@ index afd75109..a62750c9 100644
          if (self.floating && (active || topmost_float_inactive == TOPMOST_FLOAT_INACTIVE_ALL ||
                                (topmost_float_inactive == TOPMOST_FLOAT_INACTIVE_NONFULLSCREEN && !fullscreen)))
              level = NSFloatingWindowLevel;
-@@ -3554,6 +3565,30 @@ void macdrv_set_window_min_max_sizes(WineWindow *window, CGSize min_size, CGSize
+@@ -3631,6 +3642,30 @@ macdrv_view macdrv_create_view(CGRect rect)
  }
  }
  
-+WineContentView *macdrv_create_window_surface_view(CGRect rect)
++macdrv_view macdrv_create_window_surface_view(CGRect rect)
 +{
-+    WineContentView *view = macdrv_create_view(rect);
++    WineContentView *view = (WineContentView *)macdrv_create_view(rect);
 +
 +    OnMainThread(^{ view->windowSurfaceView = YES; });
-+    return view;
++    return (macdrv_view)view;
 +}
 +
-+WineContentView *macdrv_retain_view(WineContentView *view)
++macdrv_view macdrv_retain_view(macdrv_view v)
 +{
 +@autoreleasepool
 +{
-+    return [view retain];
++    return (macdrv_view)[(WineContentView *)v retain];
 +}
 +}
 +
-+void macdrv_release_view(WineContentView *view)
++void macdrv_release_view(macdrv_view v)
 +{
 +@autoreleasepool
 +{
-+    [view release];
++    [(WineContentView *)v release];
 +}
 +}
 +
  /***********************************************************************
   *              macdrv_dispose_view
   *
-@@ -3674,6 +3709,46 @@ void macdrv_set_view_hidden(WineContentView *view, bool hidden)
+@@ -3706,19 +3741,18 @@ void macdrv_set_view_superview(macdrv_view v, macdrv_view s, macdrv_window w, ma
+ {
+ @autoreleasepool
+ {
+-    OnMainThreadAsync(^{
+-        WineContentView* view = (WineContentView*)v;
+-        WineContentView* superview = (WineContentView*)s;
+-        WineWindow* window = (WineWindow*)w;
+-        WineContentView* prev = (WineContentView*)p;
+-        WineContentView* next = (WineContentView*)n;
++    WineContentView* view = (WineContentView*)v;
++    WineContentView* requestedSuperview = (WineContentView*)s;
++    WineWindow* window = (WineWindow*)w;
++    WineContentView* prev = (WineContentView*)p;
++    WineContentView* next = (WineContentView*)n;
+ 
+-        if (!superview)
+-            superview = [window contentView];
++    OnMainThreadAsync(^{
++        WineContentView* target = requestedSuperview ?: [window contentView];
+ 
+-        if (superview == [view superview])
++        if (target == [view superview])
+         {
+-            NSArray* subviews = [superview subviews];
++            NSArray* subviews = [target subviews];
+             NSUInteger index = [subviews indexOfObjectIdenticalTo:view];
+             if (!prev && !next && index == [subviews count] - 1)
+                 return;
+@@ -3729,12 +3763,12 @@ void macdrv_set_view_superview(macdrv_view v, macdrv_view s, macdrv_window w, ma
+         }
+ 
+         WineWindow* oldWindow = (WineWindow*)[view window];
+-        WineWindow* newWindow = (WineWindow*)[superview window];
++        WineWindow* newWindow = (WineWindow*)[target window];
+ 
+         if (prev)
+-            [superview addSubview:view positioned:NSWindowBelow relativeTo:prev];
++            [target addSubview:view positioned:NSWindowBelow relativeTo:prev];
+         else
+-            [superview addSubview:view positioned:NSWindowAbove relativeTo:next];
++            [target addSubview:view positioned:NSWindowAbove relativeTo:next];
+ 
+         if (oldWindow != newWindow)
+         {
+@@ -3761,6 +3795,48 @@ void macdrv_set_view_hidden(macdrv_view v, bool hidden)
  }
  }
  
-+void macdrv_set_view_alpha(WineContentView *view, CGFloat alpha)
++void macdrv_set_view_alpha(macdrv_view v, CGFloat alpha)
 +{
 +@autoreleasepool
 +{
++    WineContentView* view = (WineContentView*)v;
++
 +    OnMainThreadAsync(^{ [view setAlphaValue:alpha]; });
 +}
 +}
 +
-+void macdrv_view_set_color_image(WineContentView *view, CGImageRef image, CGRect rect, CGRect dirty)
++void macdrv_view_set_color_image(macdrv_view v, CGImageRef image, CGRect rect, CGRect dirty)
 +{
 +@autoreleasepool
 +{
-+    [view retain];
++    WineContentView *view = [(WineContentView *)v retain];
 +
 +    CGImageRetain(image);
 +    OnMainThreadAsync(^{
@@ -296,11 +343,11 @@ index afd75109..a62750c9 100644
 +}
 +}
 +
-+void macdrv_view_set_shape_image(WineContentView *view, CGImageRef image)
++void macdrv_view_set_shape_image(macdrv_view v, CGImageRef image)
 +{
 +@autoreleasepool
 +{
-+    [view retain];
++    WineContentView *view = [(WineContentView *)v retain];
 +
 +    if (image) CGImageRetain(image);
 +    OnMainThreadAsync(^{
@@ -315,69 +362,69 @@ index afd75109..a62750c9 100644
   *              macdrv_add_view_opengl_context
   *
 diff --git a/dlls/winemac.drv/macdrv.h b/dlls/winemac.drv/macdrv.h
-index 4dbce830..c35d5e60 100644
+index 2767256c..191d6615 100644
 --- a/dlls/winemac.drv/macdrv.h
 +++ b/dlls/winemac.drv/macdrv.h
-@@ -201,6 +201,9 @@ extern void macdrv_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alph
+@@ -155,6 +155,9 @@ extern void macdrv_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alph
  extern BOOL macdrv_GetWindowStyleMasks(HWND hwnd, UINT style, UINT ex_style, UINT *style_mask, UINT *ex_style_mask);
  extern struct client_surface *macdrv_CreateClientSurface(HWND hwnd, int pixel_format, BOOL raw);
  extern BOOL macdrv_CreateWindowSurface(HWND hwnd, BOOL layered, const RECT *surface_rect, struct window_surface **surface);
 +extern BOOL macdrv_is_bilibili_layered_child(HWND hwnd);
-+extern BOOL macdrv_attach_layered_child_view(HWND hwnd, WineContentView *view);
-+extern void macdrv_detach_layered_child_view(HWND hwnd, WineContentView *view);
++extern BOOL macdrv_attach_layered_child_view(HWND hwnd, macdrv_view view);
++extern void macdrv_detach_layered_child_view(HWND hwnd, macdrv_view view);
  extern void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT swp_flags,
                                      const struct window_rects *new_rects, struct window_surface *surface);
  extern void macdrv_DestroyCursorIcon(HCURSOR cursor);
-@@ -237,6 +240,7 @@ extern void macdrv_ime_set_text(HWND hwnd, CFStringRef text, bool complete,
+@@ -185,6 +188,7 @@ extern BOOL macdrv_SystemParametersInfo(UINT action, UINT int_param, void *ptr_p
      HWND                hwnd;                   /* hwnd that this private data belongs to */
-     WineWindow         *cocoa_window;
-     WineContentView    *client_view;
-+    WineContentView    *layered_view;
+     macdrv_window       cocoa_window;
+     macdrv_view         client_view;
++    macdrv_view         layered_view;
      struct remote_layer_entry *remote_layers;   /* which context renders which child hwnd */
      unsigned int        remote_layer_count;
      struct window_rects rects;                  /* window rects in monitor DPI, relative to parent client area */
 diff --git a/dlls/winemac.drv/macdrv_cocoa.h b/dlls/winemac.drv/macdrv_cocoa.h
-index 085ddbe5..03c0c9ac 100644
+index c6552baa..62ebef57 100644
 --- a/dlls/winemac.drv/macdrv_cocoa.h
 +++ b/dlls/winemac.drv/macdrv_cocoa.h
-@@ -534,10 +534,16 @@ extern void macdrv_order_cocoa_window(WineWindow *window, WineWindow *prev,
- extern void macdrv_give_cocoa_window_focus(WineWindow *window, bool activate);
- extern void macdrv_set_window_min_max_sizes(WineWindow *window, CGSize min_size, CGSize max_size);
- extern WineContentView *macdrv_create_view(CGRect rect);
-+extern WineContentView *macdrv_create_window_surface_view(CGRect rect);
-+extern WineContentView *macdrv_retain_view(WineContentView *view);
-+extern void macdrv_release_view(WineContentView *view);
- extern void macdrv_dispose_view(WineContentView *view);
- extern void macdrv_set_view_frame(WineContentView *view, CGRect rect);
- extern void macdrv_set_view_superview(WineContentView *view, WineContentView *parent, WineWindow *window, WineContentView *prev, WineContentView *next);
- extern void macdrv_set_view_hidden(WineContentView *view, bool hidden);
-+extern void macdrv_set_view_alpha(WineContentView *view, CGFloat alpha);
-+extern void macdrv_view_set_color_image(WineContentView *view, CGImageRef image, CGRect rect, CGRect dirty);
-+extern void macdrv_view_set_shape_image(WineContentView *view, CGImageRef image);
- extern void macdrv_add_view_opengl_context(WineContentView *view, WineOpenGLContext *context);
- extern void macdrv_remove_view_opengl_context(WineContentView *view, WineOpenGLContext *context);
- extern MTLDevice_id macdrv_create_metal_device(void);
-@@ -561,6 +567,7 @@ extern void macdrv_order_cocoa_window(WineWindow *window, WineWindow *prev,
- extern bool macdrv_send_keydown_to_input_source(int keyc, unsigned int flags, int repeat, void *update);
- extern void macdrv_clear_ime_text(void);
+@@ -549,10 +549,16 @@ extern void macdrv_order_cocoa_window(macdrv_window w, macdrv_window prev,
+ extern void macdrv_give_cocoa_window_focus(macdrv_window w, bool activate);
+ extern void macdrv_set_window_min_max_sizes(macdrv_window w, CGSize min_size, CGSize max_size);
+ extern macdrv_view macdrv_create_view(CGRect rect);
++extern macdrv_view macdrv_create_window_surface_view(CGRect rect);
++extern macdrv_view macdrv_retain_view(macdrv_view v);
++extern void macdrv_release_view(macdrv_view v);
+ extern void macdrv_dispose_view(macdrv_view v);
+ extern void macdrv_set_view_frame(macdrv_view v, CGRect rect);
+ extern void macdrv_set_view_superview(macdrv_view v, macdrv_view s, macdrv_window w, macdrv_view p, macdrv_view n);
+ extern void macdrv_set_view_hidden(macdrv_view v, bool hidden);
++extern void macdrv_set_view_alpha(macdrv_view v, CGFloat alpha);
++extern void macdrv_view_set_color_image(macdrv_view v, CGImageRef image, CGRect rect, CGRect dirty);
++extern void macdrv_view_set_shape_image(macdrv_view v, CGImageRef image);
+ extern void macdrv_add_view_opengl_context(macdrv_view v, macdrv_opengl_context c);
+ extern void macdrv_remove_view_opengl_context(macdrv_view v, macdrv_opengl_context c);
+ extern macdrv_metal_device macdrv_create_metal_device(void);
+@@ -575,6 +581,7 @@ extern void macdrv_order_cocoa_window(macdrv_window w, macdrv_window prev,
+ extern uint32_t macdrv_window_background_color(void);
+ extern bool macdrv_send_keydown_to_input_source(int keyc, unsigned int flags, int repeat, void *data);
  extern bool macdrv_is_any_wine_window_visible(void);
 +extern bool macdrv_is_bilibili_platform_process(void);
  
  
  /* keyboard */
 diff --git a/dlls/winemac.drv/surface.c b/dlls/winemac.drv/surface.c
-index ef87da50..3ec9ca3d 100644
+index fb1aeaa3..523fe559 100644
 --- a/dlls/winemac.drv/surface.c
 +++ b/dlls/winemac.drv/surface.c
-@@ -45,6 +45,7 @@ struct macdrv_window_surface
+@@ -47,6 +47,7 @@ struct macdrv_window_surface
  {
      struct window_surface   header;
-     WineWindow             *window;
-+    WineContentView        *layered_view;
+     macdrv_window           window;
++    macdrv_view             layered_view;
      CGDataProviderRef       provider;
  };
  
-@@ -90,13 +91,19 @@ static BOOL macdrv_surface_flush(struct window_surface *window_surface, const RE
+@@ -92,13 +93,19 @@ static BOOL macdrv_surface_flush(struct window_surface *window_surface, const RE
                            alpha_info | kCGBitmapByteOrder32Little, surface->provider, NULL, retina_on, kCGRenderingIntentDefault);
      CGColorSpaceRelease(colorspace);
  
@@ -399,7 +446,7 @@ index ef87da50..3ec9ca3d 100644
          else
          {
              const BYTE *src = shape_bits;
-@@ -113,7 +120,8 @@ static BOOL macdrv_surface_flush(struct window_surface *window_surface, const RE
+@@ -115,7 +122,8 @@ static BOOL macdrv_surface_flush(struct window_surface *window_surface, const RE
                                        provider, NULL, retina_on);
              CGDataProviderRelease(provider);
  
@@ -409,7 +456,7 @@ index ef87da50..3ec9ca3d 100644
              CGImageRelease(image);
          }
      }
-@@ -136,6 +144,11 @@ static void macdrv_surface_destroy(struct window_surface *window_surface)
+@@ -138,6 +146,11 @@ static void macdrv_surface_destroy(struct window_surface *window_surface)
      struct macdrv_window_surface *surface = get_mac_surface(window_surface);
  
      TRACE("freeing %p\n", surface);
@@ -421,7 +468,7 @@ index ef87da50..3ec9ca3d 100644
      CGDataProviderRelease(surface->provider);
  }
  
-@@ -207,6 +220,7 @@ static struct window_surface *create_surface(HWND hwnd, WineWindow *window, cons
+@@ -208,6 +221,7 @@ static struct window_surface *create_surface(HWND hwnd, macdrv_window window, co
      {
          surface = get_mac_surface(window_surface);
          surface->window = window;
@@ -429,7 +476,7 @@ index ef87da50..3ec9ca3d 100644
          surface->provider = provider;
      }
  
-@@ -237,5 +251,14 @@ BOOL macdrv_CreateWindowSurface(HWND hwnd, BOOL layered, const RECT *surface_rec
+@@ -238,5 +252,14 @@ BOOL macdrv_CreateWindowSurface(HWND hwnd, BOOL layered, const RECT *surface_rec
      *surface = create_surface(hwnd, data->cocoa_window, surface_rect);
  
      release_win_data(data);
@@ -437,7 +484,7 @@ index ef87da50..3ec9ca3d 100644
 +    if (*surface && layered && macdrv_is_bilibili_layered_child(hwnd))
 +    {
 +        struct macdrv_window_surface *mac_surface = get_mac_surface(*surface);
-+        WineContentView *view = macdrv_create_window_surface_view(CGRectZero);
++        macdrv_view view = macdrv_create_window_surface_view(CGRectZero);
 +
 +        if (view && macdrv_attach_layered_child_view(hwnd, view)) mac_surface->layered_view = view;
 +        else if (view) macdrv_dispose_view(view);
@@ -445,31 +492,31 @@ index ef87da50..3ec9ca3d 100644
      return TRUE;
  }
 diff --git a/dlls/winemac.drv/window.c b/dlls/winemac.drv/window.c
-index 55cec6f8..79c7f7aa 100644
+index d31cd24d..7bda0454 100644
 --- a/dlls/winemac.drv/window.c
 +++ b/dlls/winemac.drv/window.c
-@@ -28,6 +28,8 @@
+@@ -27,6 +27,8 @@
+ 
  #include "config.h"
- #include "macdrv.h"
  
 +#include <stdlib.h>
 +
  #include <IOKit/pwr_mgt/IOPMLib.h>
- 
- WINE_DEFAULT_DEBUG_CHANNEL(macdrv);
-@@ -37,6 +39,7 @@ static pthread_mutex_t win_data_mutex;
+ #define GetCurrentThread Mac_GetCurrentThread
+ #define LoadResource Mac_LoadResource
+@@ -44,6 +46,7 @@ static pthread_mutex_t win_data_mutex;
  static CFMutableDictionaryRef win_datas;
  
  static unsigned int activate_on_focus_time;
-+static BOOL sync_layered_child_view(HWND hwnd, WineContentView *view);
++static BOOL sync_layered_child_view(HWND hwnd, macdrv_view view);
  
  
  /* CrossOver Hack #16933 */
-@@ -332,6 +335,11 @@ static void sync_window_opacity(struct macdrv_win_data *data, BYTE alpha,
+@@ -339,6 +342,11 @@ static void sync_window_opacity(struct macdrv_win_data *data, BYTE alpha,
      }
  }
  
-+static void sync_layered_child_opacity(WineContentView *view, BYTE alpha, DWORD flags)
++static void sync_layered_child_opacity(macdrv_view view, BYTE alpha, DWORD flags)
 +{
 +    macdrv_set_view_alpha(view, flags & LWA_ALPHA ? alpha / 255.0 : 1.0);
 +}
@@ -477,7 +524,7 @@ index 55cec6f8..79c7f7aa 100644
  
  /***********************************************************************
   *              sync_window_min_max_info
-@@ -839,6 +847,110 @@ static BOOL running_image_is(const char *exe_name)
+@@ -846,6 +854,110 @@ static BOOL running_image_is(const char *exe_name)
      return !*appname && !*exe_name;
  }
  
@@ -588,16 +635,16 @@ index 55cec6f8..79c7f7aa 100644
  static void set_app_icon(void)
  {
      CFArrayRef images = create_app_icon_images();
-@@ -1217,6 +1329,57 @@ static BOOL get_hosted_rects(HWND hwnd, HWND toplevel, RECT *container, RECT *fr
+@@ -1224,6 +1336,57 @@ static BOOL get_hosted_rects(HWND hwnd, HWND toplevel, RECT *container, RECT *fr
      return !IsRectEmpty(container);
  }
  
-+static BOOL sync_layered_child_view(HWND hwnd, WineContentView *view)
++static BOOL sync_layered_child_view(HWND hwnd, macdrv_view view)
 +{
 +    HWND toplevel = NtUserGetAncestor(hwnd, GA_ROOT);
 +    RECT container, frame;
 +    struct macdrv_win_data *data;
-+    WineWindow *window;
++    macdrv_window window;
 +
 +    if (!view) return FALSE;
 +    if (!macdrv_is_bilibili_layered_child(hwnd) || !toplevel ||
@@ -621,7 +668,7 @@ index 55cec6f8..79c7f7aa 100644
 +    return TRUE;
 +}
 +
-+BOOL macdrv_attach_layered_child_view(HWND hwnd, WineContentView *view)
++BOOL macdrv_attach_layered_child_view(HWND hwnd, macdrv_view view)
 +{
 +    struct macdrv_win_data *data;
 +
@@ -634,7 +681,7 @@ index 55cec6f8..79c7f7aa 100644
 +    return TRUE;
 +}
 +
-+void macdrv_detach_layered_child_view(HWND hwnd, WineContentView *view)
++void macdrv_detach_layered_child_view(HWND hwnd, macdrv_view view)
 +{
 +    struct macdrv_win_data *data;
 +
@@ -646,7 +693,7 @@ index 55cec6f8..79c7f7aa 100644
  static void macdrv_client_surface_update(struct client_surface *client)
  {
      struct macdrv_client_surface *surface = impl_from_client_surface(client);
-@@ -1491,7 +1654,9 @@ void macdrv_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alpha, DWOR
+@@ -1497,7 +1660,9 @@ void macdrv_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alpha, DWOR
      {
          data->layered = TRUE;
          data->ulw_layered = FALSE;
@@ -657,11 +704,11 @@ index 55cec6f8..79c7f7aa 100644
          {
              sync_window_opacity(data, alpha, FALSE, flags);
              /* since layered attributes are now set, can now show the window */
-@@ -1511,12 +1676,13 @@ void macdrv_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alpha, DWOR
+@@ -1517,12 +1682,13 @@ void macdrv_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alpha, DWOR
  void macdrv_SetParent(HWND hwnd, HWND parent, HWND old_parent)
  {
      struct macdrv_win_data *data;
-+    WineContentView *layered_view;
++    macdrv_view layered_view;
  
      TRACE("%p, %p, %p\n", hwnd, parent, old_parent);
  
@@ -672,7 +719,7 @@ index 55cec6f8..79c7f7aa 100644
      if (parent != NtUserGetDesktopWindow()) /* a child window */
      {
          if (old_parent == NtUserGetDesktopWindow())
-@@ -1530,6 +1696,11 @@ void macdrv_SetParent(HWND hwnd, HWND parent, HWND old_parent)
+@@ -1536,6 +1702,11 @@ void macdrv_SetParent(HWND hwnd, HWND parent, HWND old_parent)
          create_cocoa_window(data);
      }
      release_win_data(data);
@@ -684,7 +731,7 @@ index 55cec6f8..79c7f7aa 100644
  }
  
  
-@@ -1706,7 +1877,10 @@ void macdrv_UpdateLayeredWindow(HWND hwnd, BYTE alpha, UINT flags)
+@@ -1712,7 +1883,10 @@ void macdrv_UpdateLayeredWindow(HWND hwnd, BYTE alpha, UINT flags)
              show_window(data);
  
          /* The ULW flags are a superset of the LWA flags. */
@@ -696,11 +743,11 @@ index 55cec6f8..79c7f7aa 100644
          release_win_data(data);
      }
  }
-@@ -1849,11 +2023,12 @@ void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT
+@@ -1855,11 +2029,12 @@ void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT
      BOOL fullscreen = swp_flags & WINE_SWP_FULLSCREEN;
      struct macdrv_thread_data *thread_data;
      struct macdrv_win_data *data;
-+    WineContentView *layered_view;
++    macdrv_view layered_view;
      unsigned int new_style = NtUserGetWindowLongW(hwnd, GWL_STYLE);
      struct window_rects old_rects;
  
@@ -710,7 +757,7 @@ index 55cec6f8..79c7f7aa 100644
      thread_data = macdrv_thread_data();
  
      old_rects = data->rects;
-@@ -1904,6 +2079,11 @@ void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT
+@@ -1910,6 +2085,11 @@ void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT
  
  done:
      release_win_data(data);

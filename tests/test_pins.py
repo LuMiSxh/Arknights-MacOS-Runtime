@@ -290,7 +290,7 @@ class CheckTests(PinsTestCase):
         self.assertEqual(self.check(), [])
 
     def test_stale_marker_is_reported(self) -> None:
-        self.page.write_text(self.page.read_text().replace("11.19", "11.16"))
+        self.page.write_text(self.page.read_text().replace("11.17", "11.16"))
 
         self.assertEqual(self.check(), ["docs/page.md:1: pin:wine.version is stale"])
 
@@ -317,7 +317,7 @@ class CheckTests(PinsTestCase):
             self.check()
 
     def test_unbalanced_marker_fails(self) -> None:
-        self.page.write_text("<!-- pin:wine.version -->11.19\n")
+        self.page.write_text("<!-- pin:wine.version -->11.17\n")
 
         with self.assertRaisesRegex(pins.PinError, "unbalanced"):
             self.check()

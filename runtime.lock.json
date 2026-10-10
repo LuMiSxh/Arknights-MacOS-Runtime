@@ -5,8 +5,8 @@
   "sources": {
     "wine": {
       "repository": "https://github.com/dappermint/winecx.git",
-      "commit": "5ee1af65283cf7baf162cbab545a696d29206970",
-      "version": "11.19"
+      "commit": "e0aa380780b73e20fabcfe78fd42713b94929a53",
+      "version": "11.17"
     },
     "dxmt": {
       "repository": "https://github.com/3Shain/dxmt.git",
@@ -91,7 +91,7 @@
       "component": "wine",
       "family": "ace",
       "path": "patches/wine/ace/ntoskrnl/0001-ntoskrnl-compatibility-surface.patch",
-      "sha256": "8b194297db4cdfdb23e23e39551889a6b3bb3397fc28419763200f07976490f9"
+      "sha256": "e81a63be33e7a314758fdaa73f378d33d3fba5123333697c21b0e87ce64b2e44"
     },
     {
       "id": "wine-ace-dispatcher-spoof",
@@ -126,7 +126,7 @@
       "component": "wine",
       "family": "cn",
       "path": "patches/wine/cn/windowing/0001-win32u-winemac-bilibili-layered-child.patch",
-      "sha256": "7568ad68b4c471d013e2fd7b2e66d08c3f2a84be4b1a1fe684a8deb00a4cd84a"
+      "sha256": "1c7b8dd32302cb409399035441cd378acfe260ca1515be4d96966556e326fa8d"
     }
   ]
 }

@@ -7,8 +7,8 @@ The runtime pins four upstream inputs in [`runtime.lock.json`](../runtime.lock.j
 <!-- pin-block:table -->
 | Pin | Value |
 | --- | --- |
-| `wine.commit` | `5ee1af65283cf7baf162cbab545a696d29206970` |
-| `wine.version` | `11.19` |
+| `wine.commit` | `e0aa380780b73e20fabcfe78fd42713b94929a53` |
+| `wine.version` | `11.17` |
 | `dxmt.commit` | `e94c312f5c054263acf261cfa109edf13e757587` |
 | `dxmt.version` | `0.80-262-ge94c312` |
 | `base.tag` | `v4.7.3` |

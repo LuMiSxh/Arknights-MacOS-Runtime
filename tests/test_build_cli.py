@@ -156,8 +156,8 @@ class BuildCLIContractTests(unittest.TestCase):
             "chrome_widgetW",
             "NtUserIsWindowVisible",
             "NtUserGetProp(hwnd, translucentW)",
-            "WineContentView *view = macdrv_create_window_surface_view(CGRectZero);",
-            "WineWindow *window;",
+            "WineContentView* view = (WineContentView*)v;",
+            "WineWindow* window = (WineWindow*)w;",
             "macdrv_retain_view(data->layered_view)",
             "macdrv_release_view(layered_view)",
         ):
@@ -175,7 +175,7 @@ class BuildCLIContractTests(unittest.TestCase):
             self.assertIn("ARKNIGHTS_RUNTIME_ACE_COMPACT", text)
             self.assertNotIn("ARKNIGHTS_RUNTIME_CN_COMPAT", text)
 
-    def test_ace_ntoskrnl_exports_thread_process_aliases_and_exit_status(self) -> None:
+    def test_ace_ntoskrnl_exports_capture_persistent_thread_state(self) -> None:
         root = Path(__file__).resolve().parents[1]
         patch = (
             root
@@ -186,12 +186,9 @@ class BuildCLIContractTests(unittest.TestCase):
             / "0001-ntoskrnl-compatibility-surface.patch"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("@ stdcall PsGetCurrentThreadProcess()", patch)
-        self.assertIn("@ stdcall PsGetCurrentThreadProcessId()", patch)
-        self.assertIn("@ stdcall PsGetProcessExitStatus(ptr)", patch)
-        self.assertIn(
-            "static inline BOOL arknights_runtime_ace_compact_enabled(void)", patch
-        )
+        self.assertIn("KeCapturePersistentThreadState", patch)
+        self.assertIn("@ stdcall KeCapturePersistentThreadState", patch)
+        self.assertIn("if (!arknights_runtime_ace_compact_enabled())", patch)
 
     def test_ace_ntoskrnl_exports_callable_audit_parameter_routine(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -215,7 +212,7 @@ class BuildCLIContractTests(unittest.TestCase):
         )
         self.assertIn("return STATUS_SUCCESS;", patch)
 
-    def test_ace_ntoskrnl_image_name_query_is_gated_on_compact_mode(
+    def test_ace_ntoskrnl_process_image_name_is_unconditional_for_valid_processes(
         self,
     ) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -227,12 +224,15 @@ class BuildCLIContractTests(unittest.TestCase):
             / "ntoskrnl"
             / "0001-ntoskrnl-compatibility-surface.patch"
         ).read_text(encoding="utf-8")
-        self.assertIn(
-            "PROCESSINFOCLASS info_class = arknights_runtime_ace_compact_enabled() ? ProcessImageFileNameWin32",
-            patch,
-        )
-        self.assertIn(": ProcessImageFileName;", patch)
-        self.assertIn("NtQueryInformationProcess(h, info_class, NULL, 0, &len)", patch)
+        function = patch.split(
+            "const char *WINAPI PsGetProcessImageFileName( PEPROCESS process )", 1
+        )[1].split(
+            "/*********************************************************************", 1
+        )[0]
+
+        self.assertIn("if (!process) return NULL;", function)
+        self.assertIn("return process->imageName;", function)
+        self.assertNotIn("arknights_runtime_ace_compact_enabled", function)
 
     def test_ace_ntoskrnl_process_exit_status_is_an_unconditional_accessor(
         self,
