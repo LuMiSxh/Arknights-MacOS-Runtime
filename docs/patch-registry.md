@@ -23,7 +23,7 @@ The MR is a draft. Capture and exclusive streams are unchanged.
 
 - ID: `dxmt-cursor-frame-latency`
 - File: `patches/dxmt/cursor/0001-dxmt-command-queue-configurable-frame-latency.patch`
-- Component/base: DXMT `7c8dee1c2d73415301ceb7d1fa810861cef4cd67` (`v0.80-244-g7c8dee1`)
+- Component/base: DXMT `e94c312f5c054263acf261cfa109edf13e757587` (`v0.80-262-ge94c312`)
 - Source/author: Original runtime experiment, runtime maintainers
 - License: LGPL-2.1-or-later (DXMT)
 - Gate: `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY=0..3`, read once on first command queue
@@ -55,24 +55,11 @@ The filter matches the case-insensitive final basename `a9d41799f1af1868f2db4956
 
 ## Performance
 
-- ID: `dxmt-command-context-device-initialization`
-- File: `patches/dxmt/performance/0001-dxmt-initialize-device-before-command-helpers.patch`
-- Component/base: DXMT `7c8dee1c2d73415301ceb7d1fa810861cef4cd67`
-- Source/author: Original runtime correction, runtime maintainers
-- License: LGPL-2.1-or-later (DXMT)
-- Gate: Unconditional; no runtime query
-- Inactive behavior: No alternate route; every performance-stage build initializes the device first
-- Automated gate: Hash, clean application, and DXMT compilation
-- Manual gate: Game startup and rendering with the performance family applied
-- Removal: Drop when the pinned DXMT initializes the device first
-
-`ClearUAV` creates pipelines through its outer context during member construction. The original declaration order initialized that device later, so the code read indeterminate storage. Zero could silently leave ten pipelines missing. A value of `1` reproduced the invalid Objective-C receiver and startup exit status 1. Moving the declaration and initializer fixes the lifetime dependency without a hot-path check. This is a correctness fix, not an FPS claim.
-
 ### Release present statistics gate
 
 - ID: `dxmt-skip-release-present-statistics`
-- File: `patches/dxmt/performance/0002-dxmt-skip-release-present-statistics.patch`
-- Component/base: DXMT `7c8dee1c2d73415301ceb7d1fa810861cef4cd67`
+- File: `patches/dxmt/performance/0001-dxmt-skip-release-present-statistics.patch`
+- Component/base: DXMT `e94c312f5c054263acf261cfa109edf13e757587`
 - Source/author: Original runtime optimization, runtime maintainers
 - License: LGPL-2.1-or-later (DXMT)
 - Gate: `DXMT_DEBUG`; debug builds keep statistics aggregation and HUD updates, release builds skip both
