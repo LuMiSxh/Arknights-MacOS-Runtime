@@ -88,13 +88,7 @@ class LicenseIndexTests(unittest.TestCase):
         unverified = {
             c["name"] for c in self.index["components"] if c["status"] == "unverified"
         }
-        self.assertEqual(
-            unverified,
-            {
-                "DXMT mingw-directx-headers (include/native/directx)",
-                "DXMT Windows toolchain runtime (libstdc++, libgcc, mingw-w64 CRT)",
-            },
-        )
+        self.assertEqual(unverified, set())
 
     def test_unverified_components_explain_their_basis(self) -> None:
         for component in self.index["components"]:

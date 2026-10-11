@@ -48,6 +48,7 @@ LICENSE_TEXTS: dict[str, tuple[str, ...]] = {
     "bzip2-1.0.6": ("runtime/bzip2-1.0.6.txt",),
     "CC0-1.0": ("runtime/CC0-1.0.txt",),
     "FTL": ("runtime/FTL.txt",),
+    "GCC-exception-3.1": ("runtime/GCC-exception-3.1.txt",),
     "GPL-2.0-only": ("runtime/GPL-2.0.txt",),
     "GPL-2.0-or-later": ("runtime/GPL-2.0.txt",),
     "GPL-3.0-only": ("runtime/GPL-3.0.txt",),
@@ -64,7 +65,7 @@ LICENSE_TEXTS: dict[str, tuple[str, ...]] = {
     "libpng-2.0": ("runtime/libpng-2.0.txt",),
     "libtiff": ("runtime/libtiff.txt",),
     "LLVM-exception": ("runtime/LLVM-exception.txt",),
-    "MIT": ("runtime/MIT.txt", "runtime/MIT-DXMT.txt"),
+    "MIT": ("runtime/MIT.txt", "runtime/MIT-DXMT.txt", "runtime/winpthreads.txt"),
     "NCSA": ("runtime/NCSA.txt",),
     "OLDAP-2.8": ("runtime/OLDAP-2.8.txt",),
     "SGI-B-2.0": ("runtime/SGI-B-2.0.txt",),
@@ -72,6 +73,7 @@ LICENSE_TEXTS: dict[str, tuple[str, ...]] = {
     "TU-Berlin-2.0": ("runtime/TU-Berlin-2.0.txt",),
     "Unicode-DFS-2016": ("runtime/Unicode-DFS-2016.txt",),
     "Zlib": ("runtime/Zlib.txt",),
+    "ZPL-2.1": ("runtime/ZPL-2.1.txt", "runtime/MinGW-w64-runtime.txt"),
 }
 # The LGPL-3.0 text refers to the GPL-3.0 text.
 COMPANION_LICENSES = {
