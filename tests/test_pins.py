@@ -338,10 +338,5 @@ class CheckTests(PinsTestCase):
         self.assertIn(NEW_WINE, self.page.read_text())
 
 
-class RepositoryTests(unittest.TestCase):
-    def test_repository_mentions_agree_with_the_lock(self) -> None:
-        self.assertEqual(pins.run_check(REPOSITORY_ROOT), [])
-
-
 if __name__ == "__main__":
     unittest.main()

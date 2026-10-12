@@ -63,10 +63,6 @@ def info(message: str) -> None:
     _line("info", message)
 
 
-def child_output(message: str) -> None:
-    print(f"  {styled(_symbol('child'), _CODES['child'])} {message}", file=sys.stderr)
-
-
 def success(message: str) -> None:
     _line("success", message)
 

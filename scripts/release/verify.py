@@ -286,10 +286,6 @@ def _validate_capability_archives(
         )
 
 
-def _validate_source_directories(source_root: Path) -> None:
-    pass
-
-
 def _validate_archive_licenses(archive: Path) -> str:
     """Require the license index, the listed files, and the notice in the runtime archive.
 
@@ -342,7 +338,7 @@ def _member_text(tar: tarfile.TarFile, member: tarfile.TarInfo) -> str:
     return stream.read().decode("utf-8")
 
 
-def _validate_source_directories_impl(source_root: Path) -> None:
+def _validate_source_directories(source_root: Path) -> None:
     if source_root.is_symlink() or not source_root.is_dir():
         raise ReleaseValidationError(f"source root is not a directory: {source_root}")
     for name in SOURCE_DIRECTORIES:

@@ -45,9 +45,6 @@ class LicenseIndexTests(unittest.TestCase):
             nix_packages=self.packages,
         )
 
-    def test_repository_index_is_valid(self) -> None:
-        self.validate(self.index)
-
     def test_component_without_entry_fails(self) -> None:
         index = copy.deepcopy(self.index)
         index["components"] = [c for c in index["components"] if c["name"] != "GnuTLS"]

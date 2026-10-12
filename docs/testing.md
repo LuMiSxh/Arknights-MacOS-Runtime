@@ -14,7 +14,7 @@
 7. The build verifies its emitted checksum before it publishes the artifact. Integrate and exercise the artifact in its consumer.
 8. After a clean full build, dispatch the release workflow with one version. It creates the tag and draft release only after all release gates pass.
 
-The source monitor runs monthly (first day) and on manual dispatch. A changed head is informational: pins move only through a reviewed `runtime.lock.json` change. An unreachable or missing pin fails the monitor, which never opens or changes issues.
+The source monitor runs weekly (Saturday, 04:00 UTC) and on manual dispatch. A changed head is informational: pins move only through a reviewed `runtime.lock.json` change. An unreachable or missing pin fails the monitor, which never opens or changes issues.
 
 Always run the current-runtime control and base comparison. Record the runtime commit, lock, Mac, macOS version, prefix history, display, and audio devices.
 
