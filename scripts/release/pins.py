@@ -92,7 +92,7 @@ ALLOWLIST: dict[str, tuple[str, ...]] = {
     "LICENSES/notices/wine-bundled.txt": ("wine.commit",),
     "LICENSES/notices/dxmt.txt": ("dxmt.commit", "dxmt.version", "dxmt.build"),
     "LICENSES/notices/dxmt-toolchain.txt": ("dxmt.commit", "dxmt.version"),
-    "LICENSES/notices/dxmt-unverified.txt": ("dxmt.commit", "dxmt.version"),
+    "LICENSES/notices/dxmt-headers.txt": ("dxmt.commit", "dxmt.version"),
     "LICENSES/notices/dxmt-vendored.txt": ("dxmt.commit", "dxmt.version"),
 }
 SKIPPED_DIRECTORIES = frozenset((".git", ".venv", ".build", "node_modules"))

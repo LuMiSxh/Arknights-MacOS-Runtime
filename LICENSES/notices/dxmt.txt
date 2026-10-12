@@ -11,5 +11,5 @@ Copyright (c) 2023 Feifan He. The MIT text is runtime/MIT-DXMT.txt.
 Release v0.80 uses MIT. The pinned build 0.80-262 does not. It uses LGPL-2.1-or-later.
 
 Vendored code and its licenses: see dxmt-vendored.txt.
-Headers with an unverified license: see dxmt-unverified.txt.
+Headers (mingw-directx-headers submodule): see dxmt-headers.txt.
 Windows toolchain runtime in the DLLs: see dxmt-toolchain.txt.

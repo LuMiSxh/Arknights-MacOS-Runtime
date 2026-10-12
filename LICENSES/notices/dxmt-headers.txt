@@ -1,0 +1,18 @@
+DXMT 0.80-262-ge94c312 mingw-directx-headers
+Source: https://github.com/misyltoad/mingw-directx-headers/tree/9df86f2341616ef1888ae59919feaa6d4fad693d
+DXMT source: https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587
+
+License: LGPL-2.1-or-later.
+- include/native/directx is a git submodule of DXMT (misyltoad/mingw-directx-headers, commit 9df86f2341616ef1888ae59919feaa6d4fad693d).
+- The README of the submodule at this commit states the SPDX identifier LGPL-2.1-or-later.
+- The headers are generated with WIDL from Wine IDL files, through mingw-w64. This is consistent with the LGPL license of Wine.
+- The README refers to COPYING.LGPLv2.1. The upstream repository does not contain this file.
+  The LGPL-2.1 text in runtime/LGPL-2.1.txt covers the license.
+
+Use in the build:
+- The meson.build file of DXMT requires include/native/directx/d3d11.h at configure time.
+- The directory is on the include path of the native static library DXBCParserNative.
+  The release build compiles that library for macOS and links it into winemetal.so.
+- The headers are compile-time input only. They add no separate binary.
+
+Basis: the upstream README plus the WIDL-generated headers. This project did not inspect the headers in a local checkout.

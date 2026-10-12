@@ -117,26 +117,32 @@
     {
       "name": "DXMT mingw-directx-headers (include/native/directx)",
       "version": "0.80-262-ge94c312",
-      "spdx": "NOASSERTION",
+      "spdx": "LGPL-2.1-or-later",
       "source": "https://github.com/misyltoad/mingw-directx-headers/tree/9df86f2341616ef1888ae59919feaa6d4fad693d",
       "files": [
-        "notices/dxmt-unverified.txt"
+        "runtime/LGPL-2.1.txt"
       ],
-      "status": "unverified",
-      "notice": "notices/dxmt-unverified.txt",
-      "note": "The submodule is empty in every local checkout, so no license file was read. The gitlink commit is from git ls-tree of the DXMT commit. The native DXBCParserNative library of the release build uses the headers."
+      "status": "verified",
+      "basis": "upstream-declared",
+      "notice": "notices/dxmt-headers.txt",
+      "note": "Basis: upstream README plus WIDL-generated headers. The README states LGPL-2.1-or-later and refers to COPYING.LGPLv2.1, which upstream does not contain. The shipped LGPL-2.1 text covers it. The headers are compile-time input only for the native DXBCParserNative library."
     },
     {
       "name": "DXMT Windows toolchain runtime (libstdc++, libgcc, mingw-w64 CRT)",
       "version": "0.80-262-ge94c312",
-      "spdx": "NOASSERTION",
+      "spdx": "ZPL-2.1 AND MIT AND (GPL-3.0-or-later WITH GCC-exception-3.1)",
       "source": "https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587",
       "files": [
-        "notices/dxmt-toolchain.txt"
+        "runtime/ZPL-2.1.txt",
+        "runtime/MinGW-w64-runtime.txt",
+        "runtime/winpthreads.txt",
+        "runtime/GPL-3.0.txt",
+        "runtime/GCC-exception-3.1.txt"
       ],
-      "status": "unverified",
+      "status": "verified",
+      "basis": "upstream-declared",
       "notice": "notices/dxmt-toolchain.txt",
-      "note": "Inferred from -static in meson.build and the GCC cross compiler in build-win64.txt. The DLLs were not inspected. The Homebrew formula version is not pinned. The texts of GCC-exception-3.1 and ZPL-2.1 are not in this repository."
+      "note": "Licenses are from Homebrew mingw-w64 14.0.0 (GCC 16.2.0, binutils 2.47, posix threads). Which runtime pieces are linked is inferred from -static in meson.build, not verified in the DLLs. The Homebrew formula version is not pinned by DXMT. The build tools are not shipped."
     },
     {
       "name": "LLVM (llvmPackages_15)",
@@ -148,12 +154,14 @@
         "runtime/LLVM-exception.txt",
         "runtime/BSD-2-Clause.txt",
         "runtime/BSD-3-Clause.txt",
-        "runtime/Spencer-94.txt"
+        "runtime/Spencer-94.txt",
+        "runtime/NCSA.txt",
+        "runtime/Unicode-DFS-2016.txt"
       ],
       "status": "verified",
       "basis": "upstream-declared",
       "notice": "notices/llvm.txt",
-      "note": "Upstream facts, not read in a local LLVM checkout: nixpkgs builds LLVM 15.0.7 and its llvm/LICENSE.TXT states Apache-2.0 WITH LLVM-exception. The link of LLVM into winemetal.so comes from the DXMT meson files. The set of third-party files in lib/Support that winemetal.so contains is not verified. No notice text of ConvertUTF.cpp is in this repository."
+      "note": "Upstream facts, not read in a local LLVM checkout: nixpkgs builds LLVM 15.0.7 and its llvm/LICENSE.TXT states Apache-2.0 WITH LLVM-exception. The link of LLVM into winemetal.so comes from the DXMT meson files. The set of third-party files in lib/Support that winemetal.so contains is not verified. The notice of ConvertUTF.cpp (Unicode, Inc.) is reproduced in notices/llvm.txt."
     },
     {
       "name": "MoltenVK",

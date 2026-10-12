@@ -372,6 +372,18 @@ class ReleaseVerificationTests(unittest.TestCase):
                 ):
                     self._verify()
 
+    def test_rejects_a_missing_or_symlinked_source_checkout(self) -> None:
+        (self.source_root / "wine-combined" / "source.c").unlink()
+        (self.source_root / "wine-combined").rmdir()
+        with self.assertRaisesRegex(ReleaseValidationError, "missing source checkout"):
+            self._verify()
+
+        real_root = self.root / "real-sources"
+        self.source_root.rename(real_root)
+        self.source_root.symlink_to(real_root)
+        with self.assertRaisesRegex(ReleaseValidationError, "not a directory"):
+            self._verify()
+
     def test_rejects_a_source_archive_missing_a_build_member(self) -> None:
         for member in ("scripts", "Justfile", "pyproject.toml", "uv.lock"):
             with self.subTest(member=member):

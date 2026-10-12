@@ -40,7 +40,7 @@ The CN gate covers the Bilibili window preflights in the [patch registry](docs/p
 
 ## Building
 
-Requirements: macOS 15+, Xcode command-line tools, Git, uv, Just, Nix, `x86_64-darwin` support, Rosetta 2 on Apple Silicon, and Homebrew `mingw-w64`, Meson, and Ninja.
+Requirements: macOS 15+, Xcode command-line tools, Git, uv, Just, Nix, `x86_64-darwin` support, Rosetta 2 on Apple Silicon, and Homebrew `ccache`, `mingw-w64`, Meson, and Ninja.
 
 ```sh
 just build combined

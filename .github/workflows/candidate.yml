@@ -1,11 +1,6 @@
 name: Candidate
 
 on:
-  workflow_call:
-    inputs:
-      stage:
-        type: string
-        default: combined
   workflow_dispatch:
     inputs:
       stage:
@@ -36,7 +31,7 @@ jobs:
         uses: astral-sh/setup-uv@v10.0.1
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@v31.11.1
 
       - name: Install build tools
         run: brew install ccache mingw-w64 meson ninja
