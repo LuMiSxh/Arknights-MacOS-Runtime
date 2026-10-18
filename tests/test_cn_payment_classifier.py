@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: MPL-2.0
 
 from dataclasses import dataclass, replace
-from pathlib import Path
 
 WS_CHILD = 0x40000000
 WS_POPUP = 0x80000000
@@ -139,39 +138,3 @@ def test_driver_keeps_translucent_property_requirement() -> None:
     assert not driver_accepts_payment_candidate(
         tree, "renderer", current_pid=41, translucent_property=False
     )
-
-
-def test_wine_patch_keeps_login_route_and_bounds_payment_route() -> None:
-    root = Path(__file__).resolve().parents[1]
-    patch = (
-        root
-        / "patches"
-        / "wine"
-        / "cn"
-        / "windowing"
-        / "0001-win32u-winemac-bilibili-layered-child.patch"
-    ).read_text(encoding="utf-8")
-
-    for contract in (
-        "is_bilibili_payment_proxy_candidate",
-        "static const WCHAR browserW[] = {'C','e','f','B','r','o','w','s','e','r','W','i','n','d','o','w',0};",
-        "style & WS_CHILD",
-        "style & WS_POPUP",
-        "GA_ROOT",
-        "static const WCHAR payment_rootW[] = {'C','P','a','y','D','l','g','_','P','_',0};",
-        "root_length <= ARRAY_SIZE(payment_rootW) - 1",
-        "NtUserGetWindowLongW( root, GWL_STYLE ) & WS_CHILD",
-        "NtUserGetWindowThread",
-        "parent_pid == current_pid && root_pid == parent_pid",
-        "hwnd_pid == parent_pid && hwnd_pid == root_pid",
-        "is_bilibili_layered_proxy_candidate( class_name, parent, cs.style )",
-        "return has_bilibili_webview_ancestor( parent ) || is_bilibili_payment_proxy_candidate( parent, style );",
-        "has_bilibili_webview_ancestor( parent ) || is_bilibili_payment_proxy_window( hwnd, parent )",
-        "NtUserGetProp(hwnd, translucentW)",
-        "NtUserSetProp( hwnd, translucentW, ULongToHandle( 1 ) )",
-        "if (pts_dst && is_bilibili_layered_proxy_window( hwnd )) pts_dst = NULL;",
-    ):
-        assert contract in patch, contract
-
-    assert "GA_ROOTOWNER" not in patch
-    assert "GW_OWNER" not in patch

@@ -2,13 +2,13 @@
 
 [`runtime.lock.json`](../runtime.lock.json) holds the machine-readable ordered registry. Before release, each entry must name its upstream source, author, license, gate, inactive behavior, test, and removal condition. The entries document provenance. They do not replace the corresponding-source, notice, and redistribution review that a runtime binary requires.
 
-The ACE, CEF, and CN patches target WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> and keep Wine's LGPL-2.1-or-later license.
+The ACE, CEF, and CN patches target WineCX <!-- pin:wine.commit|code -->`b1417d2773a0dfc15cc78b78e1257ee965bcca89`<!-- /pin --> and keep Wine's LGPL-2.1-or-later license.
 
 ## Audio
 
 - ID: `wine-audio-default-output`
 - File: `patches/wine/audio/0001-winecoreaudio-default-output.patch`
-- Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
+- Component/base: WineCX <!-- pin:wine.commit|code -->`b1417d2773a0dfc15cc78b78e1257ee965bcca89`<!-- /pin --> (Wine <!-- pin:wine.version -->11.19<!-- /pin -->)
 - Source/author: Wine draft MR 11370, commits `4d143f4c` and `65140f31`, Rhodri Richards
 - License: LGPL-2.1-or-later
 - Gate: `ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT=1`, parsed once per process
@@ -19,26 +19,11 @@ The ACE, CEF, and CN patches target WineCX <!-- pin:wine.commit|code -->`e0aa380
 
 The MR is a draft. Capture and exclusive streams are unchanged.
 
-## Cursor
-
-- ID: `dxmt-cursor-frame-latency`
-- File: `patches/dxmt/cursor/0001-dxmt-command-queue-configurable-frame-latency.patch`
-- Component/base: DXMT <!-- pin:dxmt.commit|code -->`e94c312f5c054263acf261cfa109edf13e757587`<!-- /pin --> (<!-- pin:dxmt.describe|code -->`v0.80-262-ge94c312`<!-- /pin -->)
-- Source/author: Original runtime experiment, runtime maintainers
-- License: LGPL-2.1-or-later (DXMT)
-- Gate: `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY=0..3`, read once on first command queue
-- Inactive behavior: Missing or invalid input retains upstream maximum `3`
-- Automated gate: Hash, clean `git apply --check`, both DXMT architectures compile
-- Manual gate: FPS, frame-pacing, and cursor comparison at 3, 2, 1, 0
-- Removal: Drop if DXMT gains an equivalent control or evidence rejects the experiment
-
-Value `0` is an Arknights extension. It waits for the completion fence of the current frame after commit, so no completed GPU frame stays queued. It is not DXGI zero-as-default, and it can reduce throughput or smoothness.
-
 ## Hardware Cursor
 
 - ID: `wine-hardware-cursor-suppression`
 - File: `patches/wine/hardware-cursor/0001-ntdll-hide-software-cursor-asset.patch`
-- Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
+- Component/base: WineCX <!-- pin:wine.commit|code -->`b1417d2773a0dfc15cc78b78e1257ee965bcca89`<!-- /pin --> (Wine <!-- pin:wine.version -->11.19<!-- /pin -->)
 - Source/author: Original runtime change; motivated by the [reported PC cursor stutter](https://www.reddit.com/r/arknights/comments/1vorlzp/pc_client_fix_for_the_annoying_mouse_stuttering/)
 - License: LGPL-2.1-or-later (Wine)
 - Gate: Exact `ARKNIGHTS_RUNTIME_HARDWARE_CURSOR=1`, checked during shared file-name resolution
@@ -51,7 +36,7 @@ The filter matches the case-insensitive final basename `a9d41799f1af1868f2db4956
 
 ## Runtime capability manifest
 
-`Libraries/runtime-capabilities.json` is the versioned producer contract that consumers read from the packaged runtime tree. Schema version 1 advertises the DXMT frame-latency range and default, hardware-cursor support, and MetalFX spatial-upscaling support. Release validation checks the manifest against the pinned patch semantics and requires the packaged copy to match the source. MetalFX upscaling is upstream DXMT behavior (`DXMT_METALFX_SPATIAL_SWAPCHAIN=1`), not a patch, so validation requires that switch in the packaged `DXMT/x64/d3d11.dll`. Consumers use conservative defaults without the manifest.
+`Libraries/runtime-capabilities.json` is the versioned producer contract that consumers read from the packaged runtime tree. Schema version 2 advertises hardware-cursor support and MetalFX spatial-upscaling support. Release validation checks the manifest against the pinned patch semantics and requires the packaged copy to match the source. Consumers use conservative defaults without the manifest.
 
 ## Performance
 
@@ -59,7 +44,7 @@ The filter matches the case-insensitive final basename `a9d41799f1af1868f2db4956
 
 - ID: `dxmt-skip-release-present-statistics`
 - File: `patches/dxmt/performance/0001-dxmt-skip-release-present-statistics.patch`
-- Component/base: DXMT <!-- pin:dxmt.commit|code -->`e94c312f5c054263acf261cfa109edf13e757587`<!-- /pin -->
+- Component/base: DXMT <!-- pin:dxmt.commit|code -->`50102f994b406f58f56d5d09f2ad20f9b90390a2`<!-- /pin -->
 - Source/author: Original runtime optimization, runtime maintainers
 - License: LGPL-2.1-or-later (DXMT)
 - Gate: `DXMT_DEBUG`; debug builds keep statistics aggregation and HUD updates, release builds skip both
@@ -72,12 +57,12 @@ Both `Present` paths keep `UpdateStatistics` behind `DXMT_DEBUG`, which avoids i
 
 ## ACE
 
-All ACE patches use the exact gate `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`. A missing, `0`, or other value keeps Wine's normal route. Every patch requires hash verification and clean application. All four are Endfield FineWine ports ([provenance](../patches/wine/ace/provenance.md)).
+The ACE patches use the exact gate `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`, except that the ntoskrnl patch adds ungated exports that upstream Wine lacks (see below). A missing, `0`, or other value keeps Wine's normal route. Every patch requires hash verification and clean application. All four are Endfield FineWine ports ([provenance](../patches/wine/ace/provenance.md)).
 
 - [`wine-ace-ntoskrnl-surface`](../patches/wine/ace/ntoskrnl/0001-ntoskrnl-compatibility-surface.patch)
-    - What: Kernel exports and process metadata for the ACE client: current-thread process, image-name, exit-status, audit-parameter, and persistent-thread-state surfaces.
-    - Scope: Compatibility-only routes use the ACE gate. `PsGetProcessImageFileName` and `PsGetProcessExitStatus` stay unconditional for valid process objects and follow their kernel `_In_` contract.
-    - Checks: compile both architectures; exercise gated and general routes.
+    - What: Kernel exports that upstream Wine 11.19 does not implement: `PsGetProcessExitStatus`, `SeSetAuditParameter`, `PsGetCurrentThreadProcess`, and `PsGetCurrentThreadProcessId`.
+    - Scope: `SeSetAuditParameter` uses the ACE gate and returns `STATUS_NOT_IMPLEMENTED` when the gate is off. The other three exports are unconditional. No upstream function body changes.
+    - Checks: compile the x86_64 `ntoskrnl.exe` target; hash and clean application.
 - [`wine-ace-dispatcher-spoof`](../patches/wine/ace/dispatcher/0001-kernel32-ace-dispatcher-spoof.patch)
     - What: x86-64 dispatcher lookup compatibility.
     - Scope: ACE gate and Rosetta x86-64 build only.
@@ -117,7 +102,7 @@ Remove a patch when the pinned WineCX supplies the behavior or the route is no l
 
 - ID: `wine-menu-command-q-quit`
 - File: `patches/wine/menu/0001-winemac-command-q-quit.patch`
-- Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
+- Component/base: WineCX <!-- pin:wine.commit|code -->`b1417d2773a0dfc15cc78b78e1257ee965bcca89`<!-- /pin --> (Wine <!-- pin:wine.version -->11.19<!-- /pin -->)
 - Source/author: Original runtime change, runtime maintainers
 - License: LGPL-2.1-or-later (Wine)
 - Gate: None. The patch is always active in the `combined` stage. It has no `ARKNIGHTS_RUNTIME_` variable, because the client needs the standard Command-Q key equivalent in every build.

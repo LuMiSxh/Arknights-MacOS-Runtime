@@ -5,13 +5,13 @@
   "sources": {
     "wine": {
       "repository": "https://github.com/dappermint/winecx.git",
-      "commit": "e0aa380780b73e20fabcfe78fd42713b94929a53",
-      "version": "11.17"
+      "commit": "b1417d2773a0dfc15cc78b78e1257ee965bcca89",
+      "version": "11.19"
     },
     "dxmt": {
       "repository": "https://github.com/3Shain/dxmt.git",
-      "commit": "e94c312f5c054263acf261cfa109edf13e757587",
-      "version": "0.80-262-ge94c312"
+      "commit": "50102f994b406f58f56d5d09f2ad20f9b90390a2",
+      "version": "0.80-267-g50102f9"
     }
   },
   "baseArtifact": {
@@ -66,13 +66,6 @@
       "sha256": "2676309df8bbcad45ae9d41848dde3e79c597189ccb2f6f899b3155b24e54a05"
     },
     {
-      "id": "dxmt-cursor-frame-latency",
-      "component": "dxmt",
-      "family": "cursor",
-      "path": "patches/dxmt/cursor/0001-dxmt-command-queue-configurable-frame-latency.patch",
-      "sha256": "fca46f29fc586576e99cd9f518180a0dcdde4ff1205153a273de1a4755d02ae5"
-    },
-    {
       "id": "wine-hardware-cursor-suppression",
       "component": "wine",
       "family": "hardware-cursor",
@@ -91,7 +84,7 @@
       "component": "wine",
       "family": "ace",
       "path": "patches/wine/ace/ntoskrnl/0001-ntoskrnl-compatibility-surface.patch",
-      "sha256": "e81a63be33e7a314758fdaa73f378d33d3fba5123333697c21b0e87ce64b2e44"
+      "sha256": "94b2a24e6fb35d90e6a6cdebc910c67bd98f1ddde6193892b02fee15fb04abbe"
     },
     {
       "id": "wine-ace-dispatcher-spoof",
@@ -126,7 +119,7 @@
       "component": "wine",
       "family": "cn",
       "path": "patches/wine/cn/windowing/0001-win32u-winemac-bilibili-layered-child.patch",
-      "sha256": "1c7b8dd32302cb409399035441cd378acfe260ca1515be4d96966556e326fa8d"
+      "sha256": "866eb7b6c5ad39bbea1162226dc2db1000a65f1374c2e1ee9f94bf6a961214da"
     },
     {
       "id": "wine-menu-command-q-quit",

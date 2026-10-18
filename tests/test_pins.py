@@ -290,7 +290,8 @@ class CheckTests(PinsTestCase):
         self.assertEqual(self.check(), [])
 
     def test_stale_marker_is_reported(self) -> None:
-        self.page.write_text(self.page.read_text().replace("11.17", "11.16"))
+        current = pins.pins_from_lock(self.lock)["wine.version"]
+        self.page.write_text(self.page.read_text().replace(current, "0.0"))
 
         self.assertEqual(self.check(), ["docs/page.md:1: pin:wine.version is stale"])
 

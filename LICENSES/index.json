@@ -26,9 +26,9 @@
   "components": [
     {
       "name": "Wine",
-      "version": "11.17",
+      "version": "11.19",
       "spdx": "LGPL-2.1-or-later",
-      "source": "https://github.com/dappermint/winecx/tree/e0aa380780b73e20fabcfe78fd42713b94929a53",
+      "source": "https://github.com/dappermint/winecx/tree/b1417d2773a0dfc15cc78b78e1257ee965bcca89",
       "files": [
         "Wine-LGPL-2.1.txt"
       ],
@@ -39,9 +39,9 @@
     },
     {
       "name": "Wine in-tree libraries and fonts",
-      "version": "11.17",
+      "version": "11.19",
       "spdx": "LGPL-2.1-or-later AND LGPL-2.1-only AND libpng-2.0 AND Zlib AND IJG AND libtiff AND MIT AND BSD-2-Clause AND BSD-3-Clause AND NCSA AND OLDAP-2.8 AND TU-Berlin-2.0 AND Unicode-DFS-2016 AND SGI-B-2.0 AND Bitstream-Vera AND (Apache-2.0 OR MIT)",
-      "source": "https://github.com/dappermint/winecx/tree/e0aa380780b73e20fabcfe78fd42713b94929a53",
+      "source": "https://github.com/dappermint/winecx/tree/b1417d2773a0dfc15cc78b78e1257ee965bcca89",
       "files": [
         "Wine-LGPL-2.1.txt",
         "runtime/Apache-2.0.txt",
@@ -66,9 +66,9 @@
     },
     {
       "name": "DXMT",
-      "version": "0.80-262-ge94c312",
+      "version": "0.80-267-g50102f9",
       "spdx": "LGPL-2.1-or-later",
-      "source": "https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587",
+      "source": "https://github.com/3Shain/dxmt/tree/50102f994b406f58f56d5d09f2ad20f9b90390a2",
       "files": [
         "DXMT-LGPL-2.1.txt",
         "runtime/MIT-DXMT.txt"
@@ -80,9 +80,9 @@
     },
     {
       "name": "DXMT vendored DXBCParser",
-      "version": "0.80-262-ge94c312",
+      "version": "0.80-267-g50102f9",
       "spdx": "MIT",
-      "source": "https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587/libs/DXBCParser",
+      "source": "https://github.com/3Shain/dxmt/tree/50102f994b406f58f56d5d09f2ad20f9b90390a2/libs/DXBCParser",
       "files": [
         "runtime/MIT.txt"
       ],
@@ -92,9 +92,9 @@
     },
     {
       "name": "DXMT vendored DXVK-derived code",
-      "version": "0.80-262-ge94c312",
+      "version": "0.80-267-g50102f9",
       "spdx": "Zlib",
-      "source": "https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587/src/util",
+      "source": "https://github.com/3Shain/dxmt/tree/50102f994b406f58f56d5d09f2ad20f9b90390a2/src/util",
       "files": [
         "runtime/Zlib.txt"
       ],
@@ -104,9 +104,9 @@
     },
     {
       "name": "DXMT vendored tl::generator header",
-      "version": "0.80-262-ge94c312",
+      "version": "0.80-267-g50102f9",
       "spdx": "CC0-1.0",
-      "source": "https://github.com/3Shain/dxmt/blob/e94c312f5c054263acf261cfa109edf13e757587/include/tl/generator.hpp",
+      "source": "https://github.com/3Shain/dxmt/blob/50102f994b406f58f56d5d09f2ad20f9b90390a2/include/tl/generator.hpp",
       "files": [
         "runtime/CC0-1.0.txt"
       ],
@@ -116,7 +116,7 @@
     },
     {
       "name": "DXMT mingw-directx-headers (include/native/directx)",
-      "version": "0.80-262-ge94c312",
+      "version": "0.80-267-g50102f9",
       "spdx": "LGPL-2.1-or-later",
       "source": "https://github.com/misyltoad/mingw-directx-headers/tree/9df86f2341616ef1888ae59919feaa6d4fad693d",
       "files": [
@@ -129,9 +129,9 @@
     },
     {
       "name": "DXMT Windows toolchain runtime (libstdc++, libgcc, mingw-w64 CRT)",
-      "version": "0.80-262-ge94c312",
+      "version": "0.80-267-g50102f9",
       "spdx": "ZPL-2.1 AND MIT AND (GPL-3.0-or-later WITH GCC-exception-3.1)",
-      "source": "https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587",
+      "source": "https://github.com/3Shain/dxmt/tree/50102f994b406f58f56d5d09f2ad20f9b90390a2",
       "files": [
         "runtime/ZPL-2.1.txt",
         "runtime/MinGW-w64-runtime.txt",

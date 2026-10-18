@@ -7,10 +7,10 @@ The runtime pins four upstream inputs in [`runtime.lock.json`](../runtime.lock.j
 <!-- pin-block:table -->
 | Pin | Value |
 | --- | --- |
-| `wine.commit` | `e0aa380780b73e20fabcfe78fd42713b94929a53` |
-| `wine.version` | `11.17` |
-| `dxmt.commit` | `e94c312f5c054263acf261cfa109edf13e757587` |
-| `dxmt.version` | `0.80-262-ge94c312` |
+| `wine.commit` | `b1417d2773a0dfc15cc78b78e1257ee965bcca89` |
+| `wine.version` | `11.19` |
+| `dxmt.commit` | `50102f994b406f58f56d5d09f2ad20f9b90390a2` |
+| `dxmt.version` | `0.80-267-g50102f9` |
 | `base.tag` | `v4.7.3` |
 | `base.url` | `https://github.com/dappermint/Whisky/releases/download/v4.7.3/Libraries.tar.gz` |
 | `base.sha256` | `a4b5d63493f80698cce5cad8e7212d9a51c8292037b00c478f4652636fcfd331` |
