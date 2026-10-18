@@ -6,9 +6,9 @@ set -euo pipefail
 stage="${1:-combined}"
 build_mode="${2:-overlay}"
 case "$stage" in
-	base|audio|cursor|hardware-cursor|performance|ace|cef|cn|combined) ;;
+	base|audio|hardware-cursor|performance|ace|cef|cn|combined) ;;
 	*)
-		echo "error: expected base, audio, cursor, hardware-cursor, performance, ace, cef, cn, or combined" >&2
+		echo "error: expected base, audio, hardware-cursor, performance, ace, cef, cn, or combined" >&2
 		exit 2
 		;;
 esac
@@ -85,7 +85,7 @@ fi
 require_command nix
 
 source_root="$stage_root/sources"
-if [[ "$stage" == cursor || "$stage" == performance ]]; then
+if [[ "$stage" == performance ]]; then
 	run_python "$repository_root/scripts/runtime.py" prepare "$stage" --destination-root "$source_root"
 	run_python "$repository_root/scripts/runtime.py" prepare base --destination-root "$source_root"
 else
@@ -93,7 +93,7 @@ else
 fi
 
 wine_source="$source_root/wine-$stage"
-if [[ "$stage" == cursor || "$stage" == performance ]]; then
+if [[ "$stage" == performance ]]; then
 	wine_source="$source_root/wine-base"
 fi
 
@@ -145,7 +145,7 @@ export ac_cv_lib_soname_gnutls="libgnutls.30.dylib"
 export ac_cv_lib_soname_MoltenVK="libMoltenVK.dylib"
 
 llvm_path=""
-if [[ "$stage" == cursor || "$stage" == performance || "$stage" == combined ]]; then
+if [[ "$stage" == performance || "$stage" == combined ]]; then
 	llvm_attribute="$nixpkgs#legacyPackages.x86_64-darwin.llvmPackages_15.llvm"
 	llvm_dev="$(nix build --no-link --print-out-paths "$llvm_attribute.dev")"
 	llvm_lib="$(nix build --no-link --print-out-paths "$llvm_attribute.lib")"
@@ -335,7 +335,7 @@ if [[ "$build_mode" == "--clean-release" ]]; then
 	done
 fi
 
-if [[ "$stage" == cursor || "$stage" == performance || "$stage" == combined ]]; then
+if [[ "$stage" == performance || "$stage" == combined ]]; then
 	require_command meson
 	require_command ninja
 	dxmt_source="$source_root/dxmt-$stage"

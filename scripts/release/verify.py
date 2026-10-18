@@ -73,7 +73,7 @@ SOURCE_ARCHIVE_MEMBERS = (
 )
 SOURCE_DIRECTORIES = SOURCE_ARCHIVE_MEMBERS[:2]
 REQUIRED_PATCH_FAMILIES = frozenset(
-    ("audio", "cursor", "hardware-cursor", "performance", "ace", "cef", "cn")
+    ("audio", "hardware-cursor", "performance", "ace", "cef", "cn")
 )
 
 

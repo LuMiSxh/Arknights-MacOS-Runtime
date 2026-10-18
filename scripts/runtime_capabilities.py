@@ -12,23 +12,10 @@ from pathlib import Path
 from typing import Any
 
 MAXIMUM_CAPABILITY_MANIFEST_BYTES = 4 * 1_024
-CAPABILITY_KEYS = {
-    "dxmtMaximumFrameLatency",
-    "hardwareCursor",
-    "metalFXSpatialUpscaling",
-}
-LATENCY_KEYS = {"minimum", "maximum", "defaultValue"}
+CAPABILITY_KEYS = {"hardwareCursor", "metalFXSpatialUpscaling"}
 # Upstream DXMT enables its MetalFX spatial swapchain when this variable is "1".
 METALFX_SWAPCHAIN_MARKER = b"DXMT_METALFX_SPATIAL_SWAPCHAIN"
 METALFX_SWAPCHAIN_LIBRARY = "DXMT/x64/d3d11.dll"
-LATENCY_PATTERN = re.compile(
-    r'getEnvVar\("ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY"\).*?'
-    r"configured\.size\(\)\s*==\s*1\s*&&\s*"
-    r"configured\.front\(\)\s*>=\s*'([0-3])'\s*&&\s*"
-    r"configured\.front\(\)\s*<=\s*'([0-3])'.*?"
-    r"return\s+uint32_t\{([0-3])\};",
-    re.DOTALL,
-)
 
 
 class CapabilityContractError(ValueError):
@@ -90,32 +77,12 @@ def validate_manifest_shape(value: Any) -> dict[str, Any]:
             "manifest must contain only schemaVersion and capabilities"
         )
     schema_version = value["schemaVersion"]
-    if type(schema_version) is not int or schema_version != 1:
-        raise CapabilityContractError("capability manifest schemaVersion must be 1")
+    if type(schema_version) is not int or schema_version != 2:
+        raise CapabilityContractError("capability manifest schemaVersion must be 2")
 
     capabilities = value["capabilities"]
     if not isinstance(capabilities, dict) or set(capabilities) != CAPABILITY_KEYS:
         raise CapabilityContractError("manifest capabilities have an invalid shape")
-    latency = capabilities["dxmtMaximumFrameLatency"]
-    if not isinstance(latency, dict) or set(latency) != LATENCY_KEYS:
-        raise CapabilityContractError("frame latency capability has an invalid shape")
-    minimum, maximum, default = (
-        latency["minimum"],
-        latency["maximum"],
-        latency["defaultValue"],
-    )
-    if any(type(number) is not int for number in (minimum, maximum, default)):
-        raise CapabilityContractError("frame latency values must be integers")
-    if (
-        minimum < 0
-        or maximum > 3
-        or minimum > maximum
-        or default != 3
-        or not minimum <= default <= maximum
-    ):
-        raise CapabilityContractError(
-            "frame latency range must include default 3 within 0..3"
-        )
     if type(capabilities["hardwareCursor"]) is not bool:
         raise CapabilityContractError("hardwareCursor capability must be a boolean")
     if type(capabilities["metalFXSpatialUpscaling"]) is not bool:
@@ -126,20 +93,9 @@ def validate_manifest_shape(value: Any) -> dict[str, Any]:
 
 
 def validate_capability_contract(
-    manifest: dict[str, Any], *, latency_patch: str, hardware_cursor_patch: str
+    manifest: dict[str, Any], *, hardware_cursor_patch: str
 ) -> None:
     value = validate_manifest_shape(manifest)
-    latency = value["capabilities"]["dxmtMaximumFrameLatency"]
-    match = LATENCY_PATTERN.search(latency_patch)
-    if match is None or "max_latency_(configured_max_latency())" not in latency_patch:
-        raise CapabilityContractError("pinned DXMT latency patch has unknown semantics")
-    actual = tuple(int(component) for component in match.groups())
-    expected = (latency["minimum"], latency["maximum"], latency["defaultValue"])
-    if actual != expected:
-        raise CapabilityContractError(
-            "manifest frame latency range does not match the pinned DXMT latency patch"
-        )
-
     if value["capabilities"]["hardwareCursor"]:
         added_source = "\n".join(
             line[1:]
@@ -192,34 +148,24 @@ def validate_source_capability_contract(
     patches = lock.get("patches")
     if not isinstance(patches, list):
         raise CapabilityContractError("runtime lock patches must be an array")
-    by_family: dict[str, dict[str, Any]] = {}
-    for family in ("cursor", "hardware-cursor"):
-        matches = [
-            patch
-            for patch in patches
-            if isinstance(patch, dict) and patch.get("family") == family
-        ]
-        if len(matches) != 1:
-            raise CapabilityContractError(
-                f"runtime lock must contain one {family} patch for capability validation"
-            )
-        by_family[family] = matches[0]
+    matches = [
+        patch
+        for patch in patches
+        if isinstance(patch, dict) and patch.get("family") == "hardware-cursor"
+    ]
+    if len(matches) != 1:
+        raise CapabilityContractError(
+            "runtime lock must contain one hardware-cursor patch for capability validation"
+        )
     try:
-        latency_patch = (repository_root / by_family["cursor"]["path"]).read_text(
+        hardware_cursor_patch = (repository_root / matches[0]["path"]).read_text(
             encoding="utf-8"
         )
-        hardware_cursor_patch = (
-            repository_root / by_family["hardware-cursor"]["path"]
-        ).read_text(encoding="utf-8")
     except (KeyError, OSError, TypeError) as error:
         raise CapabilityContractError(
             f"cannot read pinned capability patch: {error}"
         ) from error
-    validate_capability_contract(
-        manifest,
-        latency_patch=latency_patch,
-        hardware_cursor_patch=hardware_cursor_patch,
-    )
+    validate_capability_contract(manifest, hardware_cursor_patch=hardware_cursor_patch)
     return manifest
 
 

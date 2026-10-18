@@ -97,7 +97,6 @@ class ReleaseVerificationTests(unittest.TestCase):
     def _write_repository(self) -> None:
         patch_definitions = (
             ("example-audio", "audio"),
-            ("example-cursor", "cursor"),
             ("example-hardware-cursor", "hardware-cursor"),
             ("example-performance", "performance"),
             ("example-ace", "ace"),
@@ -108,15 +107,7 @@ class ReleaseVerificationTests(unittest.TestCase):
         for patch_id, family in patch_definitions:
             patch = self.root / f"patches/{patch_id}.patch"
             patch.parent.mkdir(parents=True, exist_ok=True)
-            if family == "cursor":
-                content = (
-                    '+const auto configured = dxmt::env::getEnvVar("ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY");\n'
-                    "+if (configured.size() == 1 && configured.front() >= '0' && configured.front() <= '3')\n"
-                    "+  return static_cast<uint32_t>(configured.front() - '0');\n"
-                    "+return uint32_t{3};\n"
-                    "+max_latency_(configured_max_latency()),\n"
-                )
-            elif family == "hardware-cursor":
+            if family == "hardware-cursor":
                 content = (
                     "+static BOOL arknights_runtime_hardware_cursor_enabled(void)\n"
                     "+{\n"
@@ -133,9 +124,7 @@ class ReleaseVerificationTests(unittest.TestCase):
             patches.append(
                 {
                     "id": patch_id,
-                    "component": "dxmt"
-                    if family in ("cursor", "performance")
-                    else "wine",
+                    "component": "dxmt" if family == "performance" else "wine",
                     "family": family,
                     "path": str(patch.relative_to(self.root)),
                     "sha256": hashlib.sha256(content.encode()).hexdigest(),
@@ -186,13 +175,8 @@ class ReleaseVerificationTests(unittest.TestCase):
         (self.root / "runtime-capabilities.json").write_text(
             json.dumps(
                 {
-                    "schemaVersion": 1,
+                    "schemaVersion": 2,
                     "capabilities": {
-                        "dxmtMaximumFrameLatency": {
-                            "minimum": 0,
-                            "maximum": 3,
-                            "defaultValue": 3,
-                        },
                         "hardwareCursor": True,
                         "metalFXSpatialUpscaling": False,
                     },
@@ -309,7 +293,6 @@ class ReleaseVerificationTests(unittest.TestCase):
         lock = json.loads(lock_path.read_text(encoding="utf-8"))
         for family in (
             "audio",
-            "cursor",
             "hardware-cursor",
             "performance",
             "ace",

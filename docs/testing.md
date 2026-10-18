@@ -8,7 +8,7 @@
 1. `just check`: tests lock validation and workflow syntax.
 2. `just monitor`: verifies every pinned upstream commit and reports newer heads without changing the lock.
 3. `just prepare base`: verifies the unmodified source pins.
-4. `just prepare audio`, `cursor`, `hardware-cursor`, `performance`, `ace`, `cef`, and `cn`: applies each family independently without fuzz.
+4. `just prepare audio`, `hardware-cursor`, `performance`, `ace`, `cef`, and `cn`: applies each family independently without fuzz.
 5. `just build combined`: builds an isolated overlay canary. It is not a release build.
 6. `just verify`: checks archive paths, file types, DXMT native-loader markers, dependency references, and deployment targets. Prepare locally rebuilt D3D10/D3D11/DXGI DLLs with the DOS stub of `build-canary.sh`. Otherwise Wine's builtin marker overrides native-first loading. Keep the builtin marker on `winemetal.dll`.
 7. The build verifies its emitted checksum before it publishes the artifact. Integrate and exercise the artifact in its consumer.
@@ -29,7 +29,6 @@ Restart the game before every comparison. Capture same-binary A/A runs first to 
 Test the absent, `0`, invalid, and `1` values of each control in an isolated prefix.
 
 - Audio: switch built-in, wired, Bluetooth, and HDMI defaults during playback. Test disconnect, reconnect, mute, volume, sleep/wake, browser audio, and a long session.
-- Cursor: compare frame latency 3, 2, and 1 with identical graphics settings, VSync modes, refresh rates, and capture method. Record FPS, frame pacing, stutter, crashes, and cursor latency.
 - Hardware Cursor: confirm that only `a9d41799f1af1868f2db495671227cd4.bin` (Yostar/TW) or `f7bcd64480c4566f25d65d642f5fba95.bin` (CN) is hidden. Verify that the game still shows and moves the macOS pointer.
 - Performance: apply the performance stage, restart the game, and run a startup and rendering smoke test. Record crashes, missing effects, and frame times. The statistics gate is compile-time only: debug builds keep the HUD and aggregation, release builds keep frame counters and synchronization. Use the settings and fixed scene of the preceding control.
 - ACE: record launcher startup, ACE initialization, gameplay, and clean shutdown.

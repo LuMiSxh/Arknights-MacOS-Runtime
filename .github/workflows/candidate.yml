@@ -7,7 +7,7 @@ on:
         description: Patch family to build
         type: choice
         default: combined
-        options: [base, audio, cursor, hardware-cursor, performance, ace, cef, cn, combined]
+        options: [base, audio, hardware-cursor, performance, ace, cef, cn, combined]
 
 permissions:
   contents: read
