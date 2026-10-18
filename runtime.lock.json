@@ -127,6 +127,13 @@
       "family": "cn",
       "path": "patches/wine/cn/windowing/0001-win32u-winemac-bilibili-layered-child.patch",
       "sha256": "1c7b8dd32302cb409399035441cd378acfe260ca1515be4d96966556e326fa8d"
+    },
+    {
+      "id": "wine-menu-command-q-quit",
+      "component": "wine",
+      "family": "menu",
+      "path": "patches/wine/menu/0001-winemac-command-q-quit.patch",
+      "sha256": "4c010e83ce04489eac127a258aa16fd81b4afb35185c6e3c83846f48e2f3ef30"
     }
   ]
 }

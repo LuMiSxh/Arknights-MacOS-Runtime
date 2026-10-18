@@ -112,3 +112,18 @@ The CN family contains only the Bilibili windowing patch. It uses the exact gate
     - Provenance and checks: Original runtime change; hash, apply check, offline classifier/contract tests, `win32u`/`winemac` compile, Bilibili payment-window rendering check.
 
 Remove a patch when the pinned WineCX supplies the behavior or the route is no longer needed.
+
+## Menu
+
+- ID: `wine-menu-command-q-quit`
+- File: `patches/wine/menu/0001-winemac-command-q-quit.patch`
+- Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
+- Source/author: Original runtime change, runtime maintainers
+- License: LGPL-2.1-or-later (Wine)
+- Gate: None. The patch is always active in the `combined` stage. It has no `ARKNIGHTS_RUNTIME_` variable, because the client needs the standard Command-Q key equivalent in every build.
+- Inactive behavior: None. No inactive route exists. Builds without the patch keep Wine's Option-Command-Q key equivalent for Quit.
+- Automated gate: Hash, clean `git apply --check` in lock order, `winemac.so` compile in the `combined` build
+- Manual gate: The app menu shows Command-Q for Quit. Option-Command-Q does not quit. Option-Command-H still hides other applications.
+- Removal: Drop when the client no longer needs Command-Q to quit, or when Wine offers an equivalent setting
+
+The patch changes one line in `dlls/winemac.drv/cocoa_app.m`. It sets the Quit item to the Command modifier only. Hide Others (Option-Command-H) and the other menu items keep their masks.

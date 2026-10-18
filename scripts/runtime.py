@@ -188,6 +188,7 @@ def load_lock(
             "ace",
             "cef",
             "cn",
+            "menu",
         ):
             raise LockError(f"unknown patch family: {family}")
         if HASH_PATTERN.fullmatch(expected) is None:
