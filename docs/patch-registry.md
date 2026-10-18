@@ -4,6 +4,21 @@
 
 The ACE, CEF, and CN patches target WineCX <!-- pin:wine.commit|code -->`b1417d2773a0dfc15cc78b78e1257ee965bcca89`<!-- /pin --> and keep Wine's LGPL-2.1-or-later license.
 
+## Build
+
+- ID: `wine-build-winemac-regclosekey`
+- File: `patches/wine/build/0001-winemac-d3dmetal-static-regclosekey.patch`
+- Component/base: WineCX <!-- pin:wine.commit|code -->`b1417d2773a0dfc15cc78b78e1257ee965bcca89`<!-- /pin --> (Wine <!-- pin:wine.version -->11.19<!-- /pin -->)
+- Source/author: Original runtime change, runtime maintainers
+- License: LGPL-2.1-or-later (Wine)
+- Gate: None. The patch applies in every stage that builds patched Wine, except `performance`. It has no `ARKNIGHTS_RUNTIME_` variable.
+- Inactive behavior: None. Without the patch, `winemac.drv` does not compile on the pinned source.
+- Automated gate: Hash, clean `git apply --check` in lock order, `winemac.so` compile in the `combined` build
+- Manual gate: None. The successful compile is the gate.
+- Removal: Drop when the pinned WineCX source compiles `winemac.drv` without the patch
+
+The patch renames the static helper `RegCloseKey` in `dlls/winemac.drv/d3dmetal.c` to `macdrv_reg_close_key`. The pinned source includes `winreg.h` through `macdrv.h`, which declares a non-static `RegCloseKey`. The static definition then fails to compile. The patch changes no behavior.
+
 ## Audio
 
 - ID: `wine-audio-default-output`

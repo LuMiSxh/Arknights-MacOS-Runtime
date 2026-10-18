@@ -1,0 +1,22 @@
+diff --git a/dlls/winemac.drv/d3dmetal.c b/dlls/winemac.drv/d3dmetal.c
+index 7d5d9038..ce701cfa 100644
+--- a/dlls/winemac.drv/d3dmetal.c
++++ b/dlls/winemac.drv/d3dmetal.c
+@@ -311,7 +311,7 @@ static LSTATUS WINAPI my_RegCreateKeyExA(HKEY p1, LPCSTR p2, DWORD p3, LPSTR p4,
+     return result;
+ }
+ 
+-static LSTATUS WINAPI DECLSPEC_HOTPATCH RegCloseKey( HKEY hkey )
++static LSTATUS WINAPI DECLSPEC_HOTPATCH macdrv_reg_close_key( HKEY hkey )
+ {
+     if (!hkey) return ERROR_INVALID_HANDLE;
+     if (hkey >= (HKEY)0x80000000) return ERROR_SUCCESS;
+@@ -321,7 +321,7 @@ static LSTATUS WINAPI DECLSPEC_HOTPATCH RegCloseKey( HKEY hkey )
+ static LSTATUS WINAPI my_RegCloseKey(HKEY hkey)
+ {
+     TRACE("RegCloseKey %p\n", hkey);
+-    return RegCloseKey(hkey);
++    return macdrv_reg_close_key(hkey);
+ }
+ 
+ static BOOL WINAPI my_EnumDisplayMonitors(HDC h, LPRECT p2, MONITORENUMPROC p3, LPARAM p4)

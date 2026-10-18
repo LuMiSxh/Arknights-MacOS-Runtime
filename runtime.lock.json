@@ -59,6 +59,13 @@
   },
   "patches": [
     {
+      "id": "wine-build-winemac-regclosekey",
+      "component": "wine",
+      "family": "build",
+      "path": "patches/wine/build/0001-winemac-d3dmetal-static-regclosekey.patch",
+      "sha256": "24eb0ac616c74be8f7001b30474864d923a7366cca44723064717537dbaea12a"
+    },
+    {
       "id": "wine-audio-default-output",
       "component": "wine",
       "family": "audio",
