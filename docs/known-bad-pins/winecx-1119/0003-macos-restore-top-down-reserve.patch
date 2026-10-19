@@ -1,0 +1,44 @@
+diff --git a/configure b/configure
+index 24aa6730..6f597933 100755
+--- a/configure
++++ b/configure
+@@ -12770,7 +12770,7 @@ printf '%s\n' "$ac_cv_cflags__Wl__no_huge" >&6; }
+ if test "x$ac_cv_cflags__Wl__no_huge" = xyes
+ then :
+   wine_use_preloader=no
+-            WINELOADER_LDFLAGS="$WINELOADER_LDFLAGS -Wl,-no_pie,-image_base,0x200000000,-no_huge,-no_fixup_chains,-segalign,0x1000,-segaddr,WINE_RESERVE,0x1000"
++            WINELOADER_LDFLAGS="$WINELOADER_LDFLAGS -Wl,-no_pie,-image_base,0x200000000,-no_huge,-no_fixup_chains,-segalign,0x1000,-segaddr,WINE_RESERVE,0x1000,-segaddr,WINE_TOP_DOWN,0x7ff000000000"
+ else case e in #(
+   e) wine_use_preloader=yes ;;
+ esac
+diff --git a/configure.ac b/configure.ac
+index 850613ca..38c87e1e 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -995,7 +995,7 @@ case $host_os in
+         dnl If the -no_huge linker option is present (added in Xcode 15.3), use zerofill sections instead of the preloader
+         WINE_TRY_CFLAGS([-Wl,-no_huge],
+            [wine_use_preloader=no
+-            WINELOADER_LDFLAGS="$WINELOADER_LDFLAGS -Wl,-no_pie,-image_base,0x200000000,-no_huge,-no_fixup_chains,-segalign,0x1000,-segaddr,WINE_RESERVE,0x1000"],
++            WINELOADER_LDFLAGS="$WINELOADER_LDFLAGS -Wl,-no_pie,-image_base,0x200000000,-no_huge,-no_fixup_chains,-segalign,0x1000,-segaddr,WINE_RESERVE,0x1000,-segaddr,WINE_TOP_DOWN,0x7ff000000000"],
+            [wine_use_preloader=yes])
+         ;;
+       *)    wine_use_preloader=no ;;
+diff --git a/loader/main.c b/loader/main.c
+index 64af5d2a..d3fcd20b 100644
+--- a/loader/main.c
++++ b/loader/main.c
+@@ -59,9 +59,13 @@
+ __asm__(".zerofill WINE_RESERVE,WINE_RESERVE");
+ static char __wine_reserve[0x1fffff000] __attribute__((section("WINE_RESERVE, WINE_RESERVE")));
+ 
++__asm__(".zerofill WINE_TOP_DOWN,WINE_TOP_DOWN");
++static char __wine_top_down[0x001ff0000] __attribute__((section("WINE_TOP_DOWN, WINE_TOP_DOWN")));
++
+ static const struct wine_preload_info preload_info[] =
+ {
+     { __wine_reserve,  sizeof(__wine_reserve)  }, /*         0x1000 -    0x200000000: low 8GB */
++    { __wine_top_down, sizeof(__wine_top_down) }, /* 0x7ff000000000 - 0x7ff001ff0000: top-down allocations + virtual heap */
+     { 0, 0 }                                      /* end of list */
+ };
+ 

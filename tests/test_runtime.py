@@ -114,7 +114,6 @@ class RuntimeLockTests(unittest.TestCase):
             patches_for_stage(loaded, "hardware-cursor"), [hardware_cursor]
         )
         self.assertEqual(patches_for_stage(loaded, "ace"), [])
-        self.assertEqual(patches_for_stage(loaded, "cursor"), [])
 
     def test_cef_family_stage_is_separate_from_cn_windowing(self) -> None:
         cef = dict(self.lock["patches"][0])

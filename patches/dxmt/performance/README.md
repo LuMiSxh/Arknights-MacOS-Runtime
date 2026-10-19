@@ -1,8 +1,10 @@
 # DXMT performance patches
 
-Target DXMT <!-- pin:dxmt.commit|code -->`e94c312f5c054263acf261cfa109edf13e757587`<!-- /pin --> (<!-- pin:dxmt.describe|code -->`v0.80-262-ge94c312`<!-- /pin -->, an unreleased post-<!-- pin:dxmt.tag -->0.80<!-- /pin --> canary). The patch is unconditional. It has no runtime flag.
+Target DXMT <!-- pin:dxmt.commit|code -->`50102f994b406f58f56d5d09f2ad20f9b90390a2`<!-- /pin --> (<!-- pin:dxmt.describe|code -->`v0.80-267-g50102f9`<!-- /pin -->, an unreleased post-<!-- pin:dxmt.tag -->0.80<!-- /pin --> canary). The patch is unconditional. It has no runtime flag.
 
 1. `0001-dxmt-skip-release-present-statistics.patch` puts `UpdateStatistics` and the rolling statistics aggregation behind `DXMT_DEBUG`. Release builds skip the per-present `std::format` calls and the aggregation. Frame counters and synchronization stay unchanged.
+
+2. `0002-winemetal-release-display-query-objects.patch` releases the ColorSync profiles and the ICC tag data in the display unix calls. It also wraps the NSScreen lookups in autorelease pools. Upstream issues 3Shain/dxmt#236 and #237 report the leaks.
 
 Gates, removal conditions, and patch IDs are in the [patch registry](../../../docs/patch-registry.md#performance).
 

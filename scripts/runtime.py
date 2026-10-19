@@ -29,7 +29,6 @@ BUILD_ROOT = ROOT / ".build"
 STAGES = (
     "base",
     "audio",
-    "cursor",
     "hardware-cursor",
     "performance",
     "ace",
@@ -182,12 +181,12 @@ def load_lock(
             raise LockError(f"unknown patch component: {component}")
         if family not in (
             "audio",
-            "cursor",
             "hardware-cursor",
             "performance",
             "ace",
             "cef",
             "cn",
+            "menu",
         ):
             raise LockError(f"unknown patch family: {family}")
         if HASH_PATTERN.fullmatch(expected) is None:

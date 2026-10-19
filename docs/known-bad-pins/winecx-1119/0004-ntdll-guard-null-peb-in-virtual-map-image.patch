@@ -1,0 +1,13 @@
+diff --git a/dlls/ntdll/unix/virtual.c b/dlls/ntdll/unix/virtual.c
+index b5678607..ae2c1cc5 100644
+--- a/dlls/ntdll/unix/virtual.c
++++ b/dlls/ntdll/unix/virtual.c
+@@ -3435,7 +3435,7 @@ static NTSTATUS virtual_map_image( HANDLE mapping, void **addr_ptr, SIZE_T *size
+         return status;
+     }
+ 
+-    if (peb->OSMajorVersion > 5 && /* CW HACK 22939: ASLR is supported only on Windows Vista and later */
++    if ((!peb || peb->OSMajorVersion > 5) && /* CW HACK 22939: ASLR is supported only on Windows Vista and later */
+         !pe_mapping->image.map_addr &&
+         (pe_mapping->image.image_charact & IMAGE_FILE_DLL) &&
+         (pe_mapping->image.image_flags & IMAGE_FLAGS_ImageDynamicallyRelocated))

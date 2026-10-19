@@ -1,6 +1,6 @@
 # Releasing
 
-Nothing publishes automatically. Candidate workflows build disposable overlay artifacts. The manually dispatched release workflow builds the runtime (all seven patch families) and creates only a draft.
+Nothing publishes automatically. Candidate workflows build disposable overlay artifacts. The manually dispatched release workflow builds the runtime (all six patch families) and creates only a draft.
 
 A build is promotable only after source and patch checks, a clean full build, archive validation, complete corresponding source and licenses, and the manual compatibility checks.
 

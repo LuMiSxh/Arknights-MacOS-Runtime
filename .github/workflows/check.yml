@@ -42,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        stage: [audio, cursor, hardware-cursor, performance, ace, cef, cn, combined]
+        stage: [audio, hardware-cursor, performance, ace, cef, cn, combined]
     steps:
       - name: Check out source
         uses: actions/checkout@v7.0.1

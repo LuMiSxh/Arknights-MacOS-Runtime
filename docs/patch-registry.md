@@ -19,21 +19,6 @@ The ACE, CEF, and CN patches target WineCX <!-- pin:wine.commit|code -->`e0aa380
 
 The MR is a draft. Capture and exclusive streams are unchanged.
 
-## Cursor
-
-- ID: `dxmt-cursor-frame-latency`
-- File: `patches/dxmt/cursor/0001-dxmt-command-queue-configurable-frame-latency.patch`
-- Component/base: DXMT <!-- pin:dxmt.commit|code -->`e94c312f5c054263acf261cfa109edf13e757587`<!-- /pin --> (<!-- pin:dxmt.describe|code -->`v0.80-262-ge94c312`<!-- /pin -->)
-- Source/author: Original runtime experiment, runtime maintainers
-- License: LGPL-2.1-or-later (DXMT)
-- Gate: `ARKNIGHTS_RUNTIME_DXMT_MAX_FRAME_LATENCY=0..3`, read once on first command queue
-- Inactive behavior: Missing or invalid input retains upstream maximum `3`
-- Automated gate: Hash, clean `git apply --check`, both DXMT architectures compile
-- Manual gate: FPS, frame-pacing, and cursor comparison at 3, 2, 1, 0
-- Removal: Drop if DXMT gains an equivalent control or evidence rejects the experiment
-
-Value `0` is an Arknights extension. It waits for the completion fence of the current frame after commit, so no completed GPU frame stays queued. It is not DXGI zero-as-default, and it can reduce throughput or smoothness.
-
 ## Hardware Cursor
 
 - ID: `wine-hardware-cursor-suppression`
@@ -51,7 +36,7 @@ The filter matches the case-insensitive final basename `a9d41799f1af1868f2db4956
 
 ## Runtime capability manifest
 
-`Libraries/runtime-capabilities.json` is the versioned producer contract that consumers read from the packaged runtime tree. Schema version 1 advertises the DXMT frame-latency range and default, hardware-cursor support, and MetalFX spatial-upscaling support. Release validation checks the manifest against the pinned patch semantics and requires the packaged copy to match the source. MetalFX upscaling is upstream DXMT behavior (`DXMT_METALFX_SPATIAL_SWAPCHAIN=1`), not a patch, so validation requires that switch in the packaged `DXMT/x64/d3d11.dll`. Consumers use conservative defaults without the manifest.
+`Libraries/runtime-capabilities.json` is the versioned producer contract that consumers read from the packaged runtime tree. Schema version 2 advertises hardware-cursor support and MetalFX spatial-upscaling support. Release validation checks the manifest against the pinned patch semantics and requires the packaged copy to match the source. Consumers use conservative defaults without the manifest.
 
 ## Performance
 
@@ -59,7 +44,7 @@ The filter matches the case-insensitive final basename `a9d41799f1af1868f2db4956
 
 - ID: `dxmt-skip-release-present-statistics`
 - File: `patches/dxmt/performance/0001-dxmt-skip-release-present-statistics.patch`
-- Component/base: DXMT <!-- pin:dxmt.commit|code -->`e94c312f5c054263acf261cfa109edf13e757587`<!-- /pin -->
+- Component/base: DXMT <!-- pin:dxmt.commit|code -->`50102f994b406f58f56d5d09f2ad20f9b90390a2`<!-- /pin -->
 - Source/author: Original runtime optimization, runtime maintainers
 - License: LGPL-2.1-or-later (DXMT)
 - Gate: `DXMT_DEBUG`; debug builds keep statistics aggregation and HUD updates, release builds skip both
@@ -69,6 +54,21 @@ The filter matches the case-insensitive final basename `a9d41799f1af1868f2db4956
 - Removal: Drop when the pinned DXMT removes the release-dead work or gains an equivalent build option
 
 Both `Present` paths keep `UpdateStatistics` behind `DXMT_DEBUG`, which avoids its per-present `std::format` calls in release builds. `PresentBoundary` gates the rolling statistics aggregation the same way. Release builds keep the frame counters and synchronization.
+
+### Display query leak fix
+
+- ID: `dxmt-release-display-query-objects`
+- File: `patches/dxmt/performance/0002-winemetal-release-display-query-objects.patch`
+- Component/base: DXMT <!-- pin:dxmt.commit|code -->`50102f994b406f58f56d5d09f2ad20f9b90390a2`<!-- /pin -->
+- Source/author: Original fix, runtime maintainers; the leaks are reported upstream as 3Shain/dxmt issues 236 and 237
+- License: LGPL-2.1-or-later (DXMT)
+- Gate: None; the patch is unconditional
+- Inactive behavior: Not applicable
+- Automated gate: Hash and clean application
+- Manual gate: Process memory stays flat during a long game session
+- Removal: Drop when the pinned DXMT releases the profiles, the ICC tag data, and the AppKit objects in these unix calls
+
+`GetChromaticity_xy` releases the copied ICC tag. `_WMTGetDisplayDescription` releases both ColorSync profiles. The NSScreen lookups in `_WMTGetDisplayDescription` and `_WMTQueryDisplaySettingForLayer` run in an autorelease pool.
 
 ## ACE
 
@@ -112,3 +112,18 @@ The CN family contains only the Bilibili windowing patch. It uses the exact gate
     - Provenance and checks: Original runtime change; hash, apply check, offline classifier/contract tests, `win32u`/`winemac` compile, Bilibili payment-window rendering check.
 
 Remove a patch when the pinned WineCX supplies the behavior or the route is no longer needed.
+
+## Menu
+
+- ID: `wine-menu-command-q-quit`
+- File: `patches/wine/menu/0001-winemac-command-q-quit.patch`
+- Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
+- Source/author: Original runtime change, runtime maintainers
+- License: LGPL-2.1-or-later (Wine)
+- Gate: None. The patch is always active in the `combined` stage. It has no `ARKNIGHTS_RUNTIME_` variable, because the client needs the standard Command-Q key equivalent in every build.
+- Inactive behavior: None. No inactive route exists. Builds without the patch keep Wine's Option-Command-Q key equivalent for Quit.
+- Automated gate: Hash, clean `git apply --check` in lock order, `winemac.so` compile in the `combined` build
+- Manual gate: The app menu shows Command-Q for Quit. Option-Command-Q does not quit. Option-Command-H still hides other applications.
+- Removal: Drop when the client no longer needs Command-Q to quit, or when Wine offers an equivalent setting
+
+The patch changes one line in `dlls/winemac.drv/cocoa_app.m`. It sets the Quit item to the Command modifier only. Hide Others (Option-Command-H) and the other menu items keep their masks.

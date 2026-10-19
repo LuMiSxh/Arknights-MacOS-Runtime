@@ -1,11 +1,6 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "capabilities": {
-    "dxmtMaximumFrameLatency": {
-      "minimum": 0,
-      "maximum": 3,
-      "defaultValue": 3
-    },
     "hardwareCursor": true,
     "metalFXSpatialUpscaling": true
   }

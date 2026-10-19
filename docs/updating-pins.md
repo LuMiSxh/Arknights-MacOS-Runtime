@@ -9,8 +9,8 @@ The runtime pins four upstream inputs in [`runtime.lock.json`](../runtime.lock.j
 | --- | --- |
 | `wine.commit` | `e0aa380780b73e20fabcfe78fd42713b94929a53` |
 | `wine.version` | `11.17` |
-| `dxmt.commit` | `e94c312f5c054263acf261cfa109edf13e757587` |
-| `dxmt.version` | `0.80-262-ge94c312` |
+| `dxmt.commit` | `50102f994b406f58f56d5d09f2ad20f9b90390a2` |
+| `dxmt.version` | `0.80-267-g50102f9` |
 | `base.tag` | `v4.7.3` |
 | `base.url` | `https://github.com/dappermint/Whisky/releases/download/v4.7.3/Libraries.tar.gz` |
 | `base.sha256` | `a4b5d63493f80698cce5cad8e7212d9a51c8292037b00c478f4652636fcfd331` |
@@ -26,6 +26,22 @@ The runtime pins four upstream inputs in [`runtime.lock.json`](../runtime.lock.j
 | DXMT | Head of the default branch of `3Shain/dxmt`. The version has the `git describe` form `<tag>-<commits>-g<sha>`. |
 | Base archive | Newest `dappermint/Whisky` release with a `Libraries.tar.gz` asset. The hash comes from the digest of the asset. The recipe commit is the commit of the tag `runtime-<release tag>` in `dappermint/winecx-gptk`. |
 | nixpkgs | Tip of the channel branch `NIXPKGS_CHANNEL` in `scripts/release/pins.py`. The channel is `nixos-25.05`, because the DXMT build needs `llvmPackages_15`, which later releases removed. |
+
+## Known-bad pins
+
+Do not use these pins. Patches that show the defects are in `docs/known-bad-pins/winecx-1119/`.
+
+| Pin | Result |
+| --- | --- |
+| Wine `wine1119` of `dappermint/winecx`, commit `b1417d2` (11.19) | Wine does not run on macOS x86_64 under Rosetta. The last working pin is `e0aa380` (11.17). |
+
+The 11.19 merge has three defects:
+
+1. `start_main_thread` calls `dbg_init()` before the PEB exists. This writes to address `0x2000` and the process dies with SIGBUS.
+2. The `WINE_TOP_DOWN` reserve is missing from `loader/main.c` and from the link flags. Wine then scans the mapped system area in 64 KB steps and does not start for hours.
+3. `load_main_exe` runs before the first TEB exists, so `peb` is NULL in `virtual_map_image`. The CW HACK 22939 line dereferences it and the process loops on faults.
+
+Patches 0002 to 0004 in the known-bad folder fix the three defects. The runtime was not verified with them. Before you try `wine1119` again, check that a clean prefix starts and runs `regedit`.
 
 A newer nixpkgs channel is a manual decision. Change the constant, then review the library closure.
 

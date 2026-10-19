@@ -10,8 +10,8 @@
     },
     "dxmt": {
       "repository": "https://github.com/3Shain/dxmt.git",
-      "commit": "e94c312f5c054263acf261cfa109edf13e757587",
-      "version": "0.80-262-ge94c312"
+      "commit": "50102f994b406f58f56d5d09f2ad20f9b90390a2",
+      "version": "0.80-267-g50102f9"
     }
   },
   "baseArtifact": {
@@ -66,13 +66,6 @@
       "sha256": "2676309df8bbcad45ae9d41848dde3e79c597189ccb2f6f899b3155b24e54a05"
     },
     {
-      "id": "dxmt-cursor-frame-latency",
-      "component": "dxmt",
-      "family": "cursor",
-      "path": "patches/dxmt/cursor/0001-dxmt-command-queue-configurable-frame-latency.patch",
-      "sha256": "fca46f29fc586576e99cd9f518180a0dcdde4ff1205153a273de1a4755d02ae5"
-    },
-    {
       "id": "wine-hardware-cursor-suppression",
       "component": "wine",
       "family": "hardware-cursor",
@@ -85,6 +78,13 @@
       "family": "performance",
       "path": "patches/dxmt/performance/0001-dxmt-skip-release-present-statistics.patch",
       "sha256": "fc833832a654154645cf5ebf58e1c5de1c6b6af2d9a7d5d4ceda890384285e04"
+    },
+    {
+      "id": "dxmt-release-display-query-objects",
+      "component": "dxmt",
+      "family": "performance",
+      "path": "patches/dxmt/performance/0002-winemetal-release-display-query-objects.patch",
+      "sha256": "31d663fb9b81aa166da73d463f3a5d3709e88cafa0f38d193f08aec738bd73d5"
     },
     {
       "id": "wine-ace-ntoskrnl-surface",
@@ -127,6 +127,13 @@
       "family": "cn",
       "path": "patches/wine/cn/windowing/0001-win32u-winemac-bilibili-layered-child.patch",
       "sha256": "1c7b8dd32302cb409399035441cd378acfe260ca1515be4d96966556e326fa8d"
+    },
+    {
+      "id": "wine-menu-command-q-quit",
+      "component": "wine",
+      "family": "menu",
+      "path": "patches/wine/menu/0001-winemac-command-q-quit.patch",
+      "sha256": "4c010e83ce04489eac127a258aa16fd81b4afb35185c6e3c83846f48e2f3ef30"
     }
   ]
 }
