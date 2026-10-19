@@ -5,8 +5,8 @@
   "sources": {
     "wine": {
       "repository": "https://github.com/dappermint/winecx.git",
-      "commit": "b1417d2773a0dfc15cc78b78e1257ee965bcca89",
-      "version": "11.19"
+      "commit": "e0aa380780b73e20fabcfe78fd42713b94929a53",
+      "version": "11.17"
     },
     "dxmt": {
       "repository": "https://github.com/3Shain/dxmt.git",
@@ -59,13 +59,6 @@
   },
   "patches": [
     {
-      "id": "wine-build-winemac-regclosekey",
-      "component": "wine",
-      "family": "build",
-      "path": "patches/wine/build/0001-winemac-d3dmetal-static-regclosekey.patch",
-      "sha256": "24eb0ac616c74be8f7001b30474864d923a7366cca44723064717537dbaea12a"
-    },
-    {
       "id": "wine-audio-default-output",
       "component": "wine",
       "family": "audio",
@@ -87,11 +80,18 @@
       "sha256": "fc833832a654154645cf5ebf58e1c5de1c6b6af2d9a7d5d4ceda890384285e04"
     },
     {
+      "id": "dxmt-release-display-query-objects",
+      "component": "dxmt",
+      "family": "performance",
+      "path": "patches/dxmt/performance/0002-winemetal-release-display-query-objects.patch",
+      "sha256": "31d663fb9b81aa166da73d463f3a5d3709e88cafa0f38d193f08aec738bd73d5"
+    },
+    {
       "id": "wine-ace-ntoskrnl-surface",
       "component": "wine",
       "family": "ace",
       "path": "patches/wine/ace/ntoskrnl/0001-ntoskrnl-compatibility-surface.patch",
-      "sha256": "94b2a24e6fb35d90e6a6cdebc910c67bd98f1ddde6193892b02fee15fb04abbe"
+      "sha256": "e81a63be33e7a314758fdaa73f378d33d3fba5123333697c21b0e87ce64b2e44"
     },
     {
       "id": "wine-ace-dispatcher-spoof",
@@ -126,7 +126,7 @@
       "component": "wine",
       "family": "cn",
       "path": "patches/wine/cn/windowing/0001-win32u-winemac-bilibili-layered-child.patch",
-      "sha256": "866eb7b6c5ad39bbea1162226dc2db1000a65f1374c2e1ee9f94bf6a961214da"
+      "sha256": "1c7b8dd32302cb409399035441cd378acfe260ca1515be4d96966556e326fa8d"
     },
     {
       "id": "wine-menu-command-q-quit",

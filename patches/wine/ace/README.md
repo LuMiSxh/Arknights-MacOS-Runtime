@@ -1,6 +1,6 @@
 # ACE compact compatibility patches
 
-Ordered ACE family for the `ace` and `combined` stages. The gate is `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`. See the [ACE patch registry](../../../docs/patch-registry.md#ace). The ntoskrnl patch adds only exports that the pinned Wine commit does not implement. It does not change any upstream function. Only `SeSetAuditParameter` uses the gate.
+Ordered ACE family for the `ace` and `combined` stages. The gate is `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`. See the [ACE patch registry](../../../docs/patch-registry.md#ace). General process accessors ignore the gate.
 
 Apply in this order:
 

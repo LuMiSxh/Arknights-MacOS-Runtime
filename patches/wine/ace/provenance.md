@@ -3,7 +3,7 @@
 ## Source pins
 
 - Wine base: `dappermint/winecx`
-- Wine commit: <!-- pin:wine.commit|code -->`b1417d2773a0dfc15cc78b78e1257ee965bcca89`<!-- /pin --> (Wine <!-- pin:wine.version -->11.19<!-- /pin -->)
+- Wine commit: <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Candidate reference: [`stoicswe/Endfield_FineWine`](https://github.com/stoicswe/Endfield_FineWine)
 - Reference checkout: `e5d4ccad235eefe32d912733e57e4c0bb53a5b58`
 - Reference patch families: `stage1-macos` and `stage2-dwproton`
@@ -14,15 +14,18 @@ The reference repository records the original dw-proton/Endfield work and author
 
 ### `ntoskrnl`
 
-The patch adds only kernel exports that the pinned Wine commit does not implement:
+Carries the non-X11 kernel surface that the ACE client needs:
 
-- `PsGetProcessExitStatus`: returns the exit status of a process object. Upstream keeps this export as a stub. It has no NULL check on its `_In_` process parameter.
-- `SeSetAuditParameter`: a gated no-op. It logs its arguments. With `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`, it returns `STATUS_SUCCESS`. Otherwise it returns `STATUS_NOT_IMPLEMENTED`. It never reads or writes through its pointer arguments.
-- `PsGetCurrentThreadProcess` and `PsGetCurrentThreadProcessId`: unconditional aliases of the current-process functions.
+- process image name and primary-token support
+- thread process/context accessors
+- current-thread process and process-ID accessors (unconditional aliases of the current-process functions)
+- unconditional image-name and exit-status accessors for valid process objects, without NULL checks on their `_In_` process parameters
+- the `KeCapturePersistentThreadState` export stub: logs its arguments, returns `STATUS_NOT_IMPLEMENTED`, never dereferences or writes through a pointer
+- the callable `SeSetAuditParameter` no-op: logs its arguments, returns `STATUS_SUCCESS` only when `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`, never dereferences or writes through its pointer arguments; otherwise the original Wine stub stays active
+- physical-memory compatibility stubs
+- process-object metadata lifetime handling
 
-The gate helper `arknights_runtime_ace_compact_enabled()` serves only `SeSetAuditParameter`. The patch does not change any existing upstream function.
-
-Wine <!-- pin:wine.version -->11.19<!-- /pin --> already provides the other exports that the ACE client needs: the process session and creation-time accessors, the bug-check callback exports, `PsGetProcessImageFileName`, `PsGetThreadProcess`, `KeCapturePersistentThreadState`, and `MmGetVirtualForPhysical`. The last two are only partial. `KeCapturePersistentThreadState` is a stub that returns `STATUS_NOT_IMPLEMENTED`. `MmGetVirtualForPhysical` is a semi-stub that returns its input address unchanged. The patch changes neither one. With the gate off, the ntoskrnl behavior matches upstream Wine at the pinned commit.
+Wine <!-- pin:wine.version -->11.17<!-- /pin --> already provides the process session and creation-time accessors and the bug-check callback exports, so the patch omits them.
 
 ### `dispatcher`
 

@@ -2,28 +2,13 @@
 
 [`runtime.lock.json`](../runtime.lock.json) holds the machine-readable ordered registry. Before release, each entry must name its upstream source, author, license, gate, inactive behavior, test, and removal condition. The entries document provenance. They do not replace the corresponding-source, notice, and redistribution review that a runtime binary requires.
 
-The ACE, CEF, and CN patches target WineCX <!-- pin:wine.commit|code -->`b1417d2773a0dfc15cc78b78e1257ee965bcca89`<!-- /pin --> and keep Wine's LGPL-2.1-or-later license.
-
-## Build
-
-- ID: `wine-build-winemac-regclosekey`
-- File: `patches/wine/build/0001-winemac-d3dmetal-static-regclosekey.patch`
-- Component/base: WineCX <!-- pin:wine.commit|code -->`b1417d2773a0dfc15cc78b78e1257ee965bcca89`<!-- /pin --> (Wine <!-- pin:wine.version -->11.19<!-- /pin -->)
-- Source/author: Original runtime change, runtime maintainers
-- License: LGPL-2.1-or-later (Wine)
-- Gate: None. The patch applies in every stage that builds patched Wine, except `performance`. It has no `ARKNIGHTS_RUNTIME_` variable.
-- Inactive behavior: None. Without the patch, `winemac.drv` does not compile on the pinned source.
-- Automated gate: Hash, clean `git apply --check` in lock order, `winemac.so` compile in the `combined` build
-- Manual gate: None. The successful compile is the gate.
-- Removal: Drop when the pinned WineCX source compiles `winemac.drv` without the patch
-
-The patch renames the static helper `RegCloseKey` in `dlls/winemac.drv/d3dmetal.c` to `macdrv_reg_close_key`. The pinned source includes `winreg.h` through `macdrv.h`, which declares a non-static `RegCloseKey`. The static definition then fails to compile. The patch changes no behavior.
+The ACE, CEF, and CN patches target WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> and keep Wine's LGPL-2.1-or-later license.
 
 ## Audio
 
 - ID: `wine-audio-default-output`
 - File: `patches/wine/audio/0001-winecoreaudio-default-output.patch`
-- Component/base: WineCX <!-- pin:wine.commit|code -->`b1417d2773a0dfc15cc78b78e1257ee965bcca89`<!-- /pin --> (Wine <!-- pin:wine.version -->11.19<!-- /pin -->)
+- Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Wine draft MR 11370, commits `4d143f4c` and `65140f31`, Rhodri Richards
 - License: LGPL-2.1-or-later
 - Gate: `ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT=1`, parsed once per process
@@ -38,7 +23,7 @@ The MR is a draft. Capture and exclusive streams are unchanged.
 
 - ID: `wine-hardware-cursor-suppression`
 - File: `patches/wine/hardware-cursor/0001-ntdll-hide-software-cursor-asset.patch`
-- Component/base: WineCX <!-- pin:wine.commit|code -->`b1417d2773a0dfc15cc78b78e1257ee965bcca89`<!-- /pin --> (Wine <!-- pin:wine.version -->11.19<!-- /pin -->)
+- Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Original runtime change; motivated by the [reported PC cursor stutter](https://www.reddit.com/r/arknights/comments/1vorlzp/pc_client_fix_for_the_annoying_mouse_stuttering/)
 - License: LGPL-2.1-or-later (Wine)
 - Gate: Exact `ARKNIGHTS_RUNTIME_HARDWARE_CURSOR=1`, checked during shared file-name resolution
@@ -70,14 +55,29 @@ The filter matches the case-insensitive final basename `a9d41799f1af1868f2db4956
 
 Both `Present` paths keep `UpdateStatistics` behind `DXMT_DEBUG`, which avoids its per-present `std::format` calls in release builds. `PresentBoundary` gates the rolling statistics aggregation the same way. Release builds keep the frame counters and synchronization.
 
+### Display query leak fix
+
+- ID: `dxmt-release-display-query-objects`
+- File: `patches/dxmt/performance/0002-winemetal-release-display-query-objects.patch`
+- Component/base: DXMT <!-- pin:dxmt.commit|code -->`50102f994b406f58f56d5d09f2ad20f9b90390a2`<!-- /pin -->
+- Source/author: Original fix, runtime maintainers; the leaks are reported upstream as 3Shain/dxmt issues 236 and 237
+- License: LGPL-2.1-or-later (DXMT)
+- Gate: None; the patch is unconditional
+- Inactive behavior: Not applicable
+- Automated gate: Hash and clean application
+- Manual gate: Process memory stays flat during a long game session
+- Removal: Drop when the pinned DXMT releases the profiles, the ICC tag data, and the AppKit objects in these unix calls
+
+`GetChromaticity_xy` releases the copied ICC tag. `_WMTGetDisplayDescription` releases both ColorSync profiles. The NSScreen lookups in `_WMTGetDisplayDescription` and `_WMTQueryDisplaySettingForLayer` run in an autorelease pool.
+
 ## ACE
 
-The ACE patches use the exact gate `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`, except that the ntoskrnl patch adds ungated exports that upstream Wine lacks (see below). A missing, `0`, or other value keeps Wine's normal route. Every patch requires hash verification and clean application. All four are Endfield FineWine ports ([provenance](../patches/wine/ace/provenance.md)).
+All ACE patches use the exact gate `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`. A missing, `0`, or other value keeps Wine's normal route. Every patch requires hash verification and clean application. All four are Endfield FineWine ports ([provenance](../patches/wine/ace/provenance.md)).
 
 - [`wine-ace-ntoskrnl-surface`](../patches/wine/ace/ntoskrnl/0001-ntoskrnl-compatibility-surface.patch)
-    - What: Kernel exports that upstream Wine 11.19 does not implement: `PsGetProcessExitStatus`, `SeSetAuditParameter`, `PsGetCurrentThreadProcess`, and `PsGetCurrentThreadProcessId`.
-    - Scope: `SeSetAuditParameter` uses the ACE gate and returns `STATUS_NOT_IMPLEMENTED` when the gate is off. The other three exports are unconditional. No upstream function body changes.
-    - Checks: compile the x86_64 `ntoskrnl.exe` target; hash and clean application.
+    - What: Kernel exports and process metadata for the ACE client: current-thread process, image-name, exit-status, audit-parameter, and persistent-thread-state surfaces.
+    - Scope: Compatibility-only routes use the ACE gate. `PsGetProcessImageFileName` and `PsGetProcessExitStatus` stay unconditional for valid process objects and follow their kernel `_In_` contract.
+    - Checks: compile both architectures; exercise gated and general routes.
 - [`wine-ace-dispatcher-spoof`](../patches/wine/ace/dispatcher/0001-kernel32-ace-dispatcher-spoof.patch)
     - What: x86-64 dispatcher lookup compatibility.
     - Scope: ACE gate and Rosetta x86-64 build only.
@@ -117,7 +117,7 @@ Remove a patch when the pinned WineCX supplies the behavior or the route is no l
 
 - ID: `wine-menu-command-q-quit`
 - File: `patches/wine/menu/0001-winemac-command-q-quit.patch`
-- Component/base: WineCX <!-- pin:wine.commit|code -->`b1417d2773a0dfc15cc78b78e1257ee965bcca89`<!-- /pin --> (Wine <!-- pin:wine.version -->11.19<!-- /pin -->)
+- Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Original runtime change, runtime maintainers
 - License: LGPL-2.1-or-later (Wine)
 - Gate: None. The patch is always active in the `combined` stage. It has no `ARKNIGHTS_RUNTIME_` variable, because the client needs the standard Command-Q key equivalent in every build.

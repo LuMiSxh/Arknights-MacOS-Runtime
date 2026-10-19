@@ -187,7 +187,6 @@ def load_lock(
             "cef",
             "cn",
             "menu",
-            "build",
         ):
             raise LockError(f"unknown patch family: {family}")
         if HASH_PATTERN.fullmatch(expected) is None:
@@ -206,9 +205,7 @@ def patches_for_stage(lock: dict[str, Any], stage: str) -> list[dict[str, Any]]:
         return []
     if stage == "combined":
         return list(lock["patches"])
-    # Performance builds DXMT against the unpatched base Wine tree, not a patched Wine tree.
-    families = {stage} if stage == "performance" else {stage, "build"}
-    return [patch for patch in lock["patches"] if patch["family"] in families]
+    return [patch for patch in lock["patches"] if patch["family"] == stage]
 
 
 def _run(*command: str, cwd: Path | None = None) -> None:

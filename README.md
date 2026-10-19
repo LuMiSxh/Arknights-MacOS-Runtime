@@ -13,7 +13,7 @@ Use the Runtime problem template in the [Arknights Client issue tracker](https:/
 
 ## Baseline
 
-- dappermint runtime <!-- pin:base.version -->4.7.3<!-- /pin --> with WineCX <!-- pin:wine.version -->11.19<!-- /pin -->.
+- dappermint runtime <!-- pin:base.version -->4.7.3<!-- /pin --> with WineCX <!-- pin:wine.version -->11.17<!-- /pin -->.
 - The Cursor, Performance, and combined stages build a pinned post-0.80 DXMT revision.
 - The `hardware-cursor` stage overlays only the patched `x86_64-unix/ntdll.so`.
 - The clean release tree contains newly built 64-bit Wine and DXMT (no GStreamer/FFmpeg) and the pinned Nix library closure.
