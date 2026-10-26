@@ -44,7 +44,7 @@ The filter matches the case-insensitive final basename `a9d41799f1af1868f2db4956
 
 - ID: `dxmt-skip-release-present-statistics`
 - File: `patches/dxmt/performance/0001-dxmt-skip-release-present-statistics.patch`
-- Component/base: DXMT <!-- pin:dxmt.commit|code -->`50102f994b406f58f56d5d09f2ad20f9b90390a2`<!-- /pin -->
+- Component/base: DXMT <!-- pin:dxmt.commit|code -->`9839e55f98d4aca103957ee4132d6395a325a9ed`<!-- /pin -->
 - Source/author: Original runtime optimization, runtime maintainers
 - License: LGPL-2.1-or-later (DXMT)
 - Gate: `DXMT_DEBUG`; debug builds keep statistics aggregation and HUD updates, release builds skip both
@@ -54,21 +54,6 @@ The filter matches the case-insensitive final basename `a9d41799f1af1868f2db4956
 - Removal: Drop when the pinned DXMT removes the release-dead work or gains an equivalent build option
 
 Both `Present` paths keep `UpdateStatistics` behind `DXMT_DEBUG`, which avoids its per-present `std::format` calls in release builds. `PresentBoundary` gates the rolling statistics aggregation the same way. Release builds keep the frame counters and synchronization.
-
-### Display query leak fix
-
-- ID: `dxmt-release-display-query-objects`
-- File: `patches/dxmt/performance/0002-winemetal-release-display-query-objects.patch`
-- Component/base: DXMT <!-- pin:dxmt.commit|code -->`50102f994b406f58f56d5d09f2ad20f9b90390a2`<!-- /pin -->
-- Source/author: Original fix, runtime maintainers; the leaks are reported upstream as 3Shain/dxmt issues 236 and 237
-- License: LGPL-2.1-or-later (DXMT)
-- Gate: None; the patch is unconditional
-- Inactive behavior: Not applicable
-- Automated gate: Hash and clean application
-- Manual gate: Process memory stays flat during a long game session
-- Removal: Drop when the pinned DXMT releases the profiles, the ICC tag data, and the AppKit objects in these unix calls
-
-`GetChromaticity_xy` releases the copied ICC tag. `_WMTGetDisplayDescription` releases both ColorSync profiles. The NSScreen lookups in `_WMTGetDisplayDescription` and `_WMTQueryDisplaySettingForLayer` run in an autorelease pool.
 
 ## ACE
 

@@ -1,5 +1,5 @@
-DXMT 0.80-267-g50102f9
-Source: https://github.com/3Shain/dxmt/tree/50102f994b406f58f56d5d09f2ad20f9b90390a2
+DXMT 0.80-361-g9839e55
+Source: https://github.com/3Shain/dxmt/tree/9839e55f98d4aca103957ee4132d6395a325a9ed
 
 License: LGPL-2.1-or-later for this commit.
 Copyright (c) 2023-2026 Feifan He for CodeWeavers.
@@ -8,7 +8,7 @@ The runtime copy of the text is DXMT-LGPL-2.1.txt.
 
 Earlier releases: DXMT v0.80 and older releases use the MIT License.
 Copyright (c) 2023 Feifan He. The MIT text is runtime/MIT-DXMT.txt.
-Release v0.80 uses MIT. The pinned build 0.80-267 does not. It uses LGPL-2.1-or-later.
+Release v0.80 uses MIT. The pinned build 0.80-361 does not. It uses LGPL-2.1-or-later.
 
 Vendored code and its licenses: see dxmt-vendored.txt.
 Headers (mingw-directx-headers submodule): see dxmt-headers.txt.
