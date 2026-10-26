@@ -236,8 +236,15 @@ jobs:
                   gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
                     -f ref="refs/tags/$RELEASE_TAG" \
                     -f sha="$BUILD_COMMIT" >/dev/null
-                  tag_sha="$(gh api --method GET \
-                    "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha')"
+                  # The new ref can read as 404 for a moment after the POST.
+                  tag_sha=""
+                  for attempt in 1 2 3 4 5; do
+                    if tag_sha="$(gh api --method GET \
+                      "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha')"; then
+                      break
+                    fi
+                    sleep $((attempt * 2))
+                  done
                   if [[ "$tag_sha" != "$BUILD_COMMIT" ]]; then
                     echo "error: created tag does not reference the verified build SHA" >&2
                     exit 1
