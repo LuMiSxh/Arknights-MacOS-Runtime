@@ -1,5 +1,5 @@
-DXMT 0.80-267-g50102f9 vendored code
-Source: https://github.com/3Shain/dxmt/tree/50102f994b406f58f56d5d09f2ad20f9b90390a2
+DXMT 0.80-361-g9839e55 vendored code
+Source: https://github.com/3Shain/dxmt/tree/9839e55f98d4aca103957ee4132d6395a325a9ed
 
 libs/DXBCParser: MIT License. The file headers say "Licensed under the MIT License"
 and name Microsoft as the author. The text is runtime/MIT.txt.

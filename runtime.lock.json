@@ -10,8 +10,8 @@
     },
     "dxmt": {
       "repository": "https://github.com/3Shain/dxmt.git",
-      "commit": "50102f994b406f58f56d5d09f2ad20f9b90390a2",
-      "version": "0.80-267-g50102f9"
+      "commit": "9839e55f98d4aca103957ee4132d6395a325a9ed",
+      "version": "0.80-361-g9839e55"
     }
   },
   "baseArtifact": {
@@ -78,13 +78,6 @@
       "family": "performance",
       "path": "patches/dxmt/performance/0001-dxmt-skip-release-present-statistics.patch",
       "sha256": "fc833832a654154645cf5ebf58e1c5de1c6b6af2d9a7d5d4ceda890384285e04"
-    },
-    {
-      "id": "dxmt-release-display-query-objects",
-      "component": "dxmt",
-      "family": "performance",
-      "path": "patches/dxmt/performance/0002-winemetal-release-display-query-objects.patch",
-      "sha256": "31d663fb9b81aa166da73d463f3a5d3709e88cafa0f38d193f08aec738bd73d5"
     },
     {
       "id": "wine-ace-ntoskrnl-surface",

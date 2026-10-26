@@ -9,8 +9,8 @@ The runtime pins four upstream inputs in [`runtime.lock.json`](../runtime.lock.j
 | --- | --- |
 | `wine.commit` | `e0aa380780b73e20fabcfe78fd42713b94929a53` |
 | `wine.version` | `11.17` |
-| `dxmt.commit` | `50102f994b406f58f56d5d09f2ad20f9b90390a2` |
-| `dxmt.version` | `0.80-267-g50102f9` |
+| `dxmt.commit` | `9839e55f98d4aca103957ee4132d6395a325a9ed` |
+| `dxmt.version` | `0.80-361-g9839e55` |
 | `base.tag` | `v4.7.3` |
 | `base.url` | `https://github.com/dappermint/Whisky/releases/download/v4.7.3/Libraries.tar.gz` |
 | `base.sha256` | `a4b5d63493f80698cce5cad8e7212d9a51c8292037b00c478f4652636fcfd331` |
