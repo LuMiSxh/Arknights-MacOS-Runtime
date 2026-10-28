@@ -34,6 +34,7 @@ STAGES = (
     "ace",
     "cef",
     "cn",
+    "fullscreen",
     "combined",
 )
 HASH_PATTERN = re.compile(r"[0-9a-f]{64}")
@@ -187,6 +188,7 @@ def load_lock(
             "cef",
             "cn",
             "menu",
+            "fullscreen",
         ):
             raise LockError(f"unknown patch family: {family}")
         if HASH_PATTERN.fullmatch(expected) is None:

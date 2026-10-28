@@ -122,11 +122,25 @@
       "sha256": "1c7b8dd32302cb409399035441cd378acfe260ca1515be4d96966556e326fa8d"
     },
     {
+      "id": "wine-cn-bilibili-join-all-spaces",
+      "component": "wine",
+      "family": "cn",
+      "path": "patches/wine/cn/windowing/0002-winemac-bilibili-join-all-spaces.patch",
+      "sha256": "13894e9ec70c5bf1959dc22d7b9081ec1f353968fa6583f09c413ff5e3d056c9"
+    },
+    {
       "id": "wine-menu-command-q-quit",
       "component": "wine",
       "family": "menu",
       "path": "patches/wine/menu/0001-winemac-command-q-quit.patch",
       "sha256": "4c010e83ce04489eac127a258aa16fd81b4afb35185c6e3c83846f48e2f3ef30"
+    },
+    {
+      "id": "wine-fullscreen-native-space",
+      "component": "wine",
+      "family": "fullscreen",
+      "path": "patches/wine/fullscreen/0001-winemac-native-fullscreen-space.patch",
+      "sha256": "5211393f28a8481027c539842fbaff46e9a721f3f1bfae7f9db934baa635dfc3"
     }
   ]
 }

@@ -2,6 +2,7 @@
   "schemaVersion": 2,
   "capabilities": {
     "hardwareCursor": true,
-    "metalFXSpatialUpscaling": true
+    "metalFXSpatialUpscaling": true,
+    "nativeFullscreenSpace": true
   }
 }

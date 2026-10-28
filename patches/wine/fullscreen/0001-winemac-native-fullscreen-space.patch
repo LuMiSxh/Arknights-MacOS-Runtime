@@ -1,0 +1,479 @@
+diff --git a/dlls/winemac.drv/cocoa_app.h b/dlls/winemac.drv/cocoa_app.h
+index ff7c243..ff5c9c2 100644
+--- a/dlls/winemac.drv/cocoa_app.h
++++ b/dlls/winemac.drv/cocoa_app.h
+@@ -23,6 +23,8 @@
+ #include "macdrv_cocoa.h"
+ 
+ #define ERR(...) do { if (macdrv_err_on) LogError(__func__, __VA_ARGS__); } while (false)
++#define WARN(...) do { if (macdrv_warn_on) LogMessage("warn", __func__, __VA_ARGS__); } while (false)
++#define TRACE(...) do { if (macdrv_trace_on) LogMessage("trace", __func__, __VA_ARGS__); } while (false)
+ 
+ /* Internal notification sent on NSApp for display configuration changes. The
+    userInfo contains the two keys, NSNumbers for the effected CGDirectDisplayID
+@@ -120,6 +122,7 @@ @interface WineApplicationController : NSObject <NSApplicationDelegate>
+ 
+     + (WineApplicationController*) sharedController;
+ 
++    - (void) reassertCursorClipping;
+     - (void) transformProcessToForeground:(BOOL)activateIfTransformed;
+     - (void) tryToActivateIgnoringOtherApps:(BOOL)ignore;
+ 
+@@ -168,3 +171,4 @@ @interface WineApplication : NSApplication
+ 
+ void LogError(const char* func, NSString* format, ...);
+ void LogErrorv(const char* func, NSString* format, va_list args);
++void LogMessage(const char* cls, const char* func, NSString* format, ...);
+diff --git a/dlls/winemac.drv/cocoa_app.m b/dlls/winemac.drv/cocoa_app.m
+index c57ca47..bcac5f6 100644
+--- a/dlls/winemac.drv/cocoa_app.m
++++ b/dlls/winemac.drv/cocoa_app.m
+@@ -55,6 +55,8 @@
+ static NSString* const WineExternalQuitNotificationWinePrefixKey = @"WinePrefix";
+ 
+ bool macdrv_err_on;
++bool macdrv_warn_on;
++bool macdrv_trace_on;
+ 
+ 
+ #if !defined(MAC_OS_VERSION_14_0) || MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_VERSION_14_0
+@@ -1364,6 +1366,17 @@ - (BOOL) stopClippingCursor
+         return TRUE;
+     }
+ 
++    /* A confinement rect is relative to its window, so it must be applied
++       again after the window moves to or from a native fullscreen Space. */
++    - (void) reassertCursorClipping
++    {
++        if (!self.clippingCursor || ![clipCursorHandler isKindOfClass:[WineConfinementClipCursorHandler class]])
++            return;
++
++        if (![clipCursorHandler startClippingCursor:clipCursorHandler.cursorClipRect])
++            WARN(@"failed to reapply the cursor confinement rect\n");
++    }
++
+     - (BOOL) clippingCursor
+     {
+         return clipCursorHandler.clippingCursor;
+@@ -2704,6 +2717,22 @@ void LogErrorv(const char* func, NSString* format, va_list args)
+ }
+ }
+ 
++/***********************************************************************
++ *              LogMessage
++ */
++void LogMessage(const char* cls, const char* func, NSString* format, ...)
++{
++@autoreleasepool
++{
++    va_list args;
++    va_start(args, format);
++    NSString* message = [[NSString alloc] initWithFormat:format arguments:args];
++    va_end(args);
++    fprintf(stderr, "%s:macdrv:%s:%s", cls, func, [message UTF8String]);
++    [message release];
++}
++}
++
+ /***********************************************************************
+  *              macdrv_window_rejected_focus
+  *
+diff --git a/dlls/winemac.drv/cocoa_window.h b/dlls/winemac.drv/cocoa_window.h
+index 4d573c9..ae72e49 100644
+--- a/dlls/winemac.drv/cocoa_window.h
++++ b/dlls/winemac.drv/cocoa_window.h
+@@ -68,6 +68,17 @@ @interface WineWindow : NSPanel <NSWindowDelegate>
+     NSRect nonFullscreenFrame;
+     NSTimeInterval enteredFullScreenTime;
+ 
++    /* Native fullscreen Space (ARKNIGHTS_RUNTIME_NATIVE_FULLSCREEN_SPACE) */
++    BOOL nativeSpaceCandidate;
++    BOOL nativeSpaceExempt;
++    BOOL wineRequestedSpaceExit;
++    BOOL userLeftSpace;
++    BOOL failedEnterSpace;
++    BOOL deferredWineContentRect;
++    NSRect lastWineContentRect;
++    NSRect spaceRepostRect;
++    int spaceRepostCount;
++
+     int draggingPhase;
+     NSPoint dragStartPosition;
+     NSPoint dragWindowStartPosition;
+diff --git a/dlls/winemac.drv/cocoa_window.m b/dlls/winemac.drv/cocoa_window.m
+index af510e7..e41de15 100644
+--- a/dlls/winemac.drv/cocoa_window.m
++++ b/dlls/winemac.drv/cocoa_window.m
+@@ -1067,12 +1067,51 @@ - (void) adjustFeaturesForState
+             [self setMovable:[self allowsMovingWithMaximized:maximized]];
+     }
+ 
++    /* Whether the last content rect Wine requested covers a screen. The rect is
++       in Cocoa (bottom-up) coordinates.  On a screen with a camera housing the
++       area below the housing is enough. */
++    - (BOOL) wineRectCoversScreen:(NSRect)contentRect
++    {
++        for (NSScreen* screen in [NSScreen screens])
++        {
++            NSRect needed = [screen frame];
++            needed.size.height -= screen.safeAreaInsets.top;
++            if (NSContainsRect(contentRect, needed))
++                return TRUE;
++        }
++        return FALSE;
++    }
++
++    - (BOOL) qualifiesForNativeSpace:(NSWindowCollectionBehavior)behavior
++    {
++        static const NSWindowCollectionBehavior pinnedBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
++                                                                 NSWindowCollectionBehaviorStationary;
++        NSUInteger style = [self styleMask];
++
++        /* A window that pins itself to all Spaces (such as an always-on-top
++           helper that manages its own behavior) never uses a native Space.  Its
++           owner can clear these bits again, so remember that it set them. */
++        if ([self collectionBehavior] & pinnedBehavior)
++            nativeSpaceExempt = TRUE;
++
++        return !nativeSpaceExempt &&
++               (behavior & NSWindowCollectionBehaviorParticipatesInCycle) &&
++               !(behavior & (NSWindowCollectionBehaviorIgnoresCycle | pinnedBehavior)) &&
++               !(style & NSWindowStyleMaskUtilityWindow) && !maximized &&
++               !preventsAppActivation && !noForeground &&
++               !(self.parentWindow || self.latentParentWindow) &&
++               [self wineRectCoversScreen:lastWineContentRect];
++    }
++
+     - (void) adjustFullScreenBehavior:(NSWindowCollectionBehavior)behavior
+     {
+         NSUInteger style = [self styleMask];
+ 
++        if (native_fullscreen_space)
++            nativeSpaceCandidate = [self qualifiesForNativeSpace:behavior];
++
+         if (behavior & NSWindowCollectionBehaviorParticipatesInCycle &&
+-            style & NSWindowStyleMaskResizable && !(style & NSWindowStyleMaskUtilityWindow) && !maximized &&
++            (style & NSWindowStyleMaskResizable || nativeSpaceCandidate) && !(style & NSWindowStyleMaskUtilityWindow) && !maximized &&
+             !(self.parentWindow || self.latentParentWindow))
+         {
+             behavior |= NSWindowCollectionBehaviorFullScreenPrimary;
+@@ -1082,7 +1121,7 @@ - (void) adjustFullScreenBehavior:(NSWindowCollectionBehavior)behavior
+         {
+             behavior &= ~NSWindowCollectionBehaviorFullScreenPrimary;
+             behavior |= NSWindowCollectionBehaviorFullScreenAuxiliary;
+-            if (style & NSWindowStyleMaskFullScreen)
++            if (style & NSWindowStyleMaskFullScreen && !wineRequestedSpaceExit)
+                 [super toggleFullScreen:nil];
+         }
+ 
+@@ -1755,6 +1794,8 @@ - (void) orderBelow:(WineWindow*)prev orAbove:(WineWindow*)next activate:(BOOL)a
+                it if nothing actually changed. */
+             [self windowDidResize:nil skipSizeMove:TRUE];
+ 
++            [self enterNativeSpaceIfNeeded];
++
+             if (![self isExcludedFromWindowsMenu])
+                 [NSApp addWindowsItem:self title:[self title] filename:NO];
+         }
+@@ -1784,6 +1825,14 @@ - (void) doOrderOut
+ 
+         pendingOrderOut = FALSE;
+ 
++        /* Ordering out then in again is the one way to retry a Space the user left. */
++        if (native_fullscreen_space)
++        {
++            userLeftSpace = FALSE;
++            wineRequestedSpaceExit = FALSE;
++            deferredWineContentRect = FALSE;
++        }
++
+         if ([self isMiniaturized])
+             pendingMinimize = TRUE;
+ 
+@@ -1833,6 +1882,108 @@ - (void) updateFullscreen
+ 
+             [controller adjustWindowLevels];
+         }
++
++        [self enterNativeSpaceIfNeeded];
++    }
++
++    - (BOOL) canEnterNativeSpace
++    {
++        static const NSWindowCollectionBehavior pinnedBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
++                                                                 NSWindowCollectionBehaviorStationary |
++                                                                 NSWindowCollectionBehaviorIgnoresCycle;
++        NSWindowCollectionBehavior behavior = [self collectionBehavior];
++
++        /* Read the live behavior: the owner of a window can change it at any time. */
++        return native_fullscreen_space && nativeSpaceCandidate && !nativeSpaceExempt &&
++               (behavior & NSWindowCollectionBehaviorFullScreenPrimary) && !(behavior & pinnedBehavior) &&
++               !([self styleMask] & NSWindowStyleMaskFullScreen) &&
++               !enteringFullScreen && !exitingFullScreen && !wineRequestedSpaceExit && !pendingOrderOut &&
++               !userLeftSpace && !failedEnterSpace && !self.disabled &&
++               [self isVisible] && ![self isMiniaturized] && [self isOnActiveSpace] &&
++               [self level] < CGShieldingWindowLevel() &&
++               ([NSScreen screensHaveSeparateSpaces] || [[NSScreen screens] count] == 1);
++    }
++
++    - (void) enterNativeSpaceIfNeeded
++    {
++        if (![self canEnterNativeSpace])
++            return;
++
++        /* Never toggle from inside a frame update: setFrameFromWine: must not re-enter. */
++        dispatch_async(dispatch_get_main_queue(), ^{
++            if (![self canEnterNativeSpace])
++                return;
++            TRACE(@"entering a native fullscreen Space for window %p\n", hwnd);
++            [super toggleFullScreen:nil];
++        });
++    }
++
++    /* Handles a content rect from Wine while the window is in or moving to or
++       from a native Space.  Returns TRUE if nothing else must be done with it. */
++    - (BOOL) handleWineContentRectForNativeSpace:(NSRect)contentRect
++    {
++        BOOL covers = [self wineRectCoversScreen:contentRect];
++
++        lastWineContentRect = contentRect;
++        if (!covers)
++            userLeftSpace = FALSE;
++
++        if (enteringFullScreen || exitingFullScreen || wineRequestedSpaceExit)
++        {
++            TRACE(@"window %p is changing Space, deferring content rect %@\n", hwnd, NSStringFromRect(contentRect));
++            deferredWineContentRect = TRUE;
++            return TRUE;
++        }
++
++        if (!([self styleMask] & NSWindowStyleMaskFullScreen))
++        {
++            [self adjustFullScreenBehavior:[self collectionBehavior]];
++            return FALSE;
++        }
++
++        if (covers)
++        {
++            /* Keep the frame of the Space.  Tell Wine the actual frame instead. */
++            if (!NSEqualRects(contentRect, spaceRepostRect))
++            {
++                spaceRepostRect = contentRect;
++                spaceRepostCount = 0;
++            }
++            if (spaceRepostCount < 2)
++            {
++                spaceRepostCount++;
++                TRACE(@"window %p is in a Space, reposting its frame for content rect %@\n", hwnd, NSStringFromRect(contentRect));
++                if ([self isOrderedIn])
++                    [self windowDidResize:nil skipSizeMove:TRUE];
++            }
++            else if (spaceRepostCount == 2)
++            {
++                spaceRepostCount++;
++                WARN(@"window %p keeps requesting content rect %@ in a Space, not reposting its frame again\n",
++                     hwnd, NSStringFromRect(contentRect));
++            }
++            return TRUE;
++        }
++
++        TRACE(@"window %p no longer covers its screen, leaving the Space\n", hwnd);
++        nonFullscreenFrame = [[self class] frameRectForContentRect:contentRect
++                                                         styleMask:[self styleMask] & ~NSWindowStyleMaskFullScreen];
++        wineRequestedSpaceExit = TRUE;
++        [super toggleFullScreen:nil];
++        return TRUE;
++    }
++
++    - (void) finishNativeSpaceTransition
++    {
++        NSRect contentRect = lastWineContentRect;
++
++        [[WineApplicationController sharedController] reassertCursorClipping];
++
++        if (!deferredWineContentRect)
++            return;
++        deferredWineContentRect = FALSE;
++        [[WineApplicationController sharedController] flipRect:&contentRect];
++        [self setFrameFromWine:contentRect];
+     }
+ 
+     - (void) setFrameAndWineFrame:(NSRect)frame
+@@ -1873,6 +2024,10 @@ - (void) setFrameFromWine:(NSRect)contentRect
+         [queue discardEventsMatchingMask:event_mask_for_type(WINDOW_FRAME_CHANGED)
+                                forWindow:self];
+ 
++        if (native_fullscreen_space && !NSIsEmptyRect(contentRect) &&
++            [self handleWineContentRectForNativeSpace:contentRect])
++            return;
++
+         if (!NSIsEmptyRect(contentRect))
+         {
+             NSRect frame, oldFrame;
+@@ -2571,6 +2726,14 @@ - (void) miniaturize:(id)sender
+ 
+     - (void) toggleFullScreen:(id)sender
+     {
++        /* Wine's own toggles call super, so this one comes from the user. */
++        if (native_fullscreen_space && [self styleMask] & NSWindowStyleMaskFullScreen &&
++            !wineRequestedSpaceExit && !self.disabled && !maximized)
++        {
++            TRACE(@"the user is leaving the Space of window %p\n", hwnd);
++            userLeftSpace = TRUE;
++        }
++
+         if (!self.disabled && !maximized)
+             [super toggleFullScreen:sender];
+     }
+@@ -2805,6 +2968,9 @@ - (NSSize) window:(NSWindow*)window willUseFullScreenContentSize:(NSSize)propose
+         macdrv_query* query;
+         NSSize size;
+ 
++        if (nativeSpaceCandidate)
++            return proposedSize;
++
+         query = macdrv_create_query();
+         query->type = QUERY_MIN_MAX_INFO;
+         query->window = (macdrv_window)[self retain];
+@@ -2873,6 +3039,11 @@ - (void) windowDidEnterFullScreen:(NSNotification*)notification
+     {
+         enteringFullScreen = FALSE;
+         enteredFullScreenTime = [[NSProcessInfo processInfo] systemUptime];
++        if (native_fullscreen_space)
++        {
++            TRACE(@"window %p entered a native fullscreen Space\n", hwnd);
++            [self finishNativeSpaceTransition];
++        }
+         if (pendingOrderOut)
+             [self doOrderOut];
+     }
+@@ -2882,6 +3053,13 @@ - (void) windowDidExitFullScreen:(NSNotification*)notification
+         exitingFullScreen = FALSE;
+         [self setFrameAndWineFrame:nonFullscreenFrame];
+         [self windowDidResize:nil];
++        if (native_fullscreen_space)
++        {
++            TRACE(@"window %p left its native fullscreen Space\n", hwnd);
++            wineRequestedSpaceExit = FALSE;
++            [self adjustFullScreenBehavior:[self collectionBehavior]];
++            [self finishNativeSpaceTransition];
++        }
+         if (pendingOrderOut)
+             [self doOrderOut];
+     }
+@@ -2890,6 +3068,12 @@ - (void) windowDidFailToEnterFullScreen:(NSWindow*)window
+     {
+         enteringFullScreen = FALSE;
+         enteredFullScreenTime = 0;
++        if (native_fullscreen_space)
++        {
++            WARN(@"window %p failed to enter a native fullscreen Space, not trying again\n", hwnd);
++            failedEnterSpace = TRUE;
++            [self finishNativeSpaceTransition];
++        }
+         if (pendingOrderOut)
+             [self doOrderOut];
+     }
+@@ -2898,6 +3082,12 @@ - (void) windowDidFailToExitFullScreen:(NSWindow*)window
+     {
+         exitingFullScreen = FALSE;
+         [self windowDidResize:nil];
++        if (native_fullscreen_space)
++        {
++            WARN(@"window %p failed to leave its native fullscreen Space\n", hwnd);
++            wineRequestedSpaceExit = FALSE;
++            [self finishNativeSpaceTransition];
++        }
+         if (pendingOrderOut)
+             [self doOrderOut];
+     }
+diff --git a/dlls/winemac.drv/macdrv_cocoa.h b/dlls/winemac.drv/macdrv_cocoa.h
+index c6552ba..96f8a37 100644
+--- a/dlls/winemac.drv/macdrv_cocoa.h
++++ b/dlls/winemac.drv/macdrv_cocoa.h
+@@ -130,8 +130,11 @@
+ 
+ /* main */
+ extern bool macdrv_err_on;
++extern bool macdrv_warn_on;
++extern bool macdrv_trace_on;
+ extern int topmost_float_inactive;
+ extern bool capture_displays_for_fullscreen;
++extern bool native_fullscreen_space;
+ /* CrossOver Hack 10912: Mac Edit menu */
+ extern int mac_edit_menu;
+ extern bool left_option_is_alt;
+diff --git a/dlls/winemac.drv/macdrv_main.c b/dlls/winemac.drv/macdrv_main.c
+index 05aaa57..a0f9468 100644
+--- a/dlls/winemac.drv/macdrv_main.c
++++ b/dlls/winemac.drv/macdrv_main.c
+@@ -26,6 +26,8 @@
+ 
+ #include "config.h"
+ 
++#include <stdlib.h>
++#include <string.h>
+ #include <Security/AuthSession.h>
+ #include <IOKit/pwr_mgt/IOPMLib.h>
+ 
+@@ -43,6 +45,7 @@ C_ASSERT(NUM_EVENT_TYPES <= sizeof(macdrv_event_mask) * 8);
+ 
+ int topmost_float_inactive = TOPMOST_FLOAT_INACTIVE_NONFULLSCREEN;
+ bool capture_displays_for_fullscreen = false;
++bool native_fullscreen_space = false;
+ BOOL allow_vsync = TRUE;
+ BOOL allow_set_gamma = TRUE;
+ /* CrossOver Hack 10912: Mac Edit menu */
+@@ -276,6 +279,21 @@ static inline DWORD get_config_key(HKEY defkey, HKEY appkey, const char *name,
+ }
+ 
+ 
++/* Case-insensitive match of the program's file name against an ASCII name. */
++static BOOL image_name_is(const WCHAR *image, const char *name)
++{
++    for (; *image && *name; image++, name++)
++    {
++        WCHAR left = *image, right = (unsigned char)*name;
++
++        if (left >= 'A' && left <= 'Z') left += 'a' - 'A';
++        if (right >= 'A' && right <= 'Z') right += 'a' - 'A';
++        if (left != right) return FALSE;
++    }
++    return !*image && !*name;
++}
++
++
+ /***********************************************************************
+  *              setup_options
+  *
+@@ -326,6 +344,21 @@ static void setup_options(void)
+     if (!get_config_key(hkey, appkey, "CaptureDisplaysForFullscreen", buffer, sizeof(buffer)))
+         capture_displays_for_fullscreen = IS_OPTION_TRUE(buffer[0]);
+ 
++    /* Runtime gate: only the exact value "1" enables native fullscreen Spaces. */
++    {
++        const char *value = getenv("ARKNIGHTS_RUNTIME_NATIVE_FULLSCREEN_SPACE");
++        native_fullscreen_space = value && !strcmp(value, "1");
++
++        /* The client's platform notice helper inherits the variable. Its windows
++           stay above every Space and must never get a native fullscreen Space,
++           whatever the other gates say.  This turns the feature off for the whole
++           helper process, so no window of it can qualify or enter. */
++        if (native_fullscreen_space &&
++            (image_name_is(appname, "PlatformProcess.exe") ||
++             image_name_is(appname, "PlatformProcess.original.helper.exe")))
++            native_fullscreen_space = false;
++    }
++
+     if (!get_config_key(hkey, appkey, "AllowVerticalSync", buffer, sizeof(buffer)))
+         allow_vsync = IS_OPTION_TRUE(buffer[0]);
+ 
+@@ -463,6 +496,8 @@ static NTSTATUS macdrv_init(void *arg)
+     load_strings(params->strings);
+ 
+     macdrv_err_on = ERR_ON(macdrv);
++    macdrv_warn_on = WARN_ON(macdrv);
++    macdrv_trace_on = TRACE_ON(macdrv);
+     if (macdrv_start_cocoa_app(NtGetTickCount()))
+     {
+         ERR("Failed to start Cocoa app main loop\n");
