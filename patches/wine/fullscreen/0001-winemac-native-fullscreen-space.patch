@@ -404,7 +404,7 @@ index c6552ba..96f8a37 100644
  extern int mac_edit_menu;
  extern bool left_option_is_alt;
 diff --git a/dlls/winemac.drv/macdrv_main.c b/dlls/winemac.drv/macdrv_main.c
-index 05aaa57..09460f8 100644
+index 05aaa57..a0f9468 100644
 --- a/dlls/winemac.drv/macdrv_main.c
 +++ b/dlls/winemac.drv/macdrv_main.c
 @@ -26,6 +26,8 @@
@@ -424,7 +424,29 @@ index 05aaa57..09460f8 100644
  BOOL allow_vsync = TRUE;
  BOOL allow_set_gamma = TRUE;
  /* CrossOver Hack 10912: Mac Edit menu */
-@@ -326,6 +329,12 @@ static void setup_options(void)
+@@ -276,6 +279,21 @@ static inline DWORD get_config_key(HKEY defkey, HKEY appkey, const char *name,
+ }
+ 
+ 
++/* Case-insensitive match of the program's file name against an ASCII name. */
++static BOOL image_name_is(const WCHAR *image, const char *name)
++{
++    for (; *image && *name; image++, name++)
++    {
++        WCHAR left = *image, right = (unsigned char)*name;
++
++        if (left >= 'A' && left <= 'Z') left += 'a' - 'A';
++        if (right >= 'A' && right <= 'Z') right += 'a' - 'A';
++        if (left != right) return FALSE;
++    }
++    return !*image && !*name;
++}
++
++
+ /***********************************************************************
+  *              setup_options
+  *
+@@ -326,6 +344,21 @@ static void setup_options(void)
      if (!get_config_key(hkey, appkey, "CaptureDisplaysForFullscreen", buffer, sizeof(buffer)))
          capture_displays_for_fullscreen = IS_OPTION_TRUE(buffer[0]);
  
@@ -432,12 +454,21 @@ index 05aaa57..09460f8 100644
 +    {
 +        const char *value = getenv("ARKNIGHTS_RUNTIME_NATIVE_FULLSCREEN_SPACE");
 +        native_fullscreen_space = value && !strcmp(value, "1");
++
++        /* The client's platform notice helper inherits the variable. Its windows
++           stay above every Space and must never get a native fullscreen Space,
++           whatever the other gates say.  This turns the feature off for the whole
++           helper process, so no window of it can qualify or enter. */
++        if (native_fullscreen_space &&
++            (image_name_is(appname, "PlatformProcess.exe") ||
++             image_name_is(appname, "PlatformProcess.original.helper.exe")))
++            native_fullscreen_space = false;
 +    }
 +
      if (!get_config_key(hkey, appkey, "AllowVerticalSync", buffer, sizeof(buffer)))
          allow_vsync = IS_OPTION_TRUE(buffer[0]);
  
-@@ -463,6 +472,8 @@ static NTSTATUS macdrv_init(void *arg)
+@@ -463,6 +496,8 @@ static NTSTATUS macdrv_init(void *arg)
      load_strings(params->strings);
  
      macdrv_err_on = ERR_ON(macdrv);
