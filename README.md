@@ -34,6 +34,7 @@ Each component parses only its own variable. A missing or invalid value gives th
 | ACE             | Opt-in kernel, dispatcher, Rosetta, and timing routes for ACE-protected clients                                                          | `ARKNIGHTS_RUNTIME_ACE_COMPACT`: `0`, `1`                   | Inactive                                                   |
 | CEF             | Descriptor-driven CEF compatibility; proven Bilibili loader path                                                                         | `ARKNIGHTS_RUNTIME_CEF_COMPAT`: `0`, `1`                    | Inactive                                                   |
 | CN              | Preflighted Bilibili layered-renderer path                                                                                               | `ARKNIGHTS_RUNTIME_CN_COMPAT`: `0`, `1`                     | Inactive                                                   |
+| Fullscreen      | Put a fullscreen game window into a macOS native fullscreen Space                                                                        | `ARKNIGHTS_RUNTIME_NATIVE_FULLSCREEN_SPACE`: `0`, `1`       | Inactive                                                   |
 
 The CN gate covers the Bilibili window preflights in the [patch registry](docs/patch-registry.md#cn) and, if CEF is absent, its legacy CEF fallback.
 
@@ -56,7 +57,7 @@ Outputs stay below `.build/`. These commands never install or start Wine, create
 
 ## Verification
 
-Run `just check`. Then run `just prepare STAGE` for each of `audio`, `cursor`, `hardware-cursor`, `performance`, `ace`, `cef`, `cn`, and `combined`.
+Run `just check`. Then run `just prepare STAGE` for each of `audio`, `cursor`, `hardware-cursor`, `performance`, `ace`, `cef`, `cn`, `fullscreen`, and `combined`.
 
 GitHub Actions validate the pinned sources, build the release tree, and create a draft release after the checksum, runtime-interface, provenance, source, and notice checks pass.
 

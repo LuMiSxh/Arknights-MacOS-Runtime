@@ -14,6 +14,7 @@ from scripts.runtime import ROOT, load_lock
 from scripts.runtime_capabilities import (
     CapabilityContractError,
     load_capability_manifest,
+    validate_manifest_shape,
     validate_packaged_capability_manifest,
     validate_packaged_metalfx_support,
     validate_source_capability_contract,
@@ -49,6 +50,30 @@ class RuntimeCapabilityContractTests(unittest.TestCase):
 
             library.write_bytes(b"MZ\0DXMT_METALFX_SPATIAL_SWAPCHAIN\0")
             validate_packaged_metalfx_support(runtime_root, self.manifest)
+
+    def test_native_fullscreen_space_capability_is_an_optional_boolean(self) -> None:
+        capabilities = self.manifest["capabilities"]
+        self.assertIs(capabilities["nativeFullscreenSpace"], True)
+
+        without = {
+            **self.manifest,
+            "capabilities": {
+                key: value
+                for key, value in capabilities.items()
+                if key != "nativeFullscreenSpace"
+            },
+        }
+        self.assertEqual(validate_manifest_shape(without), without)
+
+        for invalid in (
+            {**capabilities, "nativeFullscreenSpace": "yes"},
+            {**capabilities, "unknownCapability": True},
+        ):
+            with (
+                self.subTest(capabilities=invalid),
+                self.assertRaises(CapabilityContractError),
+            ):
+                validate_manifest_shape({**self.manifest, "capabilities": invalid})
 
     def test_capability_manifest_reader_rejects_fifo_without_blocking(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

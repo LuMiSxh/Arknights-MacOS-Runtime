@@ -36,7 +36,7 @@ The filter matches the case-insensitive final basename `a9d41799f1af1868f2db4956
 
 ## Runtime capability manifest
 
-`Libraries/runtime-capabilities.json` is the versioned producer contract that consumers read from the packaged runtime tree. Schema version 2 advertises hardware-cursor support and MetalFX spatial-upscaling support. Release validation checks the manifest against the pinned patch semantics and requires the packaged copy to match the source. Consumers use conservative defaults without the manifest.
+`Libraries/runtime-capabilities.json` is the versioned producer contract that consumers read from the packaged runtime tree. Schema version 2 advertises hardware-cursor support and MetalFX spatial-upscaling support. The optional `nativeFullscreenSpace` boolean advertises the fullscreen patch. Release validation checks the manifest against the pinned patch semantics and requires the packaged copy to match the source. Consumers use conservative defaults without the manifest.
 
 ## Performance
 
@@ -89,12 +89,17 @@ Add a regional descriptor only with reverse-engineering evidence for its complet
 
 ## CN
 
-The CN family contains only the Bilibili windowing patch. It uses the exact gate `ARKNIGHTS_RUNTIME_CN_COMPAT=1`. A missing, `0`, or other value keeps Wine's normal route.
+The CN family contains only the Bilibili windowing patches. They use the exact gate `ARKNIGHTS_RUNTIME_CN_COMPAT=1`. A missing, `0`, or other value keeps Wine's normal route.
 
 - [`wine-cn-bilibili-layered-child`](../patches/wine/cn/windowing/0001-win32u-winemac-bilibili-layered-child.patch)
     - What: Keeps Chromium's layered proxies for login and payment drawable inside the root Wine window.
     - Scope: CN gate and `PCGamePlatform.exe`. Login keeps the `CMyWebViewDlg` parent-chain route. Payment also requires an exact `Chrome_WidgetWin_0` `WS_CHILD` non-popup with an immediate `CefBrowserWindow` parent, a non-child `GA_ROOT` of class `CPayDlg_P_` plus a nonempty suffix, and matching HWND/parent/root process IDs. Only parent links count. The driver still requires `Chrome.WindowTranslucent` and a layered surface. Each accepted child gets an in-root view with independent color/shape images, source alpha, `SourceConstantAlpha`, root-client geometry, reparent/hide cleanup, and USER hit testing.
     - Provenance and checks: Original runtime change; hash, apply check, offline classifier/contract tests, `win32u`/`winemac` compile, Bilibili payment-window rendering check.
+
+- [`wine-cn-bilibili-join-all-spaces`](../patches/wine/cn/windowing/0002-winemac-bilibili-join-all-spaces.patch)
+    - What: Makes the Bilibili platform window join all Spaces, so it stays visible over a game in a native fullscreen Space.
+    - Scope: CN gate and `PCGamePlatform.exe` (the `macdrv_is_bilibili_platform_process()` test of the first CN patch). In `adjustFullScreenBehavior:` it clears `FullScreenPrimary` and sets `CanJoinAllSpaces` and `FullScreenAuxiliary`.
+    - Provenance and checks: Original runtime change; hash, apply check after the first CN patch, `winemac` compile.
 
 Remove a patch when the pinned WineCX supplies the behavior or the route is no longer needed.
 
@@ -112,3 +117,20 @@ Remove a patch when the pinned WineCX supplies the behavior or the route is no l
 - Removal: Drop when the client no longer needs Command-Q to quit, or when Wine offers an equivalent setting
 
 The patch changes one line in `dlls/winemac.drv/cocoa_app.m`. It sets the Quit item to the Command modifier only. Hide Others (Option-Command-H) and the other menu items keep their masks.
+
+## Fullscreen
+
+- ID: `wine-fullscreen-native-space`
+- File: `patches/wine/fullscreen/0001-winemac-native-fullscreen-space.patch`
+- Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
+- Source/author: Original runtime change, runtime maintainers
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Exact `ARKNIGHTS_RUNTIME_NATIVE_FULLSCREEN_SPACE=1`, read once in `setup_options`
+- Inactive behavior: Missing, `0`, or invalid values keep the screen-sized window at `NSStatusWindowLevel + 1`
+- Automated gate: Hash, clean `git apply --check` alone and after the `cn` family, `cocoa_app.m` syntax check
+- Manual gate: A borderless fullscreen game window enters its own Space. Leaving the Space by the user stays left. A Wine resize below screen size leaves the Space. The cursor clip still holds after each change.
+- Removal: Drop when the client no longer needs a native Space, or when WineCX offers an equivalent control
+
+A window is a candidate only when the gate is on, it participates in the window cycle, it is not a utility window, it has no parent, and the last content rect from Wine covers a screen (or the screen below the camera housing). A window that has `CanJoinAllSpaces` or `Stationary` set, ignores the cycle, prevents app activation, or has no foreground is never a candidate. This keeps helper windows, such as the platform notice window, out of the feature. The `cn` patch `wine-cn-bilibili-join-all-spaces` also sets these bits for the Bilibili platform process.
+
+The patch enters the Space with a deferred `toggleFullScreen:` call. It never changes the window frame inside a Space. It reposts the actual frame to Wine at most twice for one requested rect. When the rect from Wine no longer covers the screen, the patch leaves the Space. A user exit blocks automatic re-entry until the rect changes or the window is ordered out. The patch logs decisions in the `macdrv` debug channel.

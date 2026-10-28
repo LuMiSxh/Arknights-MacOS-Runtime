@@ -27,6 +27,7 @@ Each owning component parses its own flags. Accepted values and defaults are in 
 - ACE gate: Kernel, dispatcher, Rosetta, and timing routes.
 - CEF gate: Descriptor-driven CEF loader preflights.
 - CN gate: Bilibili window preflights ([patch registry](patch-registry.md#cn)); legacy CEF fallback only when CEF is absent.
+- Fullscreen gate: Native fullscreen Space for a screen-sized game window ([patch registry](patch-registry.md#fullscreen)).
 - Hardware Cursor gate: Hides the exact Yostar/TW or Bilibili CN cursor asset basename in shared Wine path resolution, so open, attribute, and create-if-missing calls agree.
 
 The performance family has a `DXMT_DEBUG`-gated reduction of release presentation statistics. It keeps the debug HUD output and release frame counters. It does not change rendering policy.
