@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15-intel
+    runs-on: xcode-27
     timeout-minutes: 300
     env:
       RUNTIME_STAGE: ${{ inputs.stage || 'combined' }}
@@ -30,8 +30,14 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v10.0.1
 
+      - name: Install Rosetta
+        run: softwareupdate --install-rosetta --agree-to-license
+
       - name: Install Nix
         uses: cachix/install-nix-action@v31.11.1
+        with:
+          extra_nix_config: |
+            extra-platforms = x86_64-darwin
 
       - name: Install build tools
         run: brew install ccache mingw-w64 meson ninja
