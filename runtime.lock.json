@@ -140,7 +140,7 @@
       "component": "wine",
       "family": "fullscreen",
       "path": "patches/wine/fullscreen/0001-winemac-native-fullscreen-space.patch",
-      "sha256": "5211393f28a8481027c539842fbaff46e9a721f3f1bfae7f9db934baa635dfc3"
+      "sha256": "127a339960a111b01b4e357ade4d47e02be2c8ff131751de3e7f6a9df01e4066"
     }
   ]
 }

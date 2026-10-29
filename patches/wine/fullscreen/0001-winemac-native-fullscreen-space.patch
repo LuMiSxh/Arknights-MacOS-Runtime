@@ -79,16 +79,17 @@ index c57ca47..bcac5f6 100644
   *              macdrv_window_rejected_focus
   *
 diff --git a/dlls/winemac.drv/cocoa_window.h b/dlls/winemac.drv/cocoa_window.h
-index 4d573c9..ae72e49 100644
+index 4d573c9..a57c6d1 100644
 --- a/dlls/winemac.drv/cocoa_window.h
 +++ b/dlls/winemac.drv/cocoa_window.h
-@@ -68,6 +68,17 @@ @interface WineWindow : NSPanel <NSWindowDelegate>
+@@ -68,6 +68,18 @@ @interface WineWindow : NSPanel <NSWindowDelegate>
      NSRect nonFullscreenFrame;
      NSTimeInterval enteredFullScreenTime;
  
 +    /* Native fullscreen Space (ARKNIGHTS_RUNTIME_NATIVE_FULLSCREEN_SPACE) */
 +    BOOL nativeSpaceCandidate;
 +    BOOL nativeSpaceExempt;
++    BOOL wineCloseButton;
 +    BOOL wineRequestedSpaceExit;
 +    BOOL userLeftSpace;
 +    BOOL failedEnterSpace;
@@ -101,10 +102,19 @@ index 4d573c9..ae72e49 100644
      NSPoint dragStartPosition;
      NSPoint dragWindowStartPosition;
 diff --git a/dlls/winemac.drv/cocoa_window.m b/dlls/winemac.drv/cocoa_window.m
-index af510e7..e41de15 100644
+index af510e7..2603220 100644
 --- a/dlls/winemac.drv/cocoa_window.m
 +++ b/dlls/winemac.drv/cocoa_window.m
-@@ -1067,12 +1067,51 @@ - (void) adjustFeaturesForState
+@@ -952,6 +952,8 @@ + (WineWindow*) createWindowWithFeatures:(const struct macdrv_window_features*)w
+ 
+         if (!window) return nil;
+ 
++        window->wineCloseButton = (style_mask_for_features(wf) & NSWindowStyleMaskClosable) != 0;
++
+         /* Standardize windows to eliminate differences between titled and
+            borderless windows and between NSWindow and NSPanel. */
+         [window setHidesOnDeactivate:NO];
+@@ -1067,12 +1069,56 @@ - (void) adjustFeaturesForState
              [self setMovable:[self allowsMovingWithMaximized:maximized]];
      }
  
@@ -135,11 +145,16 @@ index af510e7..e41de15 100644
 +        if ([self collectionBehavior] & pinnedBehavior)
 +            nativeSpaceExempt = TRUE;
 +
++        /* A modal dialog of another process (such as a platform login) disables
++           the game window and marks it no-foreground for a while.  That must not
++           throw a window out of its Space; it only blocks entering one. */
++        BOOL inSpace = (style & NSWindowStyleMaskFullScreen) || enteringFullScreen;
++
 +        return !nativeSpaceExempt &&
 +               (behavior & NSWindowCollectionBehaviorParticipatesInCycle) &&
 +               !(behavior & (NSWindowCollectionBehaviorIgnoresCycle | pinnedBehavior)) &&
 +               !(style & NSWindowStyleMaskUtilityWindow) && !maximized &&
-+               !preventsAppActivation && !noForeground &&
++               (inSpace || (!preventsAppActivation && !noForeground)) &&
 +               !(self.parentWindow || self.latentParentWindow) &&
 +               [self wineRectCoversScreen:lastWineContentRect];
 +    }
@@ -157,7 +172,7 @@ index af510e7..e41de15 100644
              !(self.parentWindow || self.latentParentWindow))
          {
              behavior |= NSWindowCollectionBehaviorFullScreenPrimary;
-@@ -1082,7 +1121,7 @@ - (void) adjustFullScreenBehavior:(NSWindowCollectionBehavior)behavior
+@@ -1082,7 +1128,7 @@ - (void) adjustFullScreenBehavior:(NSWindowCollectionBehavior)behavior
          {
              behavior &= ~NSWindowCollectionBehaviorFullScreenPrimary;
              behavior |= NSWindowCollectionBehaviorFullScreenAuxiliary;
@@ -166,7 +181,49 @@ index af510e7..e41de15 100644
                  [super toggleFullScreen:nil];
          }
  
-@@ -1755,6 +1794,8 @@ - (void) orderBelow:(WineWindow*)prev orAbove:(WineWindow*)next activate:(BOOL)a
+@@ -1093,6 +1139,30 @@ - (void) adjustFullScreenBehavior:(NSWindowCollectionBehavior)behavior
+         }
+     }
+ 
++    /* A borderless game window has no close button, so AppKit leaves the red
++       button disabled in its native Space.  Enable it only there: a click
++       reaches windowShouldClose:, which sends the normal Win32 close. */
++    - (BOOL) wantsSpaceCloseButton
++    {
++        return native_fullscreen_space && nativeSpaceCandidate &&
++               ([self styleMask] & NSWindowStyleMaskFullScreen);
++    }
++
++    - (void) adjustCloseButtonForSpace
++    {
++        NSUInteger style = [self styleMask];
++        BOOL closable = wineCloseButton || [self wantsSpaceCloseButton];
++
++        if (closable == !!(style & NSWindowStyleMaskClosable))
++            return;
++
++        [self setStyleMask:(closable ? style | NSWindowStyleMaskClosable : style & ~NSWindowStyleMaskClosable)];
++
++        /* -setStyleMask: resets the firstResponder to the window.  Set it back. */
++        if ([[self contentView] acceptsFirstResponder])
++            [self makeFirstResponder:[self contentView]];
++    }
++
+     - (void) setWindowFeatures:(const struct macdrv_window_features*)wf
+     {
+         static const NSUInteger usedStyles = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable |
+@@ -1101,6 +1171,10 @@ - (void) setWindowFeatures:(const struct macdrv_window_features*)wf
+         NSUInteger currentStyle = [self styleMask];
+         NSUInteger newStyle = style_mask_for_features(wf) | (currentStyle & ~usedStyles);
+ 
++        wineCloseButton = (newStyle & NSWindowStyleMaskClosable) != 0;
++        if ([self wantsSpaceCloseButton])
++            newStyle |= NSWindowStyleMaskClosable;
++
+         self.preventsAppActivation = wf->prevents_app_activation;
+ 
+         if (newStyle != currentStyle)
+@@ -1755,6 +1829,8 @@ - (void) orderBelow:(WineWindow*)prev orAbove:(WineWindow*)next activate:(BOOL)a
                 it if nothing actually changed. */
              [self windowDidResize:nil skipSizeMove:TRUE];
  
@@ -175,7 +232,7 @@ index af510e7..e41de15 100644
              if (![self isExcludedFromWindowsMenu])
                  [NSApp addWindowsItem:self title:[self title] filename:NO];
          }
-@@ -1784,6 +1825,14 @@ - (void) doOrderOut
+@@ -1784,6 +1860,14 @@ - (void) doOrderOut
  
          pendingOrderOut = FALSE;
  
@@ -190,7 +247,7 @@ index af510e7..e41de15 100644
          if ([self isMiniaturized])
              pendingMinimize = TRUE;
  
-@@ -1833,6 +1882,108 @@ - (void) updateFullscreen
+@@ -1833,6 +1917,108 @@ - (void) updateFullscreen
  
              [controller adjustWindowLevels];
          }
@@ -299,7 +356,7 @@ index af510e7..e41de15 100644
      }
  
      - (void) setFrameAndWineFrame:(NSRect)frame
-@@ -1873,6 +2024,10 @@ - (void) setFrameFromWine:(NSRect)contentRect
+@@ -1873,6 +2059,10 @@ - (void) setFrameFromWine:(NSRect)contentRect
          [queue discardEventsMatchingMask:event_mask_for_type(WINDOW_FRAME_CHANGED)
                                 forWindow:self];
  
@@ -310,7 +367,7 @@ index af510e7..e41de15 100644
          if (!NSIsEmptyRect(contentRect))
          {
              NSRect frame, oldFrame;
-@@ -2571,6 +2726,14 @@ - (void) miniaturize:(id)sender
+@@ -2571,6 +2761,14 @@ - (void) miniaturize:(id)sender
  
      - (void) toggleFullScreen:(id)sender
      {
@@ -325,7 +382,7 @@ index af510e7..e41de15 100644
          if (!self.disabled && !maximized)
              [super toggleFullScreen:sender];
      }
-@@ -2805,6 +2968,9 @@ - (NSSize) window:(NSWindow*)window willUseFullScreenContentSize:(NSSize)propose
+@@ -2805,6 +3003,9 @@ - (NSSize) window:(NSWindow*)window willUseFullScreenContentSize:(NSSize)propose
          macdrv_query* query;
          NSSize size;
  
@@ -335,19 +392,20 @@ index af510e7..e41de15 100644
          query = macdrv_create_query();
          query->type = QUERY_MIN_MAX_INFO;
          query->window = (macdrv_window)[self retain];
-@@ -2873,6 +3039,11 @@ - (void) windowDidEnterFullScreen:(NSNotification*)notification
+@@ -2873,6 +3074,12 @@ - (void) windowDidEnterFullScreen:(NSNotification*)notification
      {
          enteringFullScreen = FALSE;
          enteredFullScreenTime = [[NSProcessInfo processInfo] systemUptime];
 +        if (native_fullscreen_space)
 +        {
 +            TRACE(@"window %p entered a native fullscreen Space\n", hwnd);
++            [self adjustCloseButtonForSpace];
 +            [self finishNativeSpaceTransition];
 +        }
          if (pendingOrderOut)
              [self doOrderOut];
      }
-@@ -2882,6 +3053,13 @@ - (void) windowDidExitFullScreen:(NSNotification*)notification
+@@ -2882,6 +3089,14 @@ - (void) windowDidExitFullScreen:(NSNotification*)notification
          exitingFullScreen = FALSE;
          [self setFrameAndWineFrame:nonFullscreenFrame];
          [self windowDidResize:nil];
@@ -356,12 +414,13 @@ index af510e7..e41de15 100644
 +            TRACE(@"window %p left its native fullscreen Space\n", hwnd);
 +            wineRequestedSpaceExit = FALSE;
 +            [self adjustFullScreenBehavior:[self collectionBehavior]];
++            [self adjustCloseButtonForSpace];
 +            [self finishNativeSpaceTransition];
 +        }
          if (pendingOrderOut)
              [self doOrderOut];
      }
-@@ -2890,6 +3068,12 @@ - (void) windowDidFailToEnterFullScreen:(NSWindow*)window
+@@ -2890,6 +3105,12 @@ - (void) windowDidFailToEnterFullScreen:(NSWindow*)window
      {
          enteringFullScreen = FALSE;
          enteredFullScreenTime = 0;
@@ -374,7 +433,7 @@ index af510e7..e41de15 100644
          if (pendingOrderOut)
              [self doOrderOut];
      }
-@@ -2898,6 +3082,12 @@ - (void) windowDidFailToExitFullScreen:(NSWindow*)window
+@@ -2898,6 +3119,12 @@ - (void) windowDidFailToExitFullScreen:(NSWindow*)window
      {
          exitingFullScreen = FALSE;
          [self windowDidResize:nil];
@@ -387,6 +446,16 @@ index af510e7..e41de15 100644
          if (pendingOrderOut)
              [self doOrderOut];
      }
+@@ -2968,6 +3195,9 @@ - (void)windowDidResize:(NSNotification *)notification
+ 
+     - (BOOL)windowShouldClose:(id)sender
+     {
++        if ([self wantsSpaceCloseButton])
++            TRACE(@"window %p close requested in its native fullscreen Space\n", hwnd);
++
+         macdrv_event* event = macdrv_create_event(WINDOW_CLOSE_REQUESTED, self);
+         [queue postEvent:event];
+         macdrv_release_event(event);
 diff --git a/dlls/winemac.drv/macdrv_cocoa.h b/dlls/winemac.drv/macdrv_cocoa.h
 index c6552ba..96f8a37 100644
 --- a/dlls/winemac.drv/macdrv_cocoa.h
