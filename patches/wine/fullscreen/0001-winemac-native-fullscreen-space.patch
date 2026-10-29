@@ -101,10 +101,10 @@ index 4d573c9..ae72e49 100644
      NSPoint dragStartPosition;
      NSPoint dragWindowStartPosition;
 diff --git a/dlls/winemac.drv/cocoa_window.m b/dlls/winemac.drv/cocoa_window.m
-index af510e7..e41de15 100644
+index af510e7..f19c3a9 100644
 --- a/dlls/winemac.drv/cocoa_window.m
 +++ b/dlls/winemac.drv/cocoa_window.m
-@@ -1067,12 +1067,51 @@ - (void) adjustFeaturesForState
+@@ -1067,12 +1067,56 @@ - (void) adjustFeaturesForState
              [self setMovable:[self allowsMovingWithMaximized:maximized]];
      }
  
@@ -135,11 +135,16 @@ index af510e7..e41de15 100644
 +        if ([self collectionBehavior] & pinnedBehavior)
 +            nativeSpaceExempt = TRUE;
 +
++        /* A modal dialog of another process (such as a platform login) disables
++           the game window and marks it no-foreground for a while.  That must not
++           throw a window out of its Space; it only blocks entering one. */
++        BOOL inSpace = (style & NSWindowStyleMaskFullScreen) || enteringFullScreen;
++
 +        return !nativeSpaceExempt &&
 +               (behavior & NSWindowCollectionBehaviorParticipatesInCycle) &&
 +               !(behavior & (NSWindowCollectionBehaviorIgnoresCycle | pinnedBehavior)) &&
 +               !(style & NSWindowStyleMaskUtilityWindow) && !maximized &&
-+               !preventsAppActivation && !noForeground &&
++               (inSpace || (!preventsAppActivation && !noForeground)) &&
 +               !(self.parentWindow || self.latentParentWindow) &&
 +               [self wineRectCoversScreen:lastWineContentRect];
 +    }
