@@ -14,7 +14,7 @@ from typing import Any
 MAXIMUM_CAPABILITY_MANIFEST_BYTES = 4 * 1_024
 CAPABILITY_KEYS = {"hardwareCursor", "metalFXSpatialUpscaling"}
 # Consumers treat these keys as absent-means-false, so older manifests stay valid.
-OPTIONAL_CAPABILITY_KEYS = {"nativeFullscreenSpace"}
+OPTIONAL_CAPABILITY_KEYS = {"nativeFullscreenSpace", "aceCompat", "nativeArm64"}
 # Upstream DXMT enables its MetalFX spatial swapchain when this variable is "1".
 METALFX_SWAPCHAIN_MARKER = b"DXMT_METALFX_SPATIAL_SWAPCHAIN"
 METALFX_SWAPCHAIN_LIBRARY = "DXMT/x64/d3d11.dll"
@@ -95,13 +95,9 @@ def validate_manifest_shape(value: Any) -> dict[str, Any]:
         raise CapabilityContractError(
             "metalFXSpatialUpscaling capability must be a boolean"
         )
-    if (
-        "nativeFullscreenSpace" in capabilities
-        and type(capabilities["nativeFullscreenSpace"]) is not bool
-    ):
-        raise CapabilityContractError(
-            "nativeFullscreenSpace capability must be a boolean"
-        )
+    for optional in ("nativeFullscreenSpace", "aceCompat", "nativeArm64"):
+        if optional in capabilities and type(capabilities[optional]) is not bool:
+            raise CapabilityContractError(f"{optional} capability must be a boolean")
     return value
 
 

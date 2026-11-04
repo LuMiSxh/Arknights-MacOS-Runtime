@@ -17,8 +17,8 @@ This canary carries an unmerged Wine draft. The runtime adds only the opt-in `AR
 Apply to the exact WineCX pin:
 
 ```sh
-git apply --check patches/wine/audio/0001-winecoreaudio-default-output.patch
-git apply patches/wine/audio/0001-winecoreaudio-default-output.patch
+git apply --check patches/shared/wine/audio/0001-winecoreaudio-default-output.patch
+git apply patches/shared/wine/audio/0001-winecoreaudio-default-output.patch
 ```
 
 The patch adds no third-party dependency. The HAL callback reduces CoreAudio notifications to a pthread signal. A Wine worker thread retargets and stops/starts the AudioUnit. The render callback lock is never held across a stop or start. Process detach unregisters both HAL listeners, joins the worker, and restores the previous HAL run loop before Wine unloads the driver.

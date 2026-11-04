@@ -1,56 +1,80 @@
 name: Check
 
 on:
-  pull_request:
-  push:
-    branches: [main]
-  workflow_dispatch:
+    pull_request:
+    push:
+        branches: [main]
+    workflow_dispatch:
 
 permissions:
-  contents: read
+    contents: read
 
 concurrency:
-  group: check-${{ github.ref }}
-  cancel-in-progress: true
+    group: check-${{ github.ref }}
+    cancel-in-progress: true
+
+env:
+    PYTHONDONTWRITEBYTECODE: "1"
 
 jobs:
-  repository:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v7.0.1
+    repository:
+        runs-on: ubuntu-24.04
+        timeout-minutes: 10
+        steps:
+            - name: Check out source
+              uses: actions/checkout@v7.0.1
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v10.0.1
+            - name: Install uv
+              uses: astral-sh/setup-uv@v10.0.1
 
-      - name: Run unit and lock checks
-        env:
-          PYTHONDONTWRITEBYTECODE: "1"
-        run: |
-          uv run --locked pytest
-          uv run --locked ruff check scripts tests
-          uv run --locked ruff format --check scripts tests
-          uv run --locked --no-dev scripts/runtime.py validate-lock
-          uv run --locked --no-dev scripts/release/licenses.py generate --check
-          uv run --locked --no-dev scripts/release/pins.py check
-          git diff --check
+            - name: Run unit and lock checks
+              run: |
+                  uv run --locked pytest
+                  uv run --locked ruff check scripts tests
+                  uv run --locked ruff format --check scripts tests
+                  uv run --locked --no-dev scripts/shared/runtime.py validate-lock
+                  uv run --locked --no-dev scripts/shared/release/licenses.py generate --check
+                  uv run --locked --no-dev scripts/shared/release/pins.py check
+                  git diff --check
 
-  patches:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        stage: [audio, hardware-cursor, performance, ace, cef, cn, combined]
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v7.0.1
+    patches:
+        runs-on: ubuntu-24.04
+        timeout-minutes: 20
+        strategy:
+            fail-fast: false
+            matrix:
+                stage:
+                    - audio
+                    - hardware-cursor
+                    - performance
+                    - ace
+                    - cef
+                    - cn
+                    - fullscreen
+                    - combined
+        steps:
+            - name: Check out source
+              uses: actions/checkout@v7.0.1
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v10.0.1
+            - name: Install uv
+              uses: astral-sh/setup-uv@v10.0.1
 
-      - name: Apply ${{ matrix.stage }} patches
-        env:
-          PYTHONDONTWRITEBYTECODE: "1"
-        run: uv run --locked --no-dev scripts/runtime.py prepare "${{ matrix.stage }}"
+            - name: Apply ${{ matrix.stage }} patches
+              env:
+                  STAGE: ${{ matrix.stage }}
+              run: uv run --locked --no-dev scripts/shared/runtime.py prepare "$STAGE"
+
+    arm64-patches:
+        runs-on: ubuntu-24.04
+        timeout-minutes: 20
+        steps:
+            - name: Check out source
+              uses: actions/checkout@v7.0.1
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v10.0.1
+
+            - name: Apply the ARM64 patch set
+              run: |
+                  uv run --locked --no-dev scripts/shared/runtime.py prepare combined \
+                    --target native-arm64

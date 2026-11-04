@@ -32,7 +32,7 @@ The opt-in Hardware Cursor Wine patch filters the exact region-specific cursor a
 
 ## License files in the archive
 
-The file `LICENSES/index.json` lists every component with its version, SPDX identifier, source, license files, optional notice, and status. The status is `verified` or `unverified`. The script `scripts/release/licenses.py` validates the index against `runtime.lock.json`, the build script, and the generated inventory. The clean build puts `Licenses/` (with `index.json`) and `NOTICE.md` at the root of the runtime archive. The release check fails when they are missing.
+The file `LICENSES/index.json` lists every component with its version, SPDX identifier, source, license files, optional notice, and status. The status is `verified` or `unverified`. The script `scripts/shared/release/licenses.py` validates the index against `runtime.lock.json`, the build script, and the generated inventory. The clean build puts `Licenses/` (with `index.json`) and `NOTICE.md` at the root of the runtime archive. The release check fails when they are missing.
 
 The corresponding-source offer for the Nix libraries is not yet in place.
 

@@ -43,13 +43,26 @@ jobs:
               run: |
                   set -euo pipefail
                   release_tag="$(uv run --locked --no-dev python -c \
-                    'import sys; from scripts.release.verify import normalize_version; print(normalize_version(sys.argv[1]))' \
+                    'import sys; from scripts.shared.release.verify import normalize_version; print(normalize_version(sys.argv[1]))' \
                     "$RELEASE_VERSION_INPUT")"
+                  architecture="${release_tag##*+}"
+                  if [[ "$architecture" == "$release_tag" ]]; then
+                    architecture="x86"
+                  fi
+                  if [[ "$architecture" != "x86" ]]; then
+                    echo "error: this workflow builds x86, so the tag needs +x86 or no architecture" >&2
+                    exit 1
+                  fi
                   build_commit="$(git rev-parse --verify HEAD)"
-                  echo "RELEASE_TAG=$release_tag" >> "$GITHUB_ENV"
-                  echo "BUILD_COMMIT=$build_commit" >> "$GITHUB_ENV"
-                  echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
-                  echo "build_commit=$build_commit" >> "$GITHUB_OUTPUT"
+                  {
+                    echo "RELEASE_TAG=$release_tag"
+                    echo "RELEASE_ARCHITECTURE=$architecture"
+                    echo "BUILD_COMMIT=$build_commit"
+                  } >> "$GITHUB_ENV"
+                  {
+                    echo "release_tag=$release_tag"
+                    echo "build_commit=$build_commit"
+                  } >> "$GITHUB_OUTPUT"
 
             - name: Refuse an existing tag or release
               shell: bash
@@ -90,7 +103,7 @@ jobs:
               run: softwareupdate --install-rosetta --agree-to-license
 
             - name: Install Nix
-              uses: cachix/install-nix-action@v31
+              uses: cachix/install-nix-action@v31.11.1
               with:
                   extra_nix_config: |
                       extra-platforms = x86_64-darwin
@@ -139,7 +152,7 @@ jobs:
 
             - name: Verify release checksum, provenance, and notices
               run: |
-                  uv run --locked --no-dev scripts/release/verify.py \
+                  uv run --locked --no-dev scripts/shared/release/verify.py \
                     --tag "$RELEASE_TAG" \
                     --commit "$BUILD_COMMIT" \
                     --archive "$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG.tar.gz" \

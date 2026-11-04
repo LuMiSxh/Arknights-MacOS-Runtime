@@ -7,7 +7,7 @@ The ACE, CEF, and CN patches target WineCX <!-- pin:wine.commit|code -->`e0aa380
 ## Audio
 
 - ID: `wine-audio-default-output`
-- File: `patches/wine/audio/0001-winecoreaudio-default-output.patch`
+- File: `patches/shared/wine/audio/0001-winecoreaudio-default-output.patch`
 - Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Wine draft MR 11370, commits `4d143f4c` and `65140f31`, Rhodri Richards
 - License: LGPL-2.1-or-later
@@ -22,7 +22,7 @@ The MR is a draft. Capture and exclusive streams are unchanged.
 ## Hardware Cursor
 
 - ID: `wine-hardware-cursor-suppression`
-- File: `patches/wine/hardware-cursor/0001-ntdll-hide-software-cursor-asset.patch`
+- File: `patches/shared/wine/hardware-cursor/0001-ntdll-hide-software-cursor-asset.patch`
 - Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Original runtime change; motivated by the [reported PC cursor stutter](https://www.reddit.com/r/arknights/comments/1vorlzp/pc_client_fix_for_the_annoying_mouse_stuttering/)
 - License: LGPL-2.1-or-later (Wine)
@@ -36,14 +36,14 @@ The filter matches the case-insensitive final basename `a9d41799f1af1868f2db4956
 
 ## Runtime capability manifest
 
-`Libraries/runtime-capabilities.json` is the versioned producer contract that consumers read from the packaged runtime tree. Schema version 2 advertises hardware-cursor support and MetalFX spatial-upscaling support. The optional `nativeFullscreenSpace` boolean advertises the fullscreen patch. Release validation checks the manifest against the pinned patch semantics and requires the packaged copy to match the source. Consumers use conservative defaults without the manifest.
+`Libraries/runtime-capabilities.json` is the versioned producer contract that consumers read from the packaged runtime tree. Schema version 2 advertises hardware-cursor support and MetalFX spatial-upscaling support. The optional `nativeFullscreenSpace` boolean advertises the fullscreen patch. The optional `aceCompat` boolean advertises the full ACE patch set for the lane, and `nativeArm64` identifies a runtime that runs without Rosetta. The native-arm64 archive ships `runtime-capabilities-arm64.json`, which differs from the x86_64 manifest. Release validation checks the manifest against the pinned patch semantics and requires the packaged copy to match the source. Consumers treat missing optional keys as false and use conservative defaults without the manifest.
 
 ## Performance
 
 ### Release present statistics gate
 
 - ID: `dxmt-skip-release-present-statistics`
-- File: `patches/dxmt/performance/0001-dxmt-skip-release-present-statistics.patch`
+- File: `patches/shared/dxmt/performance/0001-dxmt-skip-release-present-statistics.patch`
 - Component/base: DXMT <!-- pin:dxmt.commit|code -->`9839e55f98d4aca103957ee4132d6395a325a9ed`<!-- /pin -->
 - Source/author: Original runtime optimization, runtime maintainers
 - License: LGPL-2.1-or-later (DXMT)
@@ -57,21 +57,21 @@ Both `Present` paths keep `UpdateStatistics` behind `DXMT_DEBUG`, which avoids i
 
 ## ACE
 
-All ACE patches use the exact gate `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`. A missing, `0`, or other value keeps Wine's normal route. Every patch requires hash verification and clean application. All four are Endfield FineWine ports ([provenance](../patches/wine/ace/provenance.md)).
+All ACE patches use the exact gate `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`. A missing, `0`, or other value keeps Wine's normal route. Every patch requires hash verification and clean application. All four are Endfield FineWine ports ([provenance](../patches/shared/wine/ace/provenance.md)).
 
-- [`wine-ace-ntoskrnl-surface`](../patches/wine/ace/ntoskrnl/0001-ntoskrnl-compatibility-surface.patch)
+- [`wine-ace-ntoskrnl-surface`](../patches/shared/wine/ace/ntoskrnl/0001-ntoskrnl-compatibility-surface.patch)
     - What: Kernel exports and process metadata for the ACE client: current-thread process, image-name, exit-status, audit-parameter, and persistent-thread-state surfaces.
     - Scope: Compatibility-only routes use the ACE gate. `PsGetProcessImageFileName` and `PsGetProcessExitStatus` stay unconditional for valid process objects and follow their kernel `_In_` contract.
     - Checks: compile both architectures; exercise gated and general routes.
-- [`wine-ace-dispatcher-spoof`](../patches/wine/ace/dispatcher/0001-kernel32-ace-dispatcher-spoof.patch)
+- [`wine-ace-dispatcher-spoof`](../patches/x86/wine/ace/dispatcher/0001-kernel32-ace-dispatcher-spoof.patch)
     - What: x86-64 dispatcher lookup compatibility.
     - Scope: ACE gate and Rosetta x86-64 build only.
     - Checks: compile; dispatcher startup.
-- [`wine-ace-rosetta-workarounds`](../patches/wine/ace/rosetta/0001-macos-rosetta-ace-workarounds.patch)
+- [`wine-ace-rosetta-workarounds`](../patches/x86/wine/ace/rosetta/0001-macos-rosetta-ace-workarounds.patch)
     - What: Bounded NOP and ACE privileged-instruction handling under Rosetta.
     - Scope: ACE gate; existing CrossOver CET/XGETBV handling is untouched.
     - Checks: compile; exercise inactive and enabled routes.
-- [`wine-ace-relative-wait`](../patches/wine/ace/timing/0001-ntdll-ace-qpc-relative-wait.patch)
+- [`wine-ace-relative-wait`](../patches/shared/wine/ace/timing/0001-ntdll-ace-qpc-relative-wait.patch)
     - What: Relative `NtDelayExecution` timing route.
     - Scope: ACE gate and negative relative waits only; other waits are unchanged.
     - Checks: focused wait tests.
@@ -80,10 +80,10 @@ All ACE patches use the exact gate `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`. A missing,
 
 The CEF family uses the exact gate `ARKNIGHTS_RUNTIME_CEF_COMPAT=1`. An absent, `0`, or invalid value keeps Wine's normal route. If the CEF variable is absent, `ARKNIGHTS_RUNTIME_CN_COMPAT=1` keeps the legacy Bilibili behavior.
 
-- [`wine-cef-bilibili-stackbase`](../patches/wine/cef/0001-ntdll-cef-compatibility.patch)
+- [`wine-cef-bilibili-stackbase`](../patches/shared/wine/cef/0001-ntdll-cef-compatibility.patch)
     - What: Descriptor-driven CEF loader compatibility; proven Bilibili CEF 80.1.15 descriptor.
     - Scope: Explicit CEF gate; legacy CN fallback only when CEF is absent. Before any write, the descriptor requires the `libcef.dll` basename and all three expected RVA byte sequences.
-    - Provenance and checks: Original runtime change; see [provenance](../patches/wine/cef/provenance.md), apply check, and x86_64 loader compile.
+    - Provenance and checks: Original runtime change; see [provenance](../patches/shared/wine/cef/provenance.md), apply check, and x86_64 loader compile.
 
 Add a regional descriptor only with reverse-engineering evidence for its complete hash/RVA/byte contract.
 
@@ -91,12 +91,12 @@ Add a regional descriptor only with reverse-engineering evidence for its complet
 
 The CN family contains only the Bilibili windowing patches. They use the exact gate `ARKNIGHTS_RUNTIME_CN_COMPAT=1`. A missing, `0`, or other value keeps Wine's normal route.
 
-- [`wine-cn-bilibili-layered-child`](../patches/wine/cn/windowing/0001-win32u-winemac-bilibili-layered-child.patch)
+- [`wine-cn-bilibili-layered-child`](../patches/shared/wine/cn/windowing/0001-win32u-winemac-bilibili-layered-child.patch)
     - What: Keeps Chromium's layered proxies for login and payment drawable inside the root Wine window.
     - Scope: CN gate and `PCGamePlatform.exe`. Login keeps the `CMyWebViewDlg` parent-chain route. Payment also requires an exact `Chrome_WidgetWin_0` `WS_CHILD` non-popup with an immediate `CefBrowserWindow` parent, a non-child `GA_ROOT` of class `CPayDlg_P_` plus a nonempty suffix, and matching HWND/parent/root process IDs. Only parent links count. The driver still requires `Chrome.WindowTranslucent` and a layered surface. Each accepted child gets an in-root view with independent color/shape images, source alpha, `SourceConstantAlpha`, root-client geometry, reparent/hide cleanup, and USER hit testing.
     - Provenance and checks: Original runtime change; hash, apply check, offline classifier/contract tests, `win32u`/`winemac` compile, Bilibili payment-window rendering check.
 
-- [`wine-cn-bilibili-join-all-spaces`](../patches/wine/cn/windowing/0002-winemac-bilibili-join-all-spaces.patch)
+- [`wine-cn-bilibili-join-all-spaces`](../patches/shared/wine/cn/windowing/0002-winemac-bilibili-join-all-spaces.patch)
     - What: Makes the Bilibili platform window join all Spaces, so it stays visible over a game in a native fullscreen Space.
     - Scope: CN gate and `PCGamePlatform.exe` (the `macdrv_is_bilibili_platform_process()` test of the first CN patch). In `adjustFullScreenBehavior:` it clears `FullScreenPrimary` and sets `CanJoinAllSpaces` and `FullScreenAuxiliary`.
     - Provenance and checks: Original runtime change; hash, apply check after the first CN patch, `winemac` compile.
@@ -106,7 +106,7 @@ Remove a patch when the pinned WineCX supplies the behavior or the route is no l
 ## Menu
 
 - ID: `wine-menu-command-q-quit`
-- File: `patches/wine/menu/0001-winemac-command-q-quit.patch`
+- File: `patches/shared/wine/menu/0001-winemac-command-q-quit.patch`
 - Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Original runtime change, runtime maintainers
 - License: LGPL-2.1-or-later (Wine)
@@ -121,13 +121,13 @@ The patch changes one line in `dlls/winemac.drv/cocoa_app.m`. It sets the Quit i
 ## Fullscreen
 
 - ID: `wine-fullscreen-native-space`
-- File: `patches/wine/fullscreen/0001-winemac-native-fullscreen-space.patch`
+- File: `patches/shared/wine/fullscreen/0001-winemac-native-fullscreen-space.patch`
 - Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Original runtime change, runtime maintainers
 - License: LGPL-2.1-or-later (Wine)
 - Gate: Exact `ARKNIGHTS_RUNTIME_NATIVE_FULLSCREEN_SPACE=1`, read once in `setup_options`
 - Inactive behavior: Missing, `0`, or invalid values keep the screen-sized window at `NSStatusWindowLevel + 1`
-- Automated gate: Hash, clean `git apply --check` alone and after the `cn` family, `cocoa_app.m` syntax check
+- Automated gate: Hash, clean `git apply --check` alone and after the `cn` family on both Wine branches, `cocoa_app.m` syntax check
 - Manual gate: A borderless fullscreen game window enters its own Space. Leaving the Space by the user stays left. A Wine resize below screen size leaves the Space. The cursor clip still holds after each change.
 - Removal: Drop when the client no longer needs a native Space, or when WineCX offers an equivalent control
 
@@ -136,3 +136,52 @@ A window is a candidate only when the gate is on, it participates in the window 
 The patch enters the Space with a deferred `toggleFullScreen:` call. It never changes the window frame inside a Space. It reposts the actual frame to Wine at most twice for one requested rect. When the rect from Wine no longer covers the screen, the patch leaves the Space. A user exit blocks automatic re-entry until the rect changes or the window is ordered out. The patch logs decisions in the `macdrv` debug channel. In a Space the close button is enabled and sends the normal Win32 close.
 
 The patch turns the feature off for the whole process when the program is `PlatformProcess.exe` or `PlatformProcess.original.helper.exe`, because the notice helper inherits the gate. This check does not depend on `ARKNIGHTS_RUNTIME_CN_COMPAT`.
+
+## Address space
+
+- ID: `wine-arm64-address-space`
+- File: `patches/arm/wine/address-space/0001-ntdll-relocate-the-shared-user-data.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Port of [`metalsharp/MetalSharp-Wine`](https://github.com/metalsharp/MetalSharp-Wine) patches `0003`, `0008`, and `0016`, Avery Felts. See [provenance](../patches/arm/wine/address-space/provenance.md).
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The `native-arm64` target has no runtime flag, because the loader cannot start without the relocation.
+- Inactive behavior: The `rosetta-x86_64` target never receives the patch, and keeps `KUSER_SHARED_DATA` at `0x7ffe0000`.
+- Automated gate: Hash, clean `git apply --check` after the shared families, ARM64 build, and `wine cmd /c ver` without the cross-architecture entitlement
+- Manual gate: A 64-bit Windows program starts under FEX, and the game reaches the login screen.
+- Removal: Drop when macOS makes the low 4 GB mappable for an ad-hoc signed arm64 loader, or when a distributable signing identity carries the cross-architecture entitlement.
+
+macOS keeps the low 4 GB of an arm64 process as a hard pagezero. `KUSER_SHARED_DATA` and the first TEB block belong inside that range. The patch exports the page address to the PE side, moves the page to `MM_SHARED_USER_DATA_VA + 4 GB` when the canonical mapping fails, lets the first 64-bit TEB block take an address above 4 GB, and emulates ARM64 loads that fault on the canonical address.
+
+macOS also reserves the main executable's Mach-O region just above 4 GB. The patch probes upward from 4 GB for the first page that `mach_vm_map` accepts, then uses that address as the floor for thread data, stacks, and image fallbacks. A fixed `limit_4g` floor fails because the reservation covers unmapped holes too.
+
+The write and execute page handling of the reference patch is not ported: WineCX 11.17 already flips those pages in `virtual_handle_fault`.
+
+## FEX
+
+- ID: `wine-arm64-fex-modules`
+- File: `patches/arm/wine/fex/0001-wine.inf-use-fex-modules.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Registry part of [`metalsharp/MetalSharp-Wine`](https://github.com/metalsharp/MetalSharp-Wine) patch `0004`, Avery Felts. See [provenance](../patches/arm/wine/fex/provenance.md).
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The `native-arm64` target always uses the FEX modules.
+- Inactive behavior: The `rosetta-x86_64` target keeps `xtajit64.dll` and `xtajit.dll`.
+- Automated gate: Hash, clean `git apply --check`, ARM64 build, and a fresh prefix whose `Wow64` values name existing modules.
+- Manual gate: A minimal x86_64 PE starts under FEX.
+- Removal: Drop when WineCX ships ARM64 Wow64 values that name the FEX modules.
+
+Wine's `wine.inf` points `Wow64\amd64` at `xtajit64.dll` and `Wow64\x86` at `xtajit.dll`. The ARM64 build ships `libarm64ecfex.dll` and `libwow64fex.dll` instead. Without the wiring, an x86_64 image loads but never starts.
+
+## Mono
+
+- ID: `wine-arm64-skip-mono`
+- File: `patches/arm/wine/mono/0001-mscoree-skip-mono-on-native-arm64.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Original change for this repository.
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The `native-arm64` target always skips the Wine Mono install.
+- Inactive behavior: The `rosetta-x86_64` target keeps the stock `install_wine_mono()` path.
+- Automated gate: Hash, clean `git apply --check`, and a fresh ARM64 prefix that does not spawn `msiexec` or the Mono helpers.
+- Manual gate: `wine cmd /c ver` on a fresh prefix exits 0 without `WINEDLLOVERRIDES`.
+- Removal: Drop when the ARM64 lane can install Wine Mono without the entitlement, or when the runtime ships a 64-bit-only .NET replacement.
+
+Wine Mono's support package runs 32-bit and ARM64EC helper executables. The 32-bit helpers need memory below 4 GB, which macOS refuses without the cross-architecture entitlement. Wine retries the install on every prefix creation and opens a download dialog when the package is not cached. Arknights does not use .NET, so the ARM64 lane skips the install.

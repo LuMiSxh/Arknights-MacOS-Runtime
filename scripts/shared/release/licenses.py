@@ -18,12 +18,13 @@ import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 if __package__:
     from ..lib.console import error, success, warning
 else:
     if str(REPOSITORY_ROOT / "scripts") not in sys.path:
         sys.path.insert(0, str(REPOSITORY_ROOT / "scripts"))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from lib.console import error, success, warning
 
 LICENSES_DIRECTORY = "LICENSES"
@@ -31,7 +32,7 @@ INDEX_NAME = "index.json"
 ARCHIVE_LICENSES_DIRECTORY = "Licenses"
 ARCHIVE_NOTICE = "NOTICE.md"
 SCHEMA_VERSION = 1
-BUILD_SCRIPT = "scripts/build-canary.sh"
+BUILD_SCRIPT = "scripts/shared/build.py"
 NIX_INVENTORY_ROLE = "Bundled Nix library"
 BUILD_ONLY_NIX_PACKAGES = frozenset(("vulkan-headers",))
 REQUIRED_COMPONENTS = frozenset(("Wine", "DXMT", "MoltenVK"))
@@ -82,7 +83,7 @@ COMPANION_LICENSES = {
 }
 SPDX_OPERATORS = frozenset(("AND", "OR", "WITH"))
 SPDX_TOKEN = re.compile(r"[A-Za-z0-9.+-]+|[()]")
-NIX_BUILD_PACKAGES = re.compile(r"for package in ([^;]+); do")
+NIX_BUILD_PACKAGES = re.compile(r"\bNIX_PACKAGES\s*=\s*\((.*?)\)", re.DOTALL)
 NIX_STORE_NAME = re.compile(
     r"^(?:[0-9a-z]{32}-)?(?P<pname>.+?)-(?P<version>\d.*?)"
     r"(?:-(?P<output>bin|dev|lib|man|doc|info|devdoc|static))?$"
@@ -241,7 +242,7 @@ def direct_nix_packages(build_script: Path) -> set[str]:
     match = NIX_BUILD_PACKAGES.search(script)
     if match is None:
         raise LicenseError("build script has no Nix package list")
-    return set(match.group(1).split())
+    return set(re.findall(r'"([a-z0-9-]+)"', match.group(1)))
 
 
 def validate_index(

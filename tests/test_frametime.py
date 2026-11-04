@@ -9,7 +9,7 @@ import unittest
 from datetime import UTC, datetime
 from pathlib import Path
 
-from scripts.frametime import FrametimeError, record
+from scripts.shared.frametime import FrametimeError, record
 
 
 class FakeCollector:

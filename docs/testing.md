@@ -10,7 +10,7 @@
 3. `just prepare base`: verifies the unmodified source pins.
 4. `just prepare audio`, `hardware-cursor`, `performance`, `ace`, `cef`, `cn`, and `fullscreen`: applies each family independently without fuzz.
 5. `just build combined`: builds an isolated overlay canary. It is not a release build.
-6. `just verify`: checks archive paths, file types, DXMT native-loader markers, dependency references, and deployment targets. Prepare locally rebuilt D3D10/D3D11/DXGI DLLs with the DOS stub of `build-canary.sh`. Otherwise Wine's builtin marker overrides native-first loading. Keep the builtin marker on `winemetal.dll`.
+6. `just verify`: checks archive paths, file types, DXMT native-loader markers, dependency references, and deployment targets. Prepare locally rebuilt D3D10/D3D11/DXGI DLLs with the DOS stub of `scripts/build.py`. Otherwise Wine's builtin marker overrides native-first loading. Keep the builtin marker on `winemetal.dll`.
 7. The build verifies its emitted checksum before it publishes the artifact. Integrate and exercise the artifact in its consumer.
 8. After a clean full build, dispatch the release workflow with one version. It creates the tag and draft release only after all release gates pass.
 

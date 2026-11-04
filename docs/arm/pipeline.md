@@ -59,14 +59,14 @@ Extend it with the target before the ARM64 lane builds.
 
 ## Commands
 
-| Command                                                                     | Purpose                                        |
-| --------------------------------------------------------------------------- | ---------------------------------------------- |
-| `uv run --locked scripts/runtime.py validate-lock`                          | Validate every target.                         |
-| `uv run --locked scripts/runtime.py validate-lock --target native-arm64`    | Validate the lock and resolve one target.      |
-| `uv run --locked scripts/runtime.py prepare combined --target native-arm64` | Clone and patch the ARM64 sources.             |
-| `just build arm64`                                                          | Build a canary ARM64 artifact.                 |
-| `just verify .build/stages/arm64/candidate/Libraries --target native-arm64` | Validate the artifact.                         |
-| `just build-release arm64`                                                  | Build a release artifact for the ARM64 target. |
+| Command                                                                            | Purpose                                   |
+| ---------------------------------------------------------------------------------- | ----------------------------------------- |
+| `uv run --locked scripts/shared/runtime.py validate-lock`                          | Validate every target.                    |
+| `uv run --locked scripts/shared/runtime.py validate-lock --target native-arm64`    | Validate the lock and resolve one target. |
+| `uv run --locked scripts/shared/runtime.py prepare combined --target native-arm64` | Clone and patch the ARM64 sources.        |
+| `just build-arm64`                                                                 | Build a canary ARM64 artifact.            |
+| `just verify-arm64`                                                                | Validate the artifact.                    |
+| `just build-release`                                                               | Build the release artifacts.              |
 
 A command without `--target` keeps its current behavior.
 The default target is `rosetta-x86_64` until the ARM64 canary passes.
@@ -89,8 +89,8 @@ flowchart LR
 ### 1. Prepare
 
 ```sh
-uv run --locked scripts/runtime.py validate-lock
-uv run --locked scripts/runtime.py prepare combined --target native-arm64
+uv run --locked scripts/shared/runtime.py validate-lock
+uv run --locked scripts/shared/runtime.py prepare combined --target native-arm64
 ```
 
 Prepare clones each source at its pinned commit.
@@ -180,6 +180,13 @@ The FEX top-level CMake file rejects macOS.
 Use the cross toolchain file for the PE build and the direct compile for the unix bridge.
 The reference for both is `metalsharp/MetalSharp-Wine` at `scripts/build-fex.sh`.
 
+The arm64ec triple selects the hybrid ABI on its own.
+Do not add `-marm64x`; that flag emits ARM64X objects instead of ARM64EC objects.
+mingw's `winnt.h` declares `RtlIsEcCode` only for `__x86_64__`.
+Force-include a header that declares it for the arm64ec build.
+Do not define `__x86_64__`; it pulls the x86 intrinsic surface into the compile.
+The forced include must skip assembly files.
+
 ### 4. DXMT
 
 ```sh
@@ -195,6 +202,11 @@ meson install -C "$dxmt_build"
 `airconv` needs LLVM 15 with typed pointers.
 Build LLVM 15 for arm64 with static libraries and no tools.
 The reference build is `dappermint/winecx-gptk` at `arm64/build-llvm15.sh`.
+
+Meson ignores `MACOSX_DEPLOYMENT_TARGET`.
+Pass a native file that sets `-mmacosx-version-min` to the lock value.
+The native `winemetal.so` then matches the deployment target.
+The cross file keeps `-marm64x`; DXMT loads as ARM64X in both process types.
 
 ### 5. Assemble
 
@@ -225,7 +237,7 @@ Libraries/
     d3d11.dll
     dxgi.dll
     winemetal.dll
-  runtime-capabilities.json
+  runtime-capabilities-arm64.json
 ```
 
 Rules:
@@ -257,7 +269,7 @@ The ARM64EC cross file sets `cpu_family` to `aarch64` and passes `-marm64x`.
 
 ### 6. Validate
 
-Extend `scripts/validate_runtime.py` with a target parameter:
+Extend `scripts/shared/validate_runtime.py` with a target parameter:
 
 | Check                   | Rosetta target                  | ARM64 target                      |
 | ----------------------- | ------------------------------- | --------------------------------- |
@@ -284,9 +296,52 @@ Arknights-MacOS-Runtime-vX.Y.Z.tar.gz
 Arknights-MacOS-Runtime-arm64-vX.Y.Z.tar.gz
 ```
 
-The `provenance.json` file gains a `target` field.
-The capability manifest stays identical.
+`provenance.json` gains a `target` field.
+The native-arm64 artifact ships `runtime-capabilities-arm64.json`.
+It differs from the x86_64 manifest in `aceCompat` and `nativeArm64`.
 Keep the ARM64 artifact out of the release until the manual canary passes.
+
+## Signing and distribution
+
+The project has no paid Apple Developer account.
+Neither target needs one, because no artifact uses the cross-architecture entitlement.
+
+| Item               | Rule                                                              |
+| ------------------ | ----------------------------------------------------------------- |
+| Signing            | Sign every Mach-O file ad hoc: `codesign --force --sign -`.       |
+| Notarization       | None. Notarization needs a paid Developer ID certificate.         |
+| Entitlement        | Never request one for a distributed artifact.                     |
+| i386, 4K pages     | Out of scope. Both need the entitlement.                          |
+| First-launch trust | The user completes Apple's **Open Anyway** flow for the launcher. |
+
+The launcher extracts the archive into application support.
+The launcher writes those files, so macOS does not quarantine them.
+The runtime therefore starts without a second trust prompt.
+
+The client publishes ad-hoc signed, non-notarized releases already.
+See `docs/development/releases-and-updates.md` in that repository.
+The ARM64 lane adds no signing requirement to that model.
+
+Ad-hoc signing does not change the redistribution terms.
+`provenance.json` records the pinned sources and the artifact hashes per target.
+The source offer stays as it is.
+
+Three conditions would break this model:
+
+1. macOS requires notarization for every executable, not only downloaded apps.
+2. Apple changes the 16K page or `PAGEZERO` behavior for unentitled processes.
+3. The client stops shipping an ad-hoc signed launcher.
+
+The first two affect both targets, not only ARM64.
+
+If Gatekeeper blocks a user, the fallback is a local build.
+`just build-release` on the user's Mac produces an artifact that macOS did not quarantine.
+
+A free Apple ID cannot authorize a distributed artifact.
+Apple documents `com.apple.developer.cross-architecture-support-unmanaged` for free accounts, but it is unreachable today.
+If Apple opens it, the profile stays bound to one team, one App ID, and one Mac.
+Use it only for a local canary with i386 or 4K pages, and never ship the result.
+See [provenance](provenance.md#entitlement-availability).
 
 ## CI
 
@@ -298,8 +353,9 @@ Keep the ARM64 artifact out of the release until the manual canary passes.
 | Release               | ARM64 macOS runner | Selected target  |
 
 Confirm that the `xcode-27` runner label resolves to Apple Silicon before the first ARM64 job.
-The current build uses `x86_64-darwin` Nix packages for Wine.
-The ARM64 target needs `aarch64-darwin` packages instead.
+The x86_64 lane uses `x86_64-darwin` Nix packages for Wine.
+The ARM64 lane resolves the same packages for `aarch64-darwin` from the locked nixpkgs commit.
+Both lanes bundle the library closure from `/nix/store`.
 
 ## Rollout
 
