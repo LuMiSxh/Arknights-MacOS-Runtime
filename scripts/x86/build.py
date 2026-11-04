@@ -373,9 +373,10 @@ def build_canary(builder: Builder, stage: str, *, clean_release: bool = False) -
     capability_manifest = str(lock["interface"]["runtimeCapabilities"])
     if clean_release:
         candidate.mkdir(parents=True)
-        shutil.copy2(ROOT / capability_manifest, candidate / capability_manifest)
     else:
         clone_tree(root / "base" / "Libraries", candidate)
+    # The base archive can carry an older manifest; the pinned source is the contract.
+    shutil.copy2(ROOT / capability_manifest, candidate / capability_manifest)
     members = ("Libraries",)
 
     launcher = candidate / "Wine" / "bin" / "Arknights"
