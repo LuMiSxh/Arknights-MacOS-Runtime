@@ -18,6 +18,15 @@ from scripts.validate_runtime import (
 )
 
 
+def pe_payload(machine: int) -> bytes:
+    payload = bytearray(128)
+    payload[0:2] = b"MZ"
+    payload[0x3C:0x40] = (0x40).to_bytes(4, "little")
+    payload[0x40:0x44] = b"PE\0\0"
+    payload[0x44:0x46] = machine.to_bytes(2, "little")
+    return bytes(payload)
+
+
 class RuntimeStructureTests(unittest.TestCase):
     def test_script_entrypoint_loads_its_runtime_module(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -146,6 +155,51 @@ class RuntimeStructureTests(unittest.TestCase):
             return_value=CompletedProcess([], 0, "PE32+ executable x86-64", ""),
         ):
             self.assertEqual(validate_required_architectures(self.root, [relative]), 1)
+
+    def test_arm64_lane_reads_the_pe_machine_type(self) -> None:
+        required = [
+            "Wine/lib/wine/aarch64-unix/winemac.so",
+            "DXMT/x64/d3d11.dll",
+        ]
+        (self.root / required[0]).parent.mkdir(parents=True)
+        (self.root / required[0]).write_bytes(b"fixture")
+        (self.root / required[1]).parent.mkdir(parents=True, exist_ok=True)
+        output = CompletedProcess([], 0, "Mach-O 64-bit bundle arm64", "")
+
+        with patch("scripts.validate_runtime.subprocess.run", return_value=output):
+            for machine in (0xA641, 0xAA64):
+                with self.subTest(machine=hex(machine)):
+                    (self.root / required[1]).write_bytes(pe_payload(machine))
+                    self.assertEqual(
+                        validate_required_architectures(self.root, required), 2
+                    )
+
+    def test_arm64_lane_rejects_x86_64_payloads(self) -> None:
+        required = [
+            "Wine/lib/wine/aarch64-unix/winemac.so",
+            "DXMT/x64/d3d11.dll",
+        ]
+        (self.root / required[0]).parent.mkdir(parents=True)
+        (self.root / required[0]).write_bytes(b"fixture")
+        (self.root / required[1]).parent.mkdir(parents=True, exist_ok=True)
+        (self.root / required[1]).write_bytes(pe_payload(0x8664))
+        arm64 = CompletedProcess([], 0, "Mach-O 64-bit bundle arm64", "")
+
+        with (
+            patch("scripts.validate_runtime.subprocess.run", return_value=arm64),
+            self.assertRaisesRegex(
+                RuntimeValidationError, "unexpected PE architecture"
+            ),
+        ):
+            validate_required_architectures(self.root, required)
+
+        (self.root / required[1]).write_bytes(pe_payload(0xA641))
+        x86_64 = CompletedProcess([], 0, "Mach-O 64-bit bundle x86_64", "")
+        with (
+            patch("scripts.validate_runtime.subprocess.run", return_value=x86_64),
+            self.assertRaisesRegex(RuntimeValidationError, "unexpected architecture"),
+        ):
+            validate_required_architectures(self.root, required)
 
     def test_rejects_a_symlink_that_escapes_the_runtime(self) -> None:
         self.create_required_files()

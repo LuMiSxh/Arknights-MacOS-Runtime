@@ -137,6 +137,9 @@
       "id": "wine-ace-dispatcher-spoof",
       "component": "wine",
       "family": "ace",
+      "targets": [
+        "rosetta-x86_64"
+      ],
       "path": "patches/wine/ace/dispatcher/0001-kernel32-ace-dispatcher-spoof.patch",
       "sha256": "f60ccef64cf3fa154de7a85b96a5fbaabceb019ed92ea0af2f94dd61d90cb2be"
     },

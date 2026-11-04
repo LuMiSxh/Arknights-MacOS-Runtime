@@ -399,11 +399,17 @@ def prepare(
     destination_root: Path = BUILD_ROOT / "sources",
     *,
     target: str | None = None,
+    all_sources: bool = False,
+    skip_patches: tuple[str, ...] = (),
 ) -> None:
     lock = load_lock(target=target)
     selected = patches_for_stage(lock, stage)
+    declared = {patch["id"] for patch in lock["patches"]}
+    unknown = sorted(set(skip_patches) - declared)
+    if unknown:
+        raise LockError(f"unknown patch to skip: {', '.join(unknown)}")
     components = {patch["component"] for patch in selected}
-    if stage == "base":
+    if stage == "base" or all_sources:
         components = set(lock["sources"])
     for component in sorted(components):
         source = lock["sources"][component]
@@ -423,6 +429,9 @@ def prepare(
         _run("git", "checkout", "--detach", source["commit"], cwd=destination)
         for patch in selected:
             if patch["component"] != component:
+                continue
+            if patch["id"] in skip_patches:
+                info(f"Skipping patch {patch['id']} by request")
                 continue
             patch_path = ROOT / patch["path"]
             _run("git", "apply", "--check", str(patch_path), cwd=destination)
@@ -479,6 +488,18 @@ def main() -> int:
     prepare_parser.add_argument("stage", choices=STAGES)
     prepare_parser.add_argument("--destination-root", type=Path)
     prepare_parser.add_argument("--target")
+    prepare_parser.add_argument(
+        "--all-sources",
+        action="store_true",
+        help="clone every source of the target, not only the ones the stage patches",
+    )
+    prepare_parser.add_argument(
+        "--skip-patch",
+        action="append",
+        default=[],
+        metavar="ID",
+        help="leave one patch out; report it in the build log (canary before a rebase)",
+    )
     fetch_parser = subparsers.add_parser("fetch-base")
     fetch_parser.add_argument("--target")
     arguments = parser.parse_args()
@@ -495,6 +516,8 @@ def main() -> int:
                 arguments.stage,
                 arguments.destination_root or BUILD_ROOT / "sources",
                 target=arguments.target,
+                all_sources=arguments.all_sources,
+                skip_patches=tuple(arguments.skip_patch),
             )
         else:
             print(fetch_base(target=arguments.target))

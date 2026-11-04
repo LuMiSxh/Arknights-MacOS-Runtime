@@ -12,6 +12,7 @@ from scripts.runtime import (
     load_lock,
     monitored_sources,
     patches_for_stage,
+    prepare,
     source_directory,
 )
 
@@ -300,6 +301,10 @@ class RuntimeLockTests(unittest.TestCase):
             source_directory("wine", "combined", arm64_view),
             "wine-native-arm64-combined",
         )
+
+    def test_rejects_an_unknown_patch_to_skip(self) -> None:
+        with self.assertRaisesRegex(LockError, "unknown patch to skip"):
+            prepare("audio", self.root / "sources", skip_patches=("missing",))
 
     def test_repository_lock_declares_the_native_arm64_target(self) -> None:
         root = Path(__file__).resolve().parents[1]
