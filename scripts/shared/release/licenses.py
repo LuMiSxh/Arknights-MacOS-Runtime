@@ -32,7 +32,7 @@ INDEX_NAME = "index.json"
 ARCHIVE_LICENSES_DIRECTORY = "Licenses"
 ARCHIVE_NOTICE = "NOTICE.md"
 SCHEMA_VERSION = 1
-BUILD_SCRIPT = "scripts/x86/build.py"
+BUILD_SCRIPT = "scripts/shared/build.py"
 NIX_INVENTORY_ROLE = "Bundled Nix library"
 BUILD_ONLY_NIX_PACKAGES = frozenset(("vulkan-headers",))
 REQUIRED_COMPONENTS = frozenset(("Wine", "DXMT", "MoltenVK"))
@@ -83,7 +83,7 @@ COMPANION_LICENSES = {
 }
 SPDX_OPERATORS = frozenset(("AND", "OR", "WITH"))
 SPDX_TOKEN = re.compile(r"[A-Za-z0-9.+-]+|[()]")
-NIX_BUILD_PACKAGES = re.compile(r"CANARY_NIX_PACKAGES\s*=\s*\((.*?)\)", re.DOTALL)
+NIX_BUILD_PACKAGES = re.compile(r"\bNIX_PACKAGES\s*=\s*\((.*?)\)", re.DOTALL)
 NIX_STORE_NAME = re.compile(
     r"^(?:[0-9a-z]{32}-)?(?P<pname>.+?)-(?P<version>\d.*?)"
     r"(?:-(?P<output>bin|dev|lib|man|doc|info|devdoc|static))?$"

@@ -21,7 +21,7 @@ else:
     from lib.console import info
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 RUNTIME_CLI = ROOT / "scripts" / "shared" / "runtime.py"
@@ -63,6 +63,26 @@ HOST_BUILD_VARIABLES = (
 
 
 NIX_STORE = "/nix/store/"
+
+
+NIX_DEFAULT_BIN = Path("/nix/var/nix/profiles/default/bin")
+
+
+NIX_PACKAGES = (
+    "freetype",
+    "gnutls",
+    "libpng",
+    "zlib",
+    "brotli",
+    "bzip2",
+    "nettle",
+    "libtasn1",
+    "libidn2",
+    "p11-kit",
+    "libunistring",
+    "gmp",
+    "vulkan-headers",
+)
 
 
 class BuildError(RuntimeError):
@@ -195,21 +215,65 @@ def references_in(builder: Builder, binary: Path, prefix: str) -> list[str]:
     return references
 
 
-def rewrite_references(builder: Builder, directory: Path, binary: Path) -> None:
+def nix_build(builder: Builder, attribute: str) -> Path | None:
+    nix = shutil.which("nix", path=builder.environment.get("PATH")) or str(
+        NIX_DEFAULT_BIN / "nix"
+    )
+    output = builder.capture(
+        nix,
+        "--extra-experimental-features",
+        "nix-command flakes",
+        "build",
+        "--no-link",
+        "--print-out-paths",
+        attribute,
+        allow_failure=True,
+    ).strip()
+    return Path(output) if output else None
+
+
+def nix_package_outputs(
+    builder: Builder, nixpkgs: str, system: str, packages: tuple[str, ...]
+) -> list[Path]:
+    """Resolve the dev, out, and lib outputs of the pinned packages."""
+
+    outputs: list[Path] = []
+    for package in packages:
+        for output_name in ("dev", "out", "lib"):
+            output = nix_build(
+                builder,
+                f"{nixpkgs}#legacyPackages.{system}.{package}.{output_name}",
+            )
+            if output is not None:
+                outputs.append(output)
+    return outputs
+
+
+def fix_release_macho(builder: Builder, directory: Path, binary: Path) -> None:
+    """Relocate a bundled Nix library next to the modules that load it."""
+
     relative = os.path.relpath(directory, binary.parent)
+    binary.chmod(binary.stat().st_mode | 0o200)
     if ".dylib" in binary.name:
-        builder.run(
-            "install_name_tool",
-            "-id",
-            f"@loader_path/{binary.name}",
-            binary,
-        )
-    for reference in references_in(builder, binary, "/opt/homebrew/"):
-        builder.run(
-            "install_name_tool",
-            "-change",
-            reference,
-            f"@loader_path/{relative}/{Path(reference).name}",
-            binary,
-        )
+        builder.run("install_name_tool", "-id", f"@loader_path/{binary.name}", binary)
+    for reference in references_in(builder, binary, NIX_STORE):
+        name = Path(reference).name
+        if name.startswith("libiconv") and "_iconv" in builder.capture(
+            "nm", "-u", binary, allow_failure=True
+        ):
+            builder.run(
+                "install_name_tool",
+                "-change",
+                reference,
+                "/usr/lib/libiconv.2.dylib",
+                binary,
+            )
+        else:
+            builder.run(
+                "install_name_tool",
+                "-change",
+                reference,
+                f"@loader_path/{relative}/{name}",
+                binary,
+            )
     builder.run("codesign", "--force", "--sign", "-", binary)

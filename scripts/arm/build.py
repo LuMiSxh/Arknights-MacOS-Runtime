@@ -14,14 +14,17 @@ if __package__:
         ARCHIVE_BUNDLED_LIBRARIES,
         CLEARED_DOS_STUB,
         LOADER_SDK_VERSION,
+        NIX_PACKAGES,
+        NIX_STORE,
         ROOT,
         RUNTIME_CLI,
         VALIDATE_CLI,
         Builder,
         BuildError,
+        fix_release_macho,
         logical_cpu_count,
+        nix_package_outputs,
         references_in,
-        rewrite_references,
         sign_directory,
         write_archive,
     )
@@ -33,14 +36,17 @@ else:
         ARCHIVE_BUNDLED_LIBRARIES,
         CLEARED_DOS_STUB,
         LOADER_SDK_VERSION,
+        NIX_PACKAGES,
+        NIX_STORE,
         ROOT,
         RUNTIME_CLI,
         VALIDATE_CLI,
         Builder,
         BuildError,
+        fix_release_macho,
         logical_cpu_count,
+        nix_package_outputs,
         references_in,
-        rewrite_references,
         sign_directory,
         write_archive,
     )
@@ -54,7 +60,7 @@ ARM64_TARGET = "native-arm64"
 ARM64_STAGE_ROOT = BUILD_ROOT / "stages" / "arm64"
 
 
-ARM64_NIX_PACKAGES = ("freetype", "gnutls", "vulkan-headers")
+ARM64_NIX_SYSTEM = "aarch64-darwin"
 
 
 def arm64_environment(builder: Builder, lock: dict[str, object]) -> None:
@@ -93,19 +99,26 @@ def arm64_environment(builder: Builder, lock: dict[str, object]) -> None:
     )
 
 
-def brew_prefixes(builder: Builder) -> tuple[str, str, str]:
+def library_flags(outputs: list[Path]) -> tuple[str, str, str]:
     pkg_config: list[str] = []
     includes: list[str] = []
     libraries: list[str] = []
-    for package in ARM64_NIX_PACKAGES:
-        prefix = Path(builder.capture("brew", "--prefix", package).strip())
-        if (prefix / "lib" / "pkgconfig").is_dir():
-            pkg_config.append(str(prefix / "lib" / "pkgconfig"))
-        if (prefix / "include").is_dir():
-            includes.append(f"-I{prefix / 'include'}")
-        if (prefix / "lib").is_dir():
-            libraries.append(f"-L{prefix / 'lib'}")
+    for output in outputs:
+        if (output / "lib" / "pkgconfig").is_dir():
+            pkg_config.append(str(output / "lib" / "pkgconfig"))
+        if (output / "include").is_dir():
+            includes.append(f"-I{output / 'include'}")
+        if (output / "lib").is_dir():
+            libraries.append(f"-L{output / 'lib'}")
     return ":".join(pkg_config), " ".join(includes), " ".join(libraries)
+
+
+def nix_outputs(builder: Builder, lock: dict[str, object]) -> list[Path]:
+    """Resolve the pinned aarch64-darwin libraries the lane links against."""
+
+    revision = str(lock["build"]["nixpkgs"]["commit"])
+    nixpkgs = f"github:NixOS/nixpkgs/{revision}"
+    return nix_package_outputs(builder, nixpkgs, ARM64_NIX_SYSTEM, NIX_PACKAGES)
 
 
 def patch_vulkan_soname(wine_source: Path) -> None:
@@ -124,11 +137,12 @@ def patch_vulkan_soname(wine_source: Path) -> None:
 
 
 def patch_fex_arm64ec_flags(source: Path) -> None:
-    """Give the arm64ec frontend the flags llvm-mingw needs for hybrid code.
+    """Declare RtlIsEcCode ahead of every arm64ec compile.
 
-    A global CMAKE_CXX_FLAGS would also hit FEX's host tools, so the guard keeps
-    the flags on the mingw side. ARM64EC is an x64-compatible ABI, so the header
-    guard that hides RtlIsEcCode in winnt.h needs __x86_64__.
+    The arm64ec triple already selects the hybrid x64-compatible ABI, so no
+    -marm64x is needed; that flag emits ARM64X objects instead. mingw's winnt.h
+    declares RtlIsEcCode only for __x86_64__, so a forced-include shim supplies
+    it without defining __x86_64__ and pulling in the x86 intrinsic surface.
     """
 
     path = source / "CMakeLists.txt"
@@ -141,9 +155,7 @@ def patch_fex_arm64ec_flags(source: Path) -> None:
     shim = (
         f"{marker}\n"
         'if (MINGW AND MINGW_TRIPLE MATCHES "^arm64ec")\n'
-        "  add_compile_options(-marm64x)\n"
         "  add_compile_options(-include${CMAKE_BINARY_DIR}/arknights-arm64ec-compat.h)\n"
-        "  add_link_options(-marm64x)\n"
         "endif()\n"
     )
     anchor = "project(FEX C CXX ASM)\n"
@@ -159,12 +171,14 @@ def write_arm64ec_compat_header(build: Path) -> None:
 
     build.mkdir(parents=True, exist_ok=True)
     header = """#pragma once
+#ifndef __ASSEMBLER__
 #ifdef __cplusplus
 extern "C" {
 #endif
 __declspec(dllimport) unsigned char __stdcall RtlIsEcCode(unsigned long long);
 #ifdef __cplusplus
 }
+#endif
 #endif
 """
     (build / "arknights-arm64ec-compat.h").write_text(header, encoding="utf-8")
@@ -219,6 +233,7 @@ def build_fex_arm64(
             "arm64",
             f"-mmacosx-version-min={builder.environment['MACOSX_DEPLOYMENT_TARGET']}",
             f"-I{source / 'Source/Windows/UnixLib'}",
+            f"-Wl,-install_name,@rpath/lib{module}.so",
             source / "Source/Windows/UnixLib/FEXUnixLib.cpp",
             "-o",
             unix_directory / f"lib{module}.so",
@@ -227,10 +242,10 @@ def build_fex_arm64(
 
 
 def build_wine_arm64(
-    builder: Builder, source: Path, build: Path, staging: Path
+    builder: Builder, source: Path, build: Path, staging: Path, outputs: list[Path]
 ) -> Path:
     patch_vulkan_soname(source)
-    pkg_config, includes, libraries = brew_prefixes(builder)
+    pkg_config, includes, libraries = library_flags(outputs)
     builder.environment.update(
         PKG_CONFIG_PATH=pkg_config,
         CFLAGS=(
@@ -270,6 +285,22 @@ def build_wine_arm64(
     return staging / "opt" / "whiskywine"
 
 
+def write_dxmt_native_file(root: Path, deployment: str) -> Path:
+    """Pin the native macOS targets, which Meson otherwise builds for the SDK."""
+
+    path = root / "dxmt-native.ini"
+    flags = f"['-mmacosx-version-min={deployment}']"
+    path.write_text(
+        "[built-in options]\n"
+        f"c_args = {flags}\n"
+        f"cpp_args = {flags}\n"
+        f"c_link_args = {flags}\n"
+        f"cpp_link_args = {flags}\n",
+        encoding="utf-8",
+    )
+    return path
+
+
 def build_dxmt_arm64(
     builder: Builder, source: Path, root: Path, wine_build: Path
 ) -> Path:
@@ -277,6 +308,9 @@ def build_dxmt_arm64(
     install = root / "dxmt-install"
     build = root / "dxmt-build"
     environment = builder.without_host_build_variables()
+    native_file = write_dxmt_native_file(
+        root, builder.environment["MACOSX_DEPLOYMENT_TARGET"]
+    )
     if not (build / "build.ninja").exists():
         builder.run(
             "meson",
@@ -285,6 +319,8 @@ def build_dxmt_arm64(
             source,
             "--cross-file",
             source / "build-arm64ec.txt",
+            "--native-file",
+            native_file,
             f"-Dnative_llvm_path={builder.environment['LLVM_ROOT']}",
             f"-Dwine_build_path={wine_build}",
             "--buildtype",
@@ -359,22 +395,22 @@ def assemble_arm64(
     )
 
 
-def bundle_arm64_libraries(builder: Builder, candidate: Path) -> None:
+def bundle_arm64_libraries(
+    builder: Builder, candidate: Path, outputs: list[Path]
+) -> None:
     """Copy the library closure of the Wine unix modules and rewrite its paths."""
 
     directory = candidate / "Wine" / "lib"
-    queue: list[Path] = []
-    for package in ARM64_NIX_PACKAGES:
-        prefix = Path(builder.capture("brew", "--prefix", package).strip())
-        for name in ARCHIVE_BUNDLED_LIBRARIES:
-            if (prefix / "lib" / name).is_file():
-                queue.append(prefix / "lib" / name)
-    queue.extend(
-        Path(reference)
-        for reference in references_in(
-            builder, directory / "wine/aarch64-unix/wine", "/opt/homebrew/"
+    queue = [
+        output / "lib" / name
+        for output in outputs
+        for name in ARCHIVE_BUNDLED_LIBRARIES
+        if (output / "lib" / name).is_file()
+    ]
+    for module in sorted((directory / "wine").glob("*-unix/*.so")):
+        queue.extend(
+            Path(reference) for reference in references_in(builder, module, NIX_STORE)
         )
-    )
     copied: set[str] = set()
     while queue:
         library = queue.pop(0)
@@ -387,12 +423,21 @@ def bundle_arm64_libraries(builder: Builder, candidate: Path) -> None:
             destination.chmod(0o644)
         queue.extend(
             Path(reference)
-            for reference in references_in(builder, destination, "/opt/homebrew/")
+            for reference in references_in(builder, destination, NIX_STORE)
         )
     for binary in sorted(directory.glob("*.dylib*")) + sorted(
-        (directory / "wine" / "aarch64-unix").glob("*.so")
+        (directory / "wine").glob("*-unix/*.so")
     ):
-        rewrite_references(builder, directory, binary)
+        fix_release_macho(builder, directory, binary)
+    link = directory / "libfreetype.dylib"
+    link.unlink(missing_ok=True)
+    link.symlink_to("libfreetype.6.dylib")
+    for binary in sorted((directory / "wine").glob("*-unix/*.so")):
+        if "@loader_path/../../" not in builder.capture("otool", "-l", binary):
+            builder.run(
+                "install_name_tool", "-add_rpath", "@loader_path/../../", binary
+            )
+        builder.run("codesign", "--force", "--sign", "-", binary)
 
 
 def build_arm64(builder: Builder, *, resume: bool, patched: bool) -> Path:
@@ -427,16 +472,19 @@ def build_arm64(builder: Builder, *, resume: bool, patched: bool) -> Path:
         )
 
     builder.run(sys.executable, RUNTIME_CLI, "validate-lock", "--target", ARM64_TARGET)
+    outputs = nix_outputs(builder, lock)
+    if not outputs:
+        raise BuildError("nix build returned no library outputs")
     wine_build = root / "wine-build"
     wine_install = build_wine_arm64(
-        builder, wine_source, wine_build, root / "wine-staging"
+        builder, wine_source, wine_build, root / "wine-staging", outputs
     )
     fex_install = build_fex_arm64(
         builder, fex_source, root, wine_install / "lib" / "wine" / "aarch64-unix"
     )
     dxmt_install = build_dxmt_arm64(builder, dxmt_source, root, wine_build)
     assemble_arm64(builder, candidate, wine_install, fex_install, dxmt_install)
-    bundle_arm64_libraries(builder, candidate)
+    bundle_arm64_libraries(builder, candidate, outputs)
     sign_directory(builder, candidate)
     builder.run(
         sys.executable,
@@ -448,5 +496,5 @@ def build_arm64(builder: Builder, *, resume: bool, patched: bool) -> Path:
         "--require-64-bit-only",
     )
     return write_archive(
-        root, "Arknights-MacOS-Runtime-arm64-canary.tar.gz", ("Libraries",)
+        candidate.parent, "Arknights-MacOS-Runtime-arm64-canary.tar.gz", ("Libraries",)
     )

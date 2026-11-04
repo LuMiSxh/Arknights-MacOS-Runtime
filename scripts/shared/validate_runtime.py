@@ -10,6 +10,7 @@ import filecmp
 import json
 import os
 import re
+import struct
 import subprocess
 from pathlib import Path
 
@@ -40,14 +41,19 @@ LEGACY_PAYLOADS = (
     "Wine/lib/gstreamer-1.0",
     "DXMT/x32",
 )
+PE_MACHINE_X86_64 = 0x8664
 PE_MACHINE_ARM64EC = 0xA641
 PE_MACHINE_ARM64 = 0xAA64
 PE_MACHINE_NAMES = {
-    0x8664: "x86-64",
+    PE_MACHINE_X86_64: "x86-64",
     PE_MACHINE_ARM64EC: "ARM64EC",
     PE_MACHINE_ARM64: "AArch64",
 }
 ARM64_PE_MACHINES = (PE_MACHINE_ARM64EC, PE_MACHINE_ARM64)
+PE32_PLUS_MAGIC = 0x20B
+PE_LOAD_CONFIG_DIRECTORY = 10
+PE_DATA_DIRECTORY_OFFSET = 112
+PE_CHPE_METADATA_OFFSET = 0xC8
 MEDIA_LIBRARY_PATTERNS = ("libav*", "libsw*", "libx26[45]*", "libaom*", "libSvtAv1*")
 
 
@@ -120,21 +126,60 @@ def _runtime_architecture(required_paths: list[str]) -> str:
     return "x86_64"
 
 
+def _pe_section_offset(table: bytes, rva: int) -> int | None:
+    """Map a virtual address to a file offset through the section table."""
+
+    for start in range(0, len(table) - 39, 40):
+        virtual_size, virtual_address, raw_size, raw_offset = struct.unpack_from(
+            "<IIII", table, start + 8
+        )
+        span = max(virtual_size, raw_size)
+        if virtual_address <= rva < virtual_address + span:
+            return raw_offset + rva - virtual_address
+    return None
+
+
 def _pe_machine(path: Path) -> int:
-    """Read the machine type from the PE header; `file` cannot tell EC from AArch64."""
+    """Read the machine type from the PE header.
+
+    An ARM64EC image keeps the x86-64 machine value and marks itself with CHPE
+    metadata in the load configuration, so the pointer decides the architecture.
+    """
 
     try:
         with path.open("rb") as file:
-            header = file.read(0x40)
-            if len(header) < 0x40 or header[:2] != b"MZ":
+            dos = file.read(0x40)
+            if len(dos) < 0x40 or dos[:2] != b"MZ":
                 raise RuntimeValidationError(f"{path.name} is not a PE file")
-            file.seek(int.from_bytes(header[0x3C:0x40], "little"))
-            signature = file.read(6)
+            file.seek(int.from_bytes(dos[0x3C:0x40], "little"))
+            header = file.read(24)
+            if len(header) != 24 or header[:4] != b"PE\0\0":
+                raise RuntimeValidationError(f"{path.name} has no PE header")
+            machine = int.from_bytes(header[4:6], "little")
+            sections = int.from_bytes(header[6:8], "little")
+            optional = file.read(int.from_bytes(header[20:22], "little"))
+            table = file.read(sections * 40)
+            if machine != PE_MACHINE_X86_64:
+                return machine
+            if len(optional) < PE_DATA_DIRECTORY_OFFSET + 8 * (
+                PE_LOAD_CONFIG_DIRECTORY + 1
+            ):
+                return machine
+            if int.from_bytes(optional[:2], "little") != PE32_PLUS_MAGIC:
+                return machine
+            directory = PE_DATA_DIRECTORY_OFFSET + PE_LOAD_CONFIG_DIRECTORY * 8
+            rva, size = struct.unpack_from("<II", optional, directory)
+            if not rva or size < PE_CHPE_METADATA_OFFSET + 8:
+                return machine
+            offset = _pe_section_offset(table, rva)
+            if offset is None:
+                return machine
+            file.seek(offset + PE_CHPE_METADATA_OFFSET)
+            if int.from_bytes(file.read(8), "little"):
+                return PE_MACHINE_ARM64EC
+            return machine
     except OSError as error:
         raise RuntimeValidationError(f"cannot read PE header: {error}") from error
-    if len(signature) != 6 or signature[:4] != b"PE\0\0":
-        raise RuntimeValidationError(f"{path.name} has no PE header")
-    return int.from_bytes(signature[4:6], "little")
 
 
 def validate_required_architectures(root: Path, required_paths: list[str]) -> int:

@@ -59,14 +59,14 @@ Extend it with the target before the ARM64 lane builds.
 
 ## Commands
 
-| Command                                                                     | Purpose                                        |
-| --------------------------------------------------------------------------- | ---------------------------------------------- |
+| Command                                                                            | Purpose                                        |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------- |
 | `uv run --locked scripts/shared/runtime.py validate-lock`                          | Validate every target.                         |
 | `uv run --locked scripts/shared/runtime.py validate-lock --target native-arm64`    | Validate the lock and resolve one target.      |
 | `uv run --locked scripts/shared/runtime.py prepare combined --target native-arm64` | Clone and patch the ARM64 sources.             |
-| `just build arm64`                                                          | Build a canary ARM64 artifact.                 |
-| `just verify .build/stages/arm64/candidate/Libraries --target native-arm64` | Validate the artifact.                         |
-| `just build-release arm64`                                                  | Build a release artifact for the ARM64 target. |
+| `just build arm64`                                                                 | Build a canary ARM64 artifact.                 |
+| `just verify .build/stages/arm64/candidate/Libraries --target native-arm64`        | Validate the artifact.                         |
+| `just build-release arm64`                                                         | Build a release artifact for the ARM64 target. |
 
 A command without `--target` keeps its current behavior.
 The default target is `rosetta-x86_64` until the ARM64 canary passes.
@@ -180,6 +180,13 @@ The FEX top-level CMake file rejects macOS.
 Use the cross toolchain file for the PE build and the direct compile for the unix bridge.
 The reference for both is `metalsharp/MetalSharp-Wine` at `scripts/build-fex.sh`.
 
+The arm64ec triple selects the hybrid ABI on its own.
+Do not add `-marm64x`; that flag emits ARM64X objects instead of ARM64EC objects.
+mingw's `winnt.h` declares `RtlIsEcCode` only for `__x86_64__`.
+Force-include a header that declares it for the arm64ec build.
+Do not define `__x86_64__`; it pulls the x86 intrinsic surface into the compile.
+The forced include must skip assembly files.
+
 ### 4. DXMT
 
 ```sh
@@ -195,6 +202,11 @@ meson install -C "$dxmt_build"
 `airconv` needs LLVM 15 with typed pointers.
 Build LLVM 15 for arm64 with static libraries and no tools.
 The reference build is `dappermint/winecx-gptk` at `arm64/build-llvm15.sh`.
+
+Meson ignores `MACOSX_DEPLOYMENT_TARGET`.
+Pass a native file that sets `-mmacosx-version-min` to the lock value.
+The native `winemetal.so` then matches the deployment target.
+The cross file keeps `-marm64x`; DXMT loads as ARM64X in both process types.
 
 ### 5. Assemble
 
@@ -340,8 +352,9 @@ See [provenance](provenance.md#entitlement-availability).
 | Release               | ARM64 macOS runner | Selected target  |
 
 Confirm that the `xcode-27` runner label resolves to Apple Silicon before the first ARM64 job.
-The current build uses `x86_64-darwin` Nix packages for Wine.
-The ARM64 target needs `aarch64-darwin` packages instead.
+The x86_64 lane uses `x86_64-darwin` Nix packages for Wine.
+The ARM64 lane resolves the same packages for `aarch64-darwin` from the locked nixpkgs commit.
+Both lanes bundle the library closure from `/nix/store`.
 
 ## Rollout
 

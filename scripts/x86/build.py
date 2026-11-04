@@ -16,6 +16,7 @@ if __package__:
         ARCHIVE_BUNDLED_LIBRARIES,
         CLEARED_DOS_STUB,
         LICENSE_CLI,
+        NIX_PACKAGES,
         NIX_STORE,
         ROOT,
         TOOLCHAIN_CLI,
@@ -24,7 +25,10 @@ if __package__:
         BuildError,
         clone_tree,
         extract_archive,
+        fix_release_macho,
         logical_cpu_count,
+        nix_build,
+        nix_package_outputs,
         references_in,
         write_archive,
     )
@@ -35,14 +39,19 @@ else:
         ARCHIVE_BUNDLED_LIBRARIES,
         CLEARED_DOS_STUB,
         LICENSE_CLI,
+        NIX_PACKAGES,
         NIX_STORE,
         ROOT,
         TOOLCHAIN_CLI,
+        VALIDATE_CLI,
         Builder,
         BuildError,
         clone_tree,
         extract_archive,
+        fix_release_macho,
         logical_cpu_count,
+        nix_build,
+        nix_package_outputs,
         references_in,
         write_archive,
     )
@@ -66,21 +75,7 @@ STAGE_HINT = (
 )
 
 
-CANARY_NIX_PACKAGES = (
-    "freetype",
-    "gnutls",
-    "libpng",
-    "zlib",
-    "brotli",
-    "bzip2",
-    "nettle",
-    "libtasn1",
-    "libidn2",
-    "p11-kit",
-    "libunistring",
-    "gmp",
-    "vulkan-headers",
-)
+CANARY_NIX_PACKAGES = NIX_PACKAGES
 
 
 def wine_overlay_artifacts(stage: str) -> tuple[str, ...]:
@@ -122,28 +117,6 @@ def validate_stage(stage: str) -> None:
         raise BuildError(STAGE_HINT)
 
 
-def nix_build(builder: Builder, attribute: str) -> Path | None:
-    output = builder.capture(
-        "nix", "build", "--no-link", "--print-out-paths", attribute, allow_failure=True
-    ).strip()
-    return Path(output) if output else None
-
-
-def nix_package_outputs(
-    builder: Builder, nixpkgs: str, packages: tuple[str, ...]
-) -> list[Path]:
-    outputs: list[Path] = []
-    for package in packages:
-        for output_name in ("dev", "out", "lib"):
-            output = nix_build(
-                builder,
-                f"{nixpkgs}#legacyPackages.x86_64-darwin.{package}.{output_name}",
-            )
-            if output is not None:
-                outputs.append(output)
-    return outputs
-
-
 def canary_environment(
     builder: Builder, lock: dict[str, object], root: Path, stage: str
 ) -> tuple[str, list[Path]]:
@@ -160,7 +133,9 @@ def canary_environment(
 
     outputs: list[Path] = []
     if stage != "hardware-cursor":
-        outputs = nix_package_outputs(builder, nixpkgs, CANARY_NIX_PACKAGES)
+        outputs = nix_package_outputs(
+            builder, nixpkgs, "x86_64-darwin", CANARY_NIX_PACKAGES
+        )
 
     pkg_config: list[str] = []
     includes: list[str] = []
@@ -341,34 +316,6 @@ def bundle_release_libraries(
             )
         builder.run("codesign", "--force", "--sign", "-", binary)
     return sorted(set(inventory))
-
-
-def fix_release_macho(builder: Builder, directory: Path, binary: Path) -> None:
-    relative = os.path.relpath(directory, binary.parent)
-    binary.chmod(binary.stat().st_mode | 0o200)
-    if ".dylib" in binary.name:
-        builder.run("install_name_tool", "-id", f"@loader_path/{binary.name}", binary)
-    for reference in references_in(builder, binary, NIX_STORE):
-        name = Path(reference).name
-        if name.startswith("libiconv") and "_iconv" in builder.capture(
-            "nm", "-u", binary, allow_failure=True
-        ):
-            builder.run(
-                "install_name_tool",
-                "-change",
-                reference,
-                "/usr/lib/libiconv.2.dylib",
-                binary,
-            )
-        else:
-            builder.run(
-                "install_name_tool",
-                "-change",
-                reference,
-                f"@loader_path/{relative}/{name}",
-                binary,
-            )
-    builder.run("codesign", "--force", "--sign", "-", binary)
 
 
 def build_dxmt_x86_64(
