@@ -191,11 +191,8 @@
       "id": "wine-fullscreen-native-space",
       "component": "wine",
       "family": "fullscreen",
-      "path": "patches/x86/wine/fullscreen/0001-winemac-native-fullscreen-space.patch",
-      "sha256": "127a339960a111b01b4e357ade4d47e02be2c8ff131751de3e7f6a9df01e4066",
-      "targets": [
-        "rosetta-x86_64"
-      ]
+      "path": "patches/shared/wine/fullscreen/0001-winemac-native-fullscreen-space.patch",
+      "sha256": "be5002957b5d7a5de5eae6ffe6d2a6df676efbce29152b6b34939bfa3869805f"
     }
   ]
 }

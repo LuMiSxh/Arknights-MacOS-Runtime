@@ -121,13 +121,13 @@ The patch changes one line in `dlls/winemac.drv/cocoa_app.m`. It sets the Quit i
 ## Fullscreen
 
 - ID: `wine-fullscreen-native-space`
-- File: `patches/x86/wine/fullscreen/0001-winemac-native-fullscreen-space.patch`
+- File: `patches/shared/wine/fullscreen/0001-winemac-native-fullscreen-space.patch`
 - Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Original runtime change, runtime maintainers
 - License: LGPL-2.1-or-later (Wine)
 - Gate: Exact `ARKNIGHTS_RUNTIME_NATIVE_FULLSCREEN_SPACE=1`, read once in `setup_options`
 - Inactive behavior: Missing, `0`, or invalid values keep the screen-sized window at `NSStatusWindowLevel + 1`
-- Automated gate: Hash, clean `git apply --check` alone and after the `cn` family, `cocoa_app.m` syntax check
+- Automated gate: Hash, clean `git apply --check` alone and after the `cn` family on both Wine branches, `cocoa_app.m` syntax check
 - Manual gate: A borderless fullscreen game window enters its own Space. Leaving the Space by the user stays left. A Wine resize below screen size leaves the Space. The cursor clip still holds after each change.
 - Removal: Drop when the client no longer needs a native Space, or when WineCX offers an equivalent control
 

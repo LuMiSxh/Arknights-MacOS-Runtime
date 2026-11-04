@@ -29,11 +29,11 @@ Wine <!-- pin:wine.version -->11.17<!-- /pin --> already provides the process se
 
 ### `dispatcher`
 
-Carries the x86_64 `KiUserApcDispatcher` / `KiUserCallbackDispatcher` `GetProcAddress` int3-stub workaround. Only `ARKNIGHTS_RUNTIME_ACE_COMPACT=1` enables it. It uses no process-name heuristics.
+Carries the x86_64 `KiUserApcDispatcher` / `KiUserCallbackDispatcher` `GetProcAddress` int3-stub workaround. Only `ARKNIGHTS_RUNTIME_ACE_COMPACT=1` enables it. It uses no process-name heuristics. The patch is x86_64 only: its stub is x86 machine code, so it lives in [`patches/x86`](../../../x86/wine/ace/dispatcher/0001-kernel32-ace-dispatcher-spoof.patch).
 
 ### `rosetta`
 
-Ports the Rosetta workarounds that the ACE client needs: bounded multi-byte NOP decoding, and classification of the ACE privileged-instruction fault that Rosetta reports as an invalid-opcode trap. CrossOver CET and XGETBV handling is unchanged.
+Ports the Rosetta workarounds that the ACE client needs: bounded multi-byte NOP decoding, and classification of the ACE privileged-instruction fault that Rosetta reports as an invalid-opcode trap. CrossOver CET and XGETBV handling is unchanged. The patch is x86_64 only and lives in [`patches/x86`](../../../x86/wine/ace/rosetta/0001-macos-rosetta-ace-workarounds.patch).
 
 ### `timing`
 

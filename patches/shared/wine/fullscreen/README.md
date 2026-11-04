@@ -4,4 +4,4 @@ Wine source patch that puts a fullscreen game window into a macOS native fullscr
 
 A window already in a Space stays there while another process's modal dialog disables it. In a Space the close button is enabled and sends the normal Win32 close.
 
-Apply: `0001-winemac-native-fullscreen-space.patch` to the pinned WineCX source. It applies alone and after the `cn` family.
+Apply: `0001-winemac-native-fullscreen-space.patch` to the pinned WineCX source. It applies to both the Rosetta and the ARM64 Wine branches, alone and after the `cn` family. The ARM64 branch has extra includes and an earlier shader-cache helper, so the `macdrv_main.c` hunks apply at an offset.
