@@ -267,6 +267,16 @@
       "targets": [
         "native-arm64"
       ]
+    },
+    {
+      "id": "fex-arm64ec-lookup-cache-commit",
+      "component": "fex",
+      "family": "fex",
+      "path": "patches/arm/fex/lookup-cache-commit/0001-lookup-cache-commit-eagerly.patch",
+      "sha256": "7c222b4607accb18671ee3599b9f7ae86d8ae870965a71fad255cbd6d58b4306",
+      "targets": [
+        "native-arm64"
+      ]
     }
   ]
 }

@@ -37,6 +37,11 @@ The address-space patch also adds the 4 GB floor probe and moves the first TEB
 block above 4 GB.
 The `mprotect_exec` half of the reference W^X handling is in the `wx-pages`
 patch; WineCX 11.17 already flips pages in `virtual_handle_fault`.
+That flip assumes the execute fault reaches the process.
+On this host an execute fault on an `rw-` page, and a write fault on an `r-x`
+page, never become `SIGBUS` or `SIGSEGV`; the thread retries the instruction.
+The patch is still needed to avoid refused RWX mappings, but it is not enough to
+run JIT code. See [results](results.md#16k-host-pages-and-the-jit-code-buffer).
 
 ## Remaining
 

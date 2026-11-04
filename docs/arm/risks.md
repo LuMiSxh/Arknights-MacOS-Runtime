@@ -42,13 +42,14 @@ A passing Wine start is not a passing ACE start.
 
 ### 16K host pages
 
-| Item       | Detail                                                                               |
-| ---------- | ------------------------------------------------------------------------------------ |
-| Risk       | A program assumes a 4K page size and fails on a 16K host page.                       |
-| Impact     | Crashes in memory allocation, JIT code, or anti-cheat checks.                        |
-| Evidence   | Arknights runs on Windows with 4K pages. The lane emulates 4K inside 16K host pages. |
-| Mitigation | Keep the WineCX write and execute flips and test the game with ACE.                  |
-| Decision   | If the emulation is not sufficient, the lane needs the entitlement for 4K pages.     |
+| Item       | Detail                                                                                                      |
+| ---------- | ----------------------------------------------------------------------------------------------------------- |
+| Risk       | A program assumes a 4K page size and fails on a 16K host page.                                              |
+| Impact     | Crashes in memory allocation, JIT code, or anti-cheat checks.                                               |
+| Evidence   | Arknights runs on Windows with 4K pages. The lane emulates 4K inside 16K host pages.                        |
+| Evidence   | On this host neither an execute fault on an `rw-` page nor a write fault on an `r-x` page becomes a signal. |
+| Mitigation | Map FEX code buffers with `MAP_JIT` and toggle `pthread_jit_write_protect_np` around writes.                |
+| Decision   | If `MAP_JIT` is refused, the lane needs the JIT entitlement or a 4K host.                                   |
 
 ## Performance
 
@@ -71,7 +72,8 @@ Test with TSO enabled first.
 | ---------- | ------------------------------------------------------------------------------------------- |
 | Risk       | Apple changes the ARM64 process layout or the fault behavior.                               |
 | Impact     | The relocation and the 4 GB floor stop working.                                             |
-| Evidence   | The lane depends on `PAGEZERO`, the Mach-O reservation above 4 GB, and `SIGSEGV` decoding.  |
+| Evidence   | The lane depends on `PAGEZERO` and the Mach-O reservation above 4 GB.                       |
+| Evidence   | macOS 27.2 does not deliver protection faults as `SIGBUS` or `SIGSEGV` to this lane.        |
 | Mitigation | Validate on every macOS major version. Keep the entitlement-compatible branches available.  |
 | Decision   | If a macOS release breaks the layout, evaluate the entitlement lane or the MetalSharp base. |
 

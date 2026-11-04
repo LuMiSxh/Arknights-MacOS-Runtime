@@ -201,6 +201,21 @@ The write and execute page handling of the reference patch is split out. WineCX 
 
 Wine's `wine.inf` points `Wow64\amd64` at `xtajit64.dll` and `Wow64\x86` at `xtajit.dll`. The ARM64 build ships `libarm64ecfex.dll` and `libwow64fex.dll` instead. Without the wiring, an x86_64 image loads but never starts.
 
+## FEX lookup cache
+
+- ID: `fex-arm64ec-lookup-cache-commit`
+- File: `patches/arm/fex/lookup-cache-commit/0001-lookup-cache-commit-eagerly.patch`
+- Component/base: FEX `4efc3abc8aca8a0d3a8aca1f153ef6c4299f4426` (fork `dappermint/FEX`)
+- Source/author: Original change for this repository.
+- License: MIT (FEX)
+- Gate: Target only. The `native-arm64` target always commits the lookup cache eagerly.
+- Inactive behavior: Other hosts ignore the commit flag in `FEXCore::Allocator::VirtualAlloc`.
+- Automated gate: Hash, clean `git apply --check`, ARM64 build, and an x86_64 PE that compiles its first block.
+- Manual gate: The x86_64 PE reaches its entry point.
+- Removal: Drop when FEX commits the lookup cache on Windows, or when Wine runs the `ResetToConsistentState` callback for reserved pages.
+
+FEX reserves the lookup cache with `Commit=false` and commits faulting pages from its `ResetToConsistentState` callback. Wine returns `STATUS_ACCESS_VIOLATION` instead and never calls the callback, so the first block lookup faulted on the same instruction forever. The patch commits the region up front.
+
 ## Mono
 
 - ID: `wine-arm64-skip-mono`
@@ -244,7 +259,7 @@ ARM64EC compiles with `__x86_64__` defined. The PE side called `unix_pe_module_l
 - Manual gate: The x86_64 PE starts under FEX.
 - Removal: Drop when WineCX handles mixed host pages on arm64 macOS.
 
-macOS refuses RWX without `MAP_JIT`. A 16K host page can mix executable 4K pages with writable ones, so `NtProtectVirtualMemory(PAGE_READWRITE)` on an image section failed with `STATUS_ACCESS_DENIED`. Write faults on the mixed page were not delivered to the signal handler, so the patch drops `PROT_EXEC` instead of `PROT_WRITE`. The page stays writable, and `virtual_handle_fault` flips it for an execute fault.
+macOS refuses RWX without `MAP_JIT`. A 16K host page can mix executable 4K pages with writable ones, so `NtProtectVirtualMemory(PAGE_READWRITE)` on an image section failed with `STATUS_ACCESS_DENIED`. Write faults on the mixed page were not delivered to the signal handler, so the patch drops `PROT_EXEC` instead of `PROT_WRITE`. The page stays writable, and `virtual_handle_fault` flips it for an execute fault. On macOS 27.2 the execute fault is also not delivered to the process, so this patch is necessary but not sufficient for JIT code. See [`docs/arm/results.md`](arm/results.md#16k-host-pages-and-the-jit-code-buffer).
 
 ## ARM64 ID registers
 
