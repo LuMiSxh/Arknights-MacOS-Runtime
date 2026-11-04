@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.runtime import (
+from scripts.shared.runtime import (
     LockError,
     _sha256_file,
     load_lock,

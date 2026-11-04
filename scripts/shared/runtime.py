@@ -23,7 +23,7 @@ else:
     from lib.console import Progress, error, info, success
     from runtime_capabilities import validate_source_capability_contract
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 LOCK_PATH = ROOT / "runtime.lock.json"
 BUILD_ROOT = ROOT / ".build"
 STAGES = (

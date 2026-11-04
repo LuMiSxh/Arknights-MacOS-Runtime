@@ -139,7 +139,7 @@ jobs:
 
             - name: Verify release checksum, provenance, and notices
               run: |
-                  uv run --locked --no-dev scripts/release/verify.py \
+                  uv run --locked --no-dev scripts/shared/release/verify.py \
                     --tag "$RELEASE_TAG" \
                     --commit "$BUILD_COMMIT" \
                     --archive "$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG.tar.gz" \

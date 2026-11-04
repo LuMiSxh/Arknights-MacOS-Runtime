@@ -3,7 +3,7 @@
 import json
 import unittest
 
-from scripts.monitor import (
+from scripts.shared.monitor import (
     MonitorReport,
     SourceStatus,
     api_urls,
@@ -11,7 +11,7 @@ from scripts.monitor import (
     report_markdown,
     report_value,
 )
-from scripts.runtime import SourcePin
+from scripts.shared.runtime import SourcePin
 
 
 class SourceMonitorTests(unittest.TestCase):

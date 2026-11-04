@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.build import (
+from scripts.shared.build import (
     CLEARED_DOS_STUB,
     Builder,
     is_macho,

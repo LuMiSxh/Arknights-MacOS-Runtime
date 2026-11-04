@@ -52,12 +52,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 if __package__:
     from ..lib.console import error, info, success, warning
 else:
     if str(REPOSITORY_ROOT / "scripts") not in sys.path:
         sys.path.insert(0, str(REPOSITORY_ROOT / "scripts"))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from lib.console import error, info, success, warning
 
 LOCK_NAME = "runtime.lock.json"

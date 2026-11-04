@@ -31,9 +31,9 @@ jobs:
           uv run --locked pytest
           uv run --locked ruff check scripts tests
           uv run --locked ruff format --check scripts tests
-          uv run --locked --no-dev scripts/runtime.py validate-lock
-          uv run --locked --no-dev scripts/release/licenses.py generate --check
-          uv run --locked --no-dev scripts/release/pins.py check
+          uv run --locked --no-dev scripts/shared/runtime.py validate-lock
+          uv run --locked --no-dev scripts/shared/release/licenses.py generate --check
+          uv run --locked --no-dev scripts/shared/release/pins.py check
           git diff --check
 
   patches:
@@ -53,4 +53,4 @@ jobs:
       - name: Apply ${{ matrix.stage }} patches
         env:
           PYTHONDONTWRITEBYTECODE: "1"
-        run: uv run --locked --no-dev scripts/runtime.py prepare "${{ matrix.stage }}"
+        run: uv run --locked --no-dev scripts/shared/runtime.py prepare "${{ matrix.stage }}"

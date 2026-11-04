@@ -5,7 +5,7 @@ import sys
 import unittest
 from pathlib import Path
 
-from scripts.build import (
+from scripts.x86.build import (
     STAGE_HINT,
     patched_machos,
     wine_overlay_artifacts,

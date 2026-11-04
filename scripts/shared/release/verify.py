@@ -13,7 +13,7 @@ import tarfile
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 if __package__:
     from ..runtime import LockError, _sha256_file, load_lock
     from ..runtime_capabilities import (
@@ -30,14 +30,14 @@ if __package__:
 else:
     if str(REPOSITORY_ROOT) not in sys.path:
         sys.path.insert(0, str(REPOSITORY_ROOT))
-    from scripts.release.licenses import (
+    from scripts.shared.release.licenses import (
         ARCHIVE_LICENSES_DIRECTORY,
         ARCHIVE_NOTICE,
         INDEX_NAME,
         REQUIRED_COMPONENTS,
     )
-    from scripts.runtime import LockError, _sha256_file, load_lock
-    from scripts.runtime_capabilities import (
+    from scripts.shared.runtime import LockError, _sha256_file, load_lock
+    from scripts.shared.runtime_capabilities import (
         CapabilityContractError,
         read_capability_manifest_bytes,
         validate_source_capability_contract,

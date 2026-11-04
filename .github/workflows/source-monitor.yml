@@ -28,7 +28,7 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   PYTHONDONTWRITEBYTECODE: "1"
               run: |
-                  uv run --locked --no-dev scripts/monitor.py \
+                  uv run --locked --no-dev scripts/shared/monitor.py \
                     --output .build/reports/source-monitor.json \
                     --summary "$GITHUB_STEP_SUMMARY"
 

@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.release.verify import (
+from scripts.shared.release.verify import (
     ReleaseValidationError,
     normalize_version,
     verify_release,

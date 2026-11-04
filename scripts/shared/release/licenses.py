@@ -18,12 +18,13 @@ import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 if __package__:
     from ..lib.console import error, success, warning
 else:
     if str(REPOSITORY_ROOT / "scripts") not in sys.path:
         sys.path.insert(0, str(REPOSITORY_ROOT / "scripts"))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from lib.console import error, success, warning
 
 LICENSES_DIRECTORY = "LICENSES"
@@ -31,7 +32,7 @@ INDEX_NAME = "index.json"
 ARCHIVE_LICENSES_DIRECTORY = "Licenses"
 ARCHIVE_NOTICE = "NOTICE.md"
 SCHEMA_VERSION = 1
-BUILD_SCRIPT = "scripts/build.py"
+BUILD_SCRIPT = "scripts/x86/build.py"
 NIX_INVENTORY_ROLE = "Bundled Nix library"
 BUILD_ONLY_NIX_PACKAGES = frozenset(("vulkan-headers",))
 REQUIRED_COMPONENTS = frozenset(("Wine", "DXMT", "MoltenVK"))

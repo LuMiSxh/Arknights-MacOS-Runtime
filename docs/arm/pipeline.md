@@ -61,9 +61,9 @@ Extend it with the target before the ARM64 lane builds.
 
 | Command                                                                     | Purpose                                        |
 | --------------------------------------------------------------------------- | ---------------------------------------------- |
-| `uv run --locked scripts/runtime.py validate-lock`                          | Validate every target.                         |
-| `uv run --locked scripts/runtime.py validate-lock --target native-arm64`    | Validate the lock and resolve one target.      |
-| `uv run --locked scripts/runtime.py prepare combined --target native-arm64` | Clone and patch the ARM64 sources.             |
+| `uv run --locked scripts/shared/runtime.py validate-lock`                          | Validate every target.                         |
+| `uv run --locked scripts/shared/runtime.py validate-lock --target native-arm64`    | Validate the lock and resolve one target.      |
+| `uv run --locked scripts/shared/runtime.py prepare combined --target native-arm64` | Clone and patch the ARM64 sources.             |
 | `just build arm64`                                                          | Build a canary ARM64 artifact.                 |
 | `just verify .build/stages/arm64/candidate/Libraries --target native-arm64` | Validate the artifact.                         |
 | `just build-release arm64`                                                  | Build a release artifact for the ARM64 target. |
@@ -89,8 +89,8 @@ flowchart LR
 ### 1. Prepare
 
 ```sh
-uv run --locked scripts/runtime.py validate-lock
-uv run --locked scripts/runtime.py prepare combined --target native-arm64
+uv run --locked scripts/shared/runtime.py validate-lock
+uv run --locked scripts/shared/runtime.py prepare combined --target native-arm64
 ```
 
 Prepare clones each source at its pinned commit.
@@ -257,7 +257,7 @@ The ARM64EC cross file sets `cpu_family` to `aarch64` and passes `-marm64x`.
 
 ### 6. Validate
 
-Extend `scripts/validate_runtime.py` with a target parameter:
+Extend `scripts/shared/validate_runtime.py` with a target parameter:
 
 | Check                   | Rosetta target                  | ARM64 target                      |
 | ----------------------- | ------------------------------- | --------------------------------- |

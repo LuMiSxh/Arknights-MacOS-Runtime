@@ -10,38 +10,38 @@ check:
     {{ uv_dev }} pytest
     {{ uv_dev }} ruff check scripts tests
     {{ uv_dev }} ruff format --check scripts tests
-    {{ uv }} scripts/runtime.py validate-lock
-    {{ uv }} scripts/release/licenses.py generate --check
-    {{ uv }} scripts/release/pins.py check
+    {{ uv }} scripts/shared/runtime.py validate-lock
+    {{ uv }} scripts/shared/release/licenses.py generate --check
+    {{ uv }} scripts/shared/release/pins.py check
     {{ uv_dev }} actionlint
     git diff --check
 
 validate:
-    {{ uv }} scripts/runtime.py validate-lock
+    {{ uv }} scripts/shared/runtime.py validate-lock
 
 update-pins *args:
-    {{ uv }} scripts/release/pins.py update {{ args }}
+    {{ uv }} scripts/shared/release/pins.py update {{ args }}
 
 monitor:
-    {{ uv }} scripts/monitor.py --output .build/reports/source-monitor.json
+    {{ uv }} scripts/shared/monitor.py --output .build/reports/source-monitor.json
 
 frametime-record case seconds:
-    {{ uv }} scripts/frametime.py record "{{ case }}" --seconds "{{ seconds }}"
+    {{ uv }} scripts/shared/frametime.py record "{{ case }}" --seconds "{{ seconds }}"
 
 prepare-arm64:
-    {{ uv }} scripts/runtime.py prepare combined --target native-arm64 --all-sources --destination-root .build/stages/arm64/sources
+    {{ uv }} scripts/shared/runtime.py prepare combined --target native-arm64 --all-sources --destination-root .build/stages/arm64/sources
 
 build-arm64 *args:
     {{ uv }} scripts/build.py arm64 {{ args }}
 
 verify-arm64:
-    {{ uv }} scripts/validate_runtime.py ".build/stages/arm64/candidate/Libraries" --target native-arm64
+    {{ uv }} scripts/shared/validate_runtime.py ".build/stages/arm64/candidate/Libraries" --target native-arm64
 
 prepare stage="combined":
-    {{ uv }} scripts/runtime.py prepare "{{ stage }}"
+    {{ uv }} scripts/shared/runtime.py prepare "{{ stage }}"
 
 fetch-base:
-    {{ uv }} scripts/runtime.py fetch-base
+    {{ uv }} scripts/shared/runtime.py fetch-base
 
 build stage="combined":
     {{ uv }} scripts/build.py canary "{{ stage }}"
@@ -50,4 +50,4 @@ build-release:
     {{ uv }} scripts/build.py release
 
 verify path=".build/stages/combined/candidate/Libraries":
-    {{ uv }} scripts/validate_runtime.py "{{ path }}"
+    {{ uv }} scripts/shared/validate_runtime.py "{{ path }}"

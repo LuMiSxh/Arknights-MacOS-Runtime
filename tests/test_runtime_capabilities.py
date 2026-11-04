@@ -10,8 +10,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.runtime import ROOT, load_lock
-from scripts.runtime_capabilities import (
+from scripts.shared.runtime import ROOT, load_lock
+from scripts.shared.runtime_capabilities import (
     CapabilityContractError,
     load_capability_manifest,
     validate_manifest_shape,
@@ -82,7 +82,7 @@ class RuntimeCapabilityContractTests(unittest.TestCase):
             command = (
                 "import sys\n"
                 "from pathlib import Path\n"
-                "from scripts.runtime_capabilities import CapabilityContractError, load_capability_manifest\n"
+                "from scripts.shared.runtime_capabilities import CapabilityContractError, load_capability_manifest\n"
                 "try:\n"
                 "    load_capability_manifest(Path(sys.argv[1]))\n"
                 "except CapabilityContractError:\n"
