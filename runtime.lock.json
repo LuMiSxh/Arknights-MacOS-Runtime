@@ -98,8 +98,7 @@
           "Wine/lib/wine/aarch64-windows/libwow64fex.dll",
           "DXMT/x64/d3d10core.dll",
           "DXMT/x64/d3d11.dll",
-          "DXMT/x64/dxgi.dll",
-          "DXMT/x64/winemetal.dll"
+          "DXMT/x64/dxgi.dll"
         ]
       }
     }

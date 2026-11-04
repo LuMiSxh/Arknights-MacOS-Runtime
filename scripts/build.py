@@ -904,6 +904,7 @@ def build_fex_arm64(
             "-DTUNE_ARCH=generic",
             "-DTUNE_CPU=none",
             "-DRANGES_NATIVE=OFF",
+            "-DFMT_MODULE=OFF",
             f"-DCMAKE_INSTALL_PREFIX={install}",
             environment=environment,
         )
@@ -997,8 +998,11 @@ def assemble_arm64(
 
     windows = wine / "lib/wine/aarch64-windows"
     unix = wine / "lib/wine/aarch64-unix"
-    for module in ("libarm64ecfex.dll", "libwow64fex.dll", "winemetal.dll"):
+    for module in ("libarm64ecfex.dll", "libwow64fex.dll"):
         shutil.copy2(fex_install / "lib" / module, windows / module)
+    shutil.copy2(
+        dxmt_install / "aarch64-windows/winemetal.dll", windows / "winemetal.dll"
+    )
     shutil.copy2(dxmt_install / "aarch64-unix/winemetal.so", unix / "winemetal.so")
     payload = candidate / "DXMT" / "x64"
     payload.mkdir(parents=True, exist_ok=True)
