@@ -184,7 +184,7 @@ macOS keeps the low 4 GB of an arm64 process as a hard pagezero. `KUSER_SHARED_D
 
 macOS also reserves the main executable's Mach-O region just above 4 GB. The patch probes upward from 4 GB for the first page that `mach_vm_map` accepts, then uses that address as the floor for thread data, stacks, and image fallbacks. A fixed `limit_4g` floor fails because the reservation covers unmapped holes too.
 
-The write and execute page handling of the reference patch is not ported: WineCX 11.17 already flips those pages in `virtual_handle_fault`.
+The write and execute page handling of the reference patch is split out. WineCX 11.17 already flips pages in `virtual_handle_fault`, and [`wine-arm64-wx-pages`](#write-and-execute-pages) adds the `mprotect_exec` half.
 
 ## FEX
 
@@ -215,3 +215,48 @@ Wine's `wine.inf` points `Wow64\amd64` at `xtajit64.dll` and `Wow64\x86` at `xta
 - Removal: Drop when the ARM64 lane can install Wine Mono without the entitlement, or when the runtime ships a 64-bit-only .NET replacement.
 
 Wine Mono's support package runs 32-bit and ARM64EC helper executables. The 32-bit helpers need memory below 4 GB, which macOS refuses without the cross-architecture entitlement. Wine retries the install on every prefix creation and opens a download dialog when the package is not cached. Arknights does not use .NET, so the ARM64 lane skips the install.
+
+## ARM64EC unix calls
+
+- ID: `wine-arm64-unix-call`
+- File: `patches/arm/wine/arm64ec-unix-call/0001-ntdll-fix-the-arm64ec-unix-call-table.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Original change for this repository.
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The `native-arm64` target always applies the guard.
+- Inactive behavior: The `rosetta-x86_64` target keeps the CodeWeavers `unix_pe_module_loaded` hook.
+- Automated gate: Hash, clean `git apply --check`, ARM64 build, and an x86_64 PE that loads `libarm64ecfex.dll`.
+- Manual gate: The x86_64 PE reaches its entry point.
+- Removal: Drop when WineCX guards the hook with `__arm64ec__` or moves it into the ARM64EC table.
+
+ARM64EC compiles with `__x86_64__` defined. The PE side called `unix_pe_module_loaded`, but the aarch64 `ntdll.so` table has no such entry. The call read past the table and jumped into unrelated data. The guard keeps the hook on x86_64 and excludes it from ARM64EC.
+
+## Mixed host pages
+
+- ID: `wine-arm64-wx-pages`
+- File: `patches/arm/wine/wx-pages/0001-ntdll-keep-mixed-host-pages-writable.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Port of the `mprotect_exec` hunk in [`metalsharp/MetalSharp-Wine`](https://github.com/metalsharp/MetalSharp-Wine) patch `0003`, Avery Felts. See [provenance](../patches/arm/wine/wx-pages/provenance.md).
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The `native-arm64` target always applies the change.
+- Inactive behavior: Other hosts keep the existing `mprotect` request.
+- Automated gate: Hash, clean `git apply --check`, ARM64 build, and an ARM64EC image whose hybrid metadata is written at load time.
+- Manual gate: The x86_64 PE starts under FEX.
+- Removal: Drop when WineCX handles mixed host pages on arm64 macOS.
+
+macOS refuses RWX without `MAP_JIT`. A 16K host page can mix executable 4K pages with writable ones, so `NtProtectVirtualMemory(PAGE_READWRITE)` on an image section failed with `STATUS_ACCESS_DENIED`. Write faults on the mixed page were not delivered to the signal handler, so the patch drops `PROT_EXEC` instead of `PROT_WRITE`. The page stays writable, and `virtual_handle_fault` flips it for an execute fault.
+
+## ARM64 ID registers
+
+- ID: `wine-arm64-id-registers`
+- File: `patches/arm/wine/id-registers/0001-ntdll-synthesize-arm64-id-registers.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Port of the ID-register hunk in [`metalsharp/MetalSharp-Wine`](https://github.com/metalsharp/MetalSharp-Wine) patch `0004`, Avery Felts. See [provenance](../patches/arm/wine/id-registers/provenance.md).
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The `native-arm64` target always applies the implementation.
+- Inactive behavior: Linux keeps the `AT_HWCAP_CPUID` path; other hosts keep the stub.
+- Automated gate: Hash, clean `git apply --check`, ARM64 build, and a prefix whose `CentralProcessor\0` values include `CP 4030`.
+- Manual gate: FEX `ProcessInit` returns success and starts an x86_64 program.
+- Removal: Drop when WineCX carries the macOS ID-register implementation.
+
+macOS does not let EL0 read the ID registers. `get_core_id_regs_arm64` was a stub, so FEX read zero features from the processor registry key and hit its `FetchHostFeatures` assert. The patch builds the values from the `hw.optional.arm.*` sysctls and the cache line size.

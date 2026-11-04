@@ -50,6 +50,9 @@ PATCH_FAMILIES = frozenset(
         "fullscreen",
         "fex",
         "mono",
+        "arm64ec",
+        "wx",
+        "id-registers",
         "winsock",
         "appcontainer",
     }

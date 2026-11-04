@@ -63,26 +63,52 @@ Arknights does not use .NET.
 
 ## x86_64 under FEX
 
-A minimal x86_64 PE loads at `0x140000000` and then stops before entry.
-There is no output after the `Loaded ... native` line.
+A minimal x86_64 PE loads at `0x140000000`.
+The process loads `libarm64ecfex.dll`, patches its hybrid metadata, resolves the
+module's imports, and completes FEX `ProcessInit`.
+The x64 guest starts, but the probe does not print its output yet.
 
 Wine's `wine.inf` now points `Wow64\amd64` at `libarm64ecfex.dll` and
 `Wow64\x86` at `libwow64fex.dll`.
 A fresh prefix writes both values.
-The PE still stops at the same point, so the wiring is necessary but not sufficient.
 
 A fresh prefix with the x86 value also reports a missing 32-bit
 `C:\windows\syswow64\rundll32.exe`.
 That is expected for a 64-bit-only lane and does not affect the native ARM64
 `cmd /c ver` start.
 
-This is the current boundary.
 The likely missing pieces are the reference ARM64EC patches:
 
 - `0004`/`0017`: ID registers and `EFlags`.
 - `0126`/`0128`: hybrid entry points and executable data views.
 
 The lane does not run the game yet.
+
+## ARM64EC unix call and W^X
+
+`libarm64ecfex.dll` is an ARM64EC module, so its PE build defines `__x86_64__`.
+The PE called CodeWeavers' `unix_pe_module_loaded` hook, but the aarch64
+`ntdll.so` table has no such entry.
+The call read past the table and jumped into string data.
+The `arm64ec-unix-call` patch gates the hook on `!defined(__arm64ec__)`.
+
+`NtProtectVirtualMemory(PAGE_READWRITE)` on the module's `.rdata` then failed
+with `STATUS_ACCESS_DENIED`.
+A 16K host page mixed executable 4K pages with writable ones, so Wine asked
+for RWX, which macOS refuses.
+Write faults on the mixed page were not delivered to the signal handler.
+The `wx-pages` patch drops `PROT_EXEC` instead, so the page stays writable and
+the handler can flip it for an execute fault.
+
+Both fixes are in the native-arm64 patch set.
+
+FEX then asserted in `CPUFeatures::FetchHostFeatures` because
+`get_core_id_regs_arm64` was a stub and the processor registry key had zero
+`CP 4xxx` values.
+The `id-registers` patch synthesizes the values from the `hw.optional.arm.*`
+sysctls.
+FEX `ProcessInit`, feature detection, the cross-process work list, and
+`ThreadInit` now return success.
 
 ## Window chrome
 
@@ -96,12 +122,12 @@ The x86_64 lane does not need it.
 
 ## Summary
 
-| Item                   | State                            |
-| ---------------------- | -------------------------------- |
-| Native ARM64 Wine boot | Works                            |
-| Shared user data       | Relocated                        |
-| Mono                   | Skipped                          |
-| x86_64 under FEX       | Hangs before entry               |
-| Game                   | Not started                      |
-| ACE                    | Not tested                       |
-| Window chrome          | Legacy on ARM; bridge prototyped |
+| Item                   | State                                        |
+| ---------------------- | -------------------------------------------- |
+| Native ARM64 Wine boot | Works                                        |
+| Shared user data       | Relocated                                    |
+| Mono                   | Skipped                                      |
+| x86_64 under FEX       | Loads and initializes FEX; entry not reached |
+| Game                   | Not started                                  |
+| ACE                    | Not tested                                   |
+| Window chrome          | Legacy on ARM; bridge prototyped             |

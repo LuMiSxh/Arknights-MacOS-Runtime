@@ -21,25 +21,27 @@ Every port needs a conflict check, a build, and a run test.
 
 ## Ported
 
-| Reference | Subject                                       | Location                          |
-| --------- | --------------------------------------------- | --------------------------------- |
-| `0003`    | Address space, shared user data, PE consumers | `patches/arm/wine/address-space/` |
-| `0008`    | Canonical-address loads in the signal handler | Same patch                        |
-| `0016`    | Skip occupied regions in the free-area search | Same patch                        |
-| `0001`    | Loader SDK 12.0 relink                        | `scripts/arm/build.py`            |
-| `0004`    | Wow64 registry values name the FEX modules    | `patches/arm/wine/fex/`           |
-| —         | Skip Wine Mono                                | `patches/arm/wine/mono/`          |
+| Reference | Subject                                       | Location                              |
+| --------- | --------------------------------------------- | ------------------------------------- |
+| `0003`    | Address space, shared user data, PE consumers | `patches/arm/wine/address-space/`     |
+| `0008`    | Canonical-address loads in the signal handler | Same patch                            |
+| `0016`    | Skip occupied regions in the free-area search | Same patch                            |
+| `0001`    | Loader SDK 12.0 relink                        | `scripts/arm/build.py`                |
+| `0004`    | Wow64 registry values name the FEX modules    | `patches/arm/wine/fex/`               |
+| —         | Skip Wine Mono                                | `patches/arm/wine/mono/`              |
+| —         | ARM64EC unix-call guard                       | `patches/arm/wine/arm64ec-unix-call/` |
+| `0003`    | Keep mixed host pages writable                | `patches/arm/wine/wx-pages/`          |
+| `0004`    | Synthesize the ARM64 ID registers             | `patches/arm/wine/id-registers/`      |
 
 The address-space patch also adds the 4 GB floor probe and moves the first TEB
 block above 4 GB.
-The write and execute hunks are not ported: WineCX 11.17 already flips those
-pages in `virtual_handle_fault`.
+The `mprotect_exec` half of the reference W^X handling is in the `wx-pages`
+patch; WineCX 11.17 already flips pages in `virtual_handle_fault`.
 
 ## Remaining
 
 | Reference | Subject                                       | Needed for          |
 | --------- | --------------------------------------------- | ------------------- |
-| `0004`    | ARM64 ID registers (Wow64 wiring is ported)   | x86_64 startup      |
 | `0017`    | Carry `EFlags` AF and DF through ARM64EC      | x86_64 startup      |
 | `0126`    | Start an x64 thread from a hybrid module      | x86_64 startup      |
 | `0128`    | Tell the emulator about executable data views | Self-modifying code |

@@ -237,6 +237,36 @@
       "targets": [
         "native-arm64"
       ]
+    },
+    {
+      "id": "wine-arm64-unix-call",
+      "component": "wine",
+      "family": "arm64ec",
+      "path": "patches/arm/wine/arm64ec-unix-call/0001-ntdll-fix-the-arm64ec-unix-call-table.patch",
+      "sha256": "d8ebf89ae787e7c6645131063bb1acd95450d3c19673efd9de2f8dac2107bf73",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "wine-arm64-wx-pages",
+      "component": "wine",
+      "family": "wx",
+      "path": "patches/arm/wine/wx-pages/0001-ntdll-keep-mixed-host-pages-writable.patch",
+      "sha256": "0dfda7cf0d49221ccf7d9c1d9bb82c95397c7b658e05552ce9b2af1b82e2945e",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "wine-arm64-id-registers",
+      "component": "wine",
+      "family": "id-registers",
+      "path": "patches/arm/wine/id-registers/0001-ntdll-synthesize-arm64-id-registers.patch",
+      "sha256": "aa67d12796bca881bada8e5491619499d6116a1c15212d6b472efc385c04608f",
+      "targets": [
+        "native-arm64"
+      ]
     }
   ]
 }

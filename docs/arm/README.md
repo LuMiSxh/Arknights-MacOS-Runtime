@@ -18,16 +18,16 @@ See [results](results.md#entitlement) and
 
 ## Status
 
-| Item                            | State                                 |
-| ------------------------------- | ------------------------------------- |
-| ARM64 build target              | Works                                 |
-| Native ARM64 `wine cmd /c ver`  | Works                                 |
-| Shared user data and 4 GB floor | Ported                                |
-| Wow64 wiring to the FEX modules | Ported                                |
-| x86_64 program under FEX        | Loads, then hangs before entry        |
-| Game and ACE                    | Not started                           |
-| Client ARM64 support            | Local app works; game is not playable |
-| SDK 12 window-chrome bridge     | Prototyped, not shipped               |
+| Item                            | State                                      |
+| ------------------------------- | ------------------------------------------ |
+| ARM64 build target              | Works                                      |
+| Native ARM64 `wine cmd /c ver`  | Works                                      |
+| Shared user data and 4 GB floor | Ported                                     |
+| Wow64 wiring to the FEX modules | Ported                                     |
+| x86_64 program under FEX        | Loads, FEX initializes, x64 startup stalls |
+| Game and ACE                    | Not started                                |
+| Client ARM64 support            | Local app works; game is not playable      |
+| SDK 12 window-chrome bridge     | Prototyped, not shipped                    |
 
 The x86_64 lane stays the default until a 64-bit program runs under FEX and the
 game passes the compatibility checks.

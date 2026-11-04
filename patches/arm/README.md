@@ -12,6 +12,12 @@ Families:
   that the ARM64 build ships.
 - [`wine/mono`](wine/mono/README.md): skips the Wine Mono installer, which needs
   32-bit helpers that cannot run without the cross-architecture entitlement.
+- [`wine/arm64ec-unix-call`](wine/arm64ec-unix-call/README.md): keeps the ARM64EC
+  PE from calling the x86-only unix hook.
+- [`wine/wx-pages`](wine/wx-pages/README.md): drops write from RWX host pages on
+  arm64 macOS so image writes succeed.
+- [`wine/id-registers`](wine/id-registers/README.md): synthesizes the ARM64 ID
+  registers on macOS for FEX host-feature detection.
 
 Still to write:
 
