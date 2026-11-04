@@ -29,7 +29,7 @@ class BuildHelperTests(unittest.TestCase):
         member.mkdir(parents=True)
         (member / "Wine").write_bytes(b"payload")
 
-        path = write_archive(directory, "Libraries", "runtime.tar.gz")
+        path = write_archive(directory, "runtime.tar.gz", ("Libraries",))
 
         with tarfile.open(path) as archive:
             self.assertEqual(archive.getnames()[0], "Libraries")
@@ -40,7 +40,7 @@ class BuildHelperTests(unittest.TestCase):
         member = self.root / "Libraries" / "Wine" / "bin"
         member.mkdir(parents=True)
         (member / "wine64").write_bytes(b"x")
-        path = write_archive(self.root, "Libraries", "runtime.tar.gz")
+        path = write_archive(self.root, "runtime.tar.gz", ("Libraries",))
 
         with tarfile.open(path) as archive:
             extracted = archive.extractfile("Libraries/Wine/bin/wine64")
@@ -91,7 +91,9 @@ class BuildHelperTests(unittest.TestCase):
         member.mkdir()
         (member / "marker").write_bytes(b"x")
         path = write_archive(
-            self.root, "Libraries", "Arknights-MacOS-Runtime-arm64-canary.tar.gz"
+            self.root,
+            "Arknights-MacOS-Runtime-arm64-canary.tar.gz",
+            ("Libraries",),
         )
 
         with io.BytesIO(path.read_bytes()) as buffer, tarfile.open(fileobj=buffer):

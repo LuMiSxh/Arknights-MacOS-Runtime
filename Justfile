@@ -44,10 +44,10 @@ fetch-base:
     {{ uv }} scripts/runtime.py fetch-base
 
 build stage="combined":
-    scripts/build-canary.sh "{{ stage }}"
+    {{ uv }} scripts/build.py canary "{{ stage }}"
 
 build-release:
-    scripts/build-release.sh
+    {{ uv }} scripts/build.py release
 
 verify path=".build/stages/combined/candidate/Libraries":
     {{ uv }} scripts/validate_runtime.py "{{ path }}"

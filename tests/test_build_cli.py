@@ -1,59 +1,70 @@
 # SPDX-License-Identifier: MPL-2.0
 
 import subprocess
+import sys
 import unittest
 from pathlib import Path
+
+from scripts.build import (
+    STAGE_HINT,
+    patched_machos,
+    wine_overlay_artifacts,
+)
 
 
 class BuildCLIContractTests(unittest.TestCase):
     def test_rejects_an_unknown_stage_before_doing_work(self) -> None:
         root = Path(__file__).resolve().parents[1]
         result = subprocess.run(
-            ["bash", str(root / "scripts" / "build-canary.sh"), "unknown"],
+            [sys.executable, str(root / "scripts" / "build.py"), "canary", "unknown"],
             capture_output=True,
             check=False,
             text=True,
         )
+
         self.assertEqual(result.returncode, 2)
-        self.assertIn(
-            "expected base, audio, hardware-cursor, performance, ace, cef, cn, or combined",
-            result.stderr,
-        )
+        self.assertIn(STAGE_HINT, result.stderr)
 
     def test_hardware_cursor_stage_only_overlays_wine_ntdll(self) -> None:
-        root = Path(__file__).resolve().parents[1]
-        script = (root / "scripts" / "build-canary.sh").read_text(encoding="utf-8")
-
-        self.assertIn("base|audio|hardware-cursor|performance", script)
-        self.assertIn('if [[ "$stage" == hardware-cursor ]]; then', script)
-        self.assertIn('prepare "$stage" --destination-root "$source_root"', script)
-        self.assertIn(
-            'if [[ "$stage" == hardware-cursor || "$stage" == audio || "$stage" == ace || "$stage" == cef || "$stage" == cn || "$stage" == combined ]]; then',
-            script,
+        self.assertEqual(
+            wine_overlay_artifacts("hardware-cursor"),
+            ("lib/wine/x86_64-unix/ntdll.so",),
         )
-        self.assertIn('make -j"$(sysctl -n hw.logicalcpu)" dlls/ntdll/ntdll.so', script)
-        self.assertIn('cp "$wine_build/dlls/ntdll/ntdll.so"', script)
-        self.assertIn("overlay_wine_file lib/wine/x86_64-unix/ntdll.so", script)
-        self.assertIn(
-            'if [[ "$stage" == performance || "$stage" == combined ]]; then',
-            script,
+        self.assertEqual(
+            patched_machos("hardware-cursor"), ("lib/wine/x86_64-unix/ntdll.so",)
         )
 
     def test_combined_overlay_replaces_bilibili_renderer_artifacts(self) -> None:
-        root = Path(__file__).resolve().parents[1]
-        script = (root / "scripts" / "build-canary.sh").read_text(encoding="utf-8")
+        artifacts = wine_overlay_artifacts("combined")
 
         for artifact in (
             "lib/wine/x86_64-unix/winemac.so",
             "lib/wine/x86_64-windows/ntdll.dll",
             "lib/wine/x86_64-unix/win32u.so",
         ):
-            self.assertIn(f"overlay_wine_file {artifact}", script)
+            self.assertIn(artifact, artifacts)
 
-        self.assertIn(
-            '"$stage" == ace || "$stage" == cef || "$stage" == combined', script
+    def test_a_stage_overlays_only_its_own_families(self) -> None:
+        self.assertEqual(
+            wine_overlay_artifacts("audio"),
+            ("lib/wine/x86_64-unix/winecoreaudio.so",),
         )
-        self.assertIn("overlay_wine_file lib/wine/x86_64-windows/ntdll.dll", script)
+        self.assertEqual(
+            wine_overlay_artifacts("cef"),
+            ("lib/wine/x86_64-windows/ntdll.dll",),
+        )
+        self.assertEqual(patched_machos("cef"), ())
+        self.assertIn("lib/wine/x86_64-unix/win32u.so", wine_overlay_artifacts("cn"))
+
+    def test_only_macho_overlays_are_signed(self) -> None:
+        for stage in ("audio", "ace", "cn", "combined"):
+            with self.subTest(stage=stage):
+                for artifact in patched_machos(stage):
+                    self.assertTrue(artifact.endswith(".so"))
+                self.assertEqual(
+                    set(patched_machos(stage)) - set(wine_overlay_artifacts(stage)),
+                    set(),
+                )
 
 
 if __name__ == "__main__":
