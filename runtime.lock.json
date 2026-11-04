@@ -1,6 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "archiveSchemaVersion": 2,
+  "defaultTarget": "rosetta-x86_64",
   "deploymentTarget": "15.0",
   "sources": {
     "wine": {
@@ -57,6 +58,52 @@
       "DXMT/x64/winemetal.dll"
     ]
   },
+  "targets": {
+    "rosetta-x86_64": {},
+    "native-arm64": {
+      "sources": {
+        "wine": {
+          "repository": "https://github.com/dappermint/winecx.git",
+          "commit": "c8ef4872c1d53120b80aa92185fc7e295d94d092",
+          "version": "11.17"
+        },
+        "dxmt": {
+          "repository": "https://github.com/3Shain/dxmt.git",
+          "commit": "9839e55f98d4aca103957ee4132d6395a325a9ed",
+          "version": "0.80-361-g9839e55"
+        },
+        "fex": {
+          "repository": "https://github.com/dappermint/FEX.git",
+          "commit": "4efc3abc8aca8a0d3a8aca1f153ef6c4299f4426"
+        }
+      },
+      "baseArtifact": null,
+      "interface": {
+        "wineDirectory": "Wine",
+        "dxmtDirectory": "DXMT",
+        "runtimeCapabilities": "runtime-capabilities.json",
+        "executables": [
+          "Wine/bin/Arknights",
+          "Wine/bin/wine64",
+          "Wine/bin/wineserver"
+        ],
+        "requiredFiles": [
+          "Wine/lib/wine/aarch64-unix/winemac.so",
+          "Wine/lib/wine/aarch64-unix/winecoreaudio.so",
+          "Wine/lib/wine/aarch64-unix/winemetal.so",
+          "Wine/lib/wine/aarch64-unix/libarm64ecfex.so",
+          "Wine/lib/wine/aarch64-unix/libwow64fex.so",
+          "Wine/lib/wine/aarch64-windows/winemetal.dll",
+          "Wine/lib/wine/aarch64-windows/libarm64ecfex.dll",
+          "Wine/lib/wine/aarch64-windows/libwow64fex.dll",
+          "DXMT/x64/d3d10core.dll",
+          "DXMT/x64/d3d11.dll",
+          "DXMT/x64/dxgi.dll",
+          "DXMT/x64/winemetal.dll"
+        ]
+      }
+    }
+  },
   "patches": [
     {
       "id": "wine-audio-default-output",
@@ -97,6 +144,9 @@
       "id": "wine-ace-rosetta-workarounds",
       "component": "wine",
       "family": "ace",
+      "targets": [
+        "rosetta-x86_64"
+      ],
       "path": "patches/wine/ace/rosetta/0001-macos-rosetta-ace-workarounds.patch",
       "sha256": "d6c259ef95d715fec0717882a656e2ef5dfc59b72af02969a38d05bd253e2f95"
     },

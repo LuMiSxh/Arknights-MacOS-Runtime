@@ -61,7 +61,7 @@ Run `just check`. Then run `just prepare STAGE` for each of `audio`, `cursor`, `
 
 GitHub Actions validate the pinned sources, build the release tree, and create a draft release after the checksum, runtime-interface, provenance, source, and notice checks pass.
 
-See [architecture](docs/architecture.md), [patch registry](docs/patch-registry.md), [redistribution inventory](docs/legal/redistribution.md), [testing](docs/testing.md), [release gates](docs/releasing.md), [updating pins](docs/updating-pins.md), and the pinned [runtime identity](runtime.lock.json).
+See [architecture](docs/architecture.md), [patch registry](docs/patch-registry.md), [redistribution inventory](docs/legal/redistribution.md), [testing](docs/testing.md), [release gates](docs/releasing.md), [updating pins](docs/updating-pins.md), the [native ARM64 plan](docs/arm/README.md), and the pinned [runtime identity](runtime.lock.json).
 
 ## License
 

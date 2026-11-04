@@ -12,7 +12,7 @@ import re
 import subprocess
 import urllib.request
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import urlparse
 
@@ -37,6 +37,28 @@ STAGES = (
     "fullscreen",
     "combined",
 )
+PATCH_FAMILIES = frozenset(
+    {
+        "audio",
+        "hardware-cursor",
+        "performance",
+        "ace",
+        "cef",
+        "cn",
+        "menu",
+        "fullscreen",
+    }
+)
+SCHEMA_VERSION = 3
+ARCHIVE_SCHEMA_VERSION = 2
+# A target entry replaces these keys as a whole. Anything absent is inherited
+# from the top level, which holds the default target's pins.
+TARGET_OVERRIDE_KEYS = frozenset(
+    {"deploymentTarget", "sources", "interface", "baseArtifact"}
+)
+SOURCE_COMPONENTS = ("wine", "dxmt", "fex")
+REQUIRED_SOURCES = ("wine", "dxmt")
+TARGET_NAME = re.compile(r"[a-z0-9][a-z0-9._-]{0,63}")
 HASH_PATTERN = re.compile(r"[0-9a-f]{64}")
 COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 
@@ -97,22 +119,53 @@ def _source_pin(value: Any, name: str) -> SourcePin:
     return SourcePin(name.rsplit(".", maxsplit=1)[-1], repository, commit)
 
 
+def _require_path_list(mapping: dict[str, Any], key: str, context: str) -> list[str]:
+    value = mapping.get(key)
+    if value is None:
+        return []
+    if not isinstance(value, list) or not value:
+        raise LockError(f"{context}.{key} must be a non-empty array")
+    entries = []
+    for index, entry in enumerate(value):
+        if not isinstance(entry, str) or not entry:
+            raise LockError(f"{context}.{key}[{index}] must be a non-empty string")
+        entries.append(_runtime_relative(entry, f"{context}.{key}[{index}]"))
+    return entries
+
+
+def _runtime_relative(value: str, context: str) -> str:
+    path = PurePosixPath(value)
+    if path.is_absolute() or ".." in path.parts or "\\" in value:
+        raise LockError(f"{context} must be a runtime-relative path")
+    return value
+
+
+def _target_name(value: Any, context: str) -> str:
+    if not isinstance(value, str) or TARGET_NAME.fullmatch(value) is None:
+        raise LockError(f"{context} must be a lowercase target name")
+    return value
+
+
 def monitored_sources(lock: dict[str, Any]) -> tuple[SourcePin, ...]:
     """Return every source pin owned and monitored by the runtime repository."""
 
     sources = _require_mapping(lock.get("sources"), "sources")
-    artifact = _require_mapping(lock.get("baseArtifact"), "baseArtifact")
-    provenance = _require_mapping(lock.get("baseProvenance"), "baseProvenance")
-    build = _require_mapping(lock.get("build"), "build")
     pins = [
-        _source_pin(sources.get("wine"), "sources.wine"),
-        _source_pin(sources.get("dxmt"), "sources.dxmt"),
-        _source_pin(artifact.get("recipe"), "baseArtifact.buildRecipe"),
+        _source_pin(sources.get(component), f"sources.{component}")
+        for component in REQUIRED_SOURCES
     ]
-    pins[-1] = SourcePin("buildRecipe", pins[-1].repository, pins[-1].commit)
-    for component in ("moltenvk", "wineGecko"):
-        pin = _source_pin(provenance.get(component), f"baseProvenance.{component}")
-        pins.append(SourcePin(component, pin.repository, pin.commit))
+    if "fex" in sources:
+        pins.append(_source_pin(sources["fex"], "sources.fex"))
+    if lock.get("baseArtifact") is not None:
+        recipe = _source_pin(
+            lock["baseArtifact"].get("recipe"), "baseArtifact.buildRecipe"
+        )
+        pins.append(SourcePin("buildRecipe", recipe.repository, recipe.commit))
+        provenance = _require_mapping(lock.get("baseProvenance"), "baseProvenance")
+        for component in ("moltenvk", "wineGecko"):
+            pin = _source_pin(provenance.get(component), f"baseProvenance.{component}")
+            pins.append(SourcePin(component, pin.repository, pin.commit))
+    build = _require_mapping(lock.get("build"), "build")
     pin = _source_pin(build.get("nixpkgs"), "build.nixpkgs")
     pins.append(SourcePin("nixpkgs", pin.repository, pin.commit))
     return tuple(pins)
@@ -136,68 +189,188 @@ def _contained_file(root: Path, relative: str) -> Path:
     return path
 
 
-def load_lock(
-    path: Path = LOCK_PATH, *, repository_root: Path = ROOT
+def _validate_sources(value: Any, context: str) -> dict[str, Any]:
+    sources = _require_mapping(value, context)
+    missing = [component for component in REQUIRED_SOURCES if component not in sources]
+    if missing:
+        raise LockError(f"{context} must pin {', '.join(missing)}")
+    unknown = sorted(set(sources) - set(SOURCE_COMPONENTS))
+    if unknown:
+        raise LockError(f"{context} has unknown components: {', '.join(unknown)}")
+    for component, pin in sources.items():
+        _source_pin(pin, f"{context}.{component}")
+    return sources
+
+
+def _validate_base_artifact(value: Any, context: str) -> dict[str, Any]:
+    artifact = _require_mapping(value, context)
+    url = _require_string(artifact, "url", context)
+    digest = _require_string(artifact, "sha256", context)
+    if not url.startswith("https://github.com/"):
+        raise LockError(f"{context}.url must use GitHub HTTPS")
+    if HASH_PATTERN.fullmatch(digest) is None:
+        raise LockError(f"{context}.sha256 must be a lowercase SHA-256 hash")
+    _source_pin(artifact.get("recipe"), f"{context}.buildRecipe")
+    return artifact
+
+
+def _validate_interface(value: Any, context: str) -> dict[str, Any]:
+    interface = _require_mapping(value, context)
+    for key in ("wineDirectory", "dxmtDirectory", "runtimeCapabilities"):
+        if key in interface:
+            _require_string(interface, key, context)
+    for key in ("executables", "requiredFiles"):
+        _require_path_list(interface, key, context)
+    return interface
+
+
+def _validate_targets(lock: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    declared = _require_mapping(lock.get("targets"), "targets")
+    if not declared:
+        raise LockError("targets must name at least one target")
+    targets: dict[str, dict[str, Any]] = {}
+    for name, value in declared.items():
+        _target_name(name, f"targets.{name}")
+        overrides = _require_mapping(value, f"targets.{name}")
+        unknown = sorted(set(overrides) - TARGET_OVERRIDE_KEYS)
+        if unknown:
+            raise LockError(f"targets.{name} has unknown keys: {', '.join(unknown)}")
+        targets[name] = overrides
+    default_target = _target_name(lock.get("defaultTarget"), "defaultTarget")
+    if default_target not in targets:
+        raise LockError("defaultTarget must name a declared target")
+    return targets
+
+
+def _selected_target(
+    lock: dict[str, Any], targets: dict[str, dict[str, Any]], target: str | None
+) -> str:
+    if target is None:
+        return lock["defaultTarget"]
+    _target_name(target, "target")
+    if target not in targets:
+        raise LockError(
+            f"unknown target {target!r}; expected one of {', '.join(sorted(targets))}"
+        )
+    return target
+
+
+def _patch_targets(
+    patch: dict[str, Any], targets: dict[str, dict[str, Any]], context: str
+) -> list[str]:
+    declared = patch.get("targets")
+    if declared is None:
+        return sorted(targets)
+    if not isinstance(declared, list) or not declared:
+        raise LockError(f"{context}.targets must be a non-empty array")
+    names: list[str] = []
+    for index, name in enumerate(declared):
+        _target_name(name, f"{context}.targets[{index}]")
+        if name not in targets:
+            raise LockError(
+                f"{context}.targets[{index}] names an undeclared target: {name}"
+            )
+        if name in names:
+            raise LockError(f"{context}.targets repeats the target {name}")
+        names.append(name)
+    return names
+
+
+def _resolve_target(
+    lock: dict[str, Any], name: str, overrides: dict[str, Any]
 ) -> dict[str, Any]:
+    """Flatten the document for one target. A target entry replaces whole keys."""
+
+    resolved: dict[str, Any] = {
+        "schemaVersion": lock["schemaVersion"],
+        "archiveSchemaVersion": lock["archiveSchemaVersion"],
+        "defaultTarget": lock["defaultTarget"],
+        "target": name,
+        "baseProvenance": lock.get("baseProvenance"),
+        "build": lock.get("build"),
+        "patches": [],
+    }
+    for key in ("deploymentTarget", "sources", "interface", "baseArtifact"):
+        resolved[key] = overrides[key] if key in overrides else lock.get(key)
+    return resolved
+
+
+def load_lock(
+    path: Path = LOCK_PATH,
+    *,
+    repository_root: Path = ROOT,
+    target: str | None = None,
+) -> dict[str, Any]:
+    """Validate the lock and return its resolved view for one build target."""
+
     try:
         lock = _require_mapping(json.loads(path.read_text(encoding="utf-8")), "lock")
     except (OSError, json.JSONDecodeError) as error:
         raise LockError(f"cannot read {path}: {error}") from error
 
-    if lock.get("schemaVersion") != 2:
-        raise LockError("schemaVersion must be 2")
-    if lock.get("archiveSchemaVersion") != 2:
-        raise LockError("archiveSchemaVersion must be 2")
-    if lock.get("deploymentTarget") != "15.0":
-        raise LockError("deploymentTarget must be 15.0")
+    if lock.get("schemaVersion") != SCHEMA_VERSION:
+        raise LockError(f"schemaVersion must be {SCHEMA_VERSION}")
+    if lock.get("archiveSchemaVersion") != ARCHIVE_SCHEMA_VERSION:
+        raise LockError(f"archiveSchemaVersion must be {ARCHIVE_SCHEMA_VERSION}")
 
-    sources = _require_mapping(lock.get("sources"), "sources")
-    for component in ("wine", "dxmt"):
-        _source_pin(sources.get(component), f"sources.{component}")
+    targets = _validate_targets(lock)
+    selected = _selected_target(lock, targets, target)
 
-    artifact = _require_mapping(lock.get("baseArtifact"), "baseArtifact")
-    artifact_url = _require_string(artifact, "url", "baseArtifact")
-    artifact_hash = _require_string(artifact, "sha256", "baseArtifact")
-    if not artifact_url.startswith("https://github.com/"):
-        raise LockError("baseArtifact.url must use GitHub HTTPS")
-    if HASH_PATTERN.fullmatch(artifact_hash) is None:
-        raise LockError("baseArtifact.sha256 must be a lowercase SHA-256 hash")
-    monitored_sources(lock)
+    provenance = _require_mapping(lock.get("baseProvenance"), "baseProvenance")
+    for component in ("moltenvk", "wineGecko"):
+        _source_pin(provenance.get(component), f"baseProvenance.{component}")
+    build = _require_mapping(lock.get("build"), "build")
+    _source_pin(build.get("nixpkgs"), "build.nixpkgs")
+
+    resolved = {
+        name: _resolve_target(lock, name, overrides)
+        for name, overrides in targets.items()
+    }
+    for name, view in resolved.items():
+        if view["deploymentTarget"] != "15.0":
+            raise LockError(f"{name}.deploymentTarget must be 15.0")
+        _validate_sources(view["sources"], f"{name}.sources")
+        if view["baseArtifact"] is not None:
+            _validate_base_artifact(view["baseArtifact"], f"{name}.baseArtifact")
+        _validate_interface(view["interface"], f"{name}.interface")
 
     patches = lock.get("patches")
     if not isinstance(patches, list):
         raise LockError("patches must be an array")
     seen_ids: set[str] = set()
+    applicability: dict[str, list[str]] = {}
     for index, value in enumerate(patches):
-        patch = _require_mapping(value, f"patches[{index}]")
-        patch_id = _require_string(patch, "id", f"patches[{index}]")
-        component = _require_string(patch, "component", f"patches[{index}]")
-        family = _require_string(patch, "family", f"patches[{index}]")
-        relative = _require_string(patch, "path", f"patches[{index}]")
-        expected = _require_string(patch, "sha256", f"patches[{index}]")
+        context = f"patches[{index}]"
+        patch = _require_mapping(value, context)
+        patch_id = _require_string(patch, "id", context)
+        component = _require_string(patch, "component", context)
+        family = _require_string(patch, "family", context)
+        relative = _require_string(patch, "path", context)
+        expected = _require_string(patch, "sha256", context)
         if patch_id in seen_ids:
             raise LockError(f"duplicate patch id: {patch_id}")
         seen_ids.add(patch_id)
-        if component not in sources:
-            raise LockError(f"unknown patch component: {component}")
-        if family not in (
-            "audio",
-            "hardware-cursor",
-            "performance",
-            "ace",
-            "cef",
-            "cn",
-            "menu",
-            "fullscreen",
-        ):
+        if family not in PATCH_FAMILIES:
             raise LockError(f"unknown patch family: {family}")
+        names = _patch_targets(patch, targets, context)
+        for name in names:
+            if component not in resolved[name]["sources"]:
+                raise LockError(
+                    f"patch {patch_id} uses {component}, "
+                    f"which the {name} target does not build"
+                )
         if HASH_PATTERN.fullmatch(expected) is None:
             raise LockError(f"patch {patch_id} has an invalid SHA-256 hash")
         actual = _sha256_file(_contained_file(repository_root, relative))
         if actual != expected:
             raise LockError(f"patch {patch_id} hash mismatch: {actual} != {expected}")
+        applicability[patch_id] = names
 
-    return lock
+    for name, view in resolved.items():
+        view["patches"] = [
+            patch for patch in patches if name in applicability[patch["id"]]
+        ]
+    return resolved[selected]
 
 
 def patches_for_stage(lock: dict[str, Any], stage: str) -> list[dict[str, Any]]:
@@ -214,15 +387,27 @@ def _run(*command: str, cwd: Path | None = None) -> None:
     subprocess.run(command, cwd=cwd, check=True)
 
 
-def prepare(stage: str, destination_root: Path = BUILD_ROOT / "sources") -> None:
-    lock = load_lock()
+def source_directory(component: str, stage: str, lock: dict[str, Any]) -> str:
+    """Name a prepared source directory. The default target keeps the legacy name."""
+
+    target = "" if lock["target"] == lock["defaultTarget"] else f"-{lock['target']}"
+    return f"{component}{target}-{stage}"
+
+
+def prepare(
+    stage: str,
+    destination_root: Path = BUILD_ROOT / "sources",
+    *,
+    target: str | None = None,
+) -> None:
+    lock = load_lock(target=target)
     selected = patches_for_stage(lock, stage)
     components = {patch["component"] for patch in selected}
     if stage == "base":
         components = set(lock["sources"])
     for component in sorted(components):
         source = lock["sources"][component]
-        destination = destination_root / f"{component}-{stage}"
+        destination = destination_root / source_directory(component, stage, lock)
         if destination.exists():
             raise LockError(f"source destination already exists: {destination}")
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -245,9 +430,13 @@ def prepare(stage: str, destination_root: Path = BUILD_ROOT / "sources") -> None
         success(f"Prepared pinned {component} source")
 
 
-def fetch_base() -> Path:
-    lock = load_lock()
+def fetch_base(*, target: str | None = None) -> Path:
+    lock = load_lock(target=target)
     artifact = lock["baseArtifact"]
+    if artifact is None:
+        raise LockError(
+            f"the {lock['target']} target builds every component and has no base artifact"
+        )
     downloads = BUILD_ROOT / "downloads"
     downloads.mkdir(parents=True, exist_ok=True)
     destination = downloads / "Libraries.tar.gz"
@@ -284,24 +473,31 @@ def fetch_base() -> Path:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("validate-lock")
+    validate_parser = subparsers.add_parser("validate-lock")
+    validate_parser.add_argument("--target")
     prepare_parser = subparsers.add_parser("prepare")
     prepare_parser.add_argument("stage", choices=STAGES)
     prepare_parser.add_argument("--destination-root", type=Path)
-    subparsers.add_parser("fetch-base")
+    prepare_parser.add_argument("--target")
+    fetch_parser = subparsers.add_parser("fetch-base")
+    fetch_parser.add_argument("--target")
     arguments = parser.parse_args()
     try:
         if arguments.command == "validate-lock":
-            lock = load_lock()
+            lock = load_lock(target=arguments.target)
             validate_source_capability_contract(lock, ROOT)
-            success("Validated runtime.lock.json")
+            if arguments.target is None:
+                success("Validated runtime.lock.json")
+            else:
+                success(f"Validated runtime.lock.json for the {lock['target']} target")
         elif arguments.command == "prepare":
             prepare(
                 arguments.stage,
                 arguments.destination_root or BUILD_ROOT / "sources",
+                target=arguments.target,
             )
         else:
-            print(fetch_base())
+            print(fetch_base(target=arguments.target))
     except (LockError, OSError, subprocess.CalledProcessError) as caught_error:
         error(str(caught_error))
         return 1

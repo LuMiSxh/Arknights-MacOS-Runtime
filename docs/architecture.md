@@ -33,3 +33,7 @@ Each owning component parses its own flags. Accepted values and defaults are in 
 The performance family has a `DXMT_DEBUG`-gated reduction of release presentation statistics. It keeps the debug HUD output and release frame counters. It does not change rendering policy.
 
 The launcher selects the remaining flags from the profile of the active client. A profile owns the publisher, distribution variant, runtime environment overrides, and the ACE warning on Play. The runtime never infers compatibility from a publisher name, so a future ACE client stays independent from the Bilibili CN routes.
+
+## Native ARM64 target
+
+`runtime.lock.json` declares a second target, `native-arm64`. It runs WineCX on ARM64 without Rosetta, with FEX for x86_64 programs and DXMT ARM64EC for Direct3D 10 and 11. The project has no distributable signing identity, so the target must not use the cross-architecture entitlement. `rosetta-x86_64` stays the default until the ARM64 canary passes. The plan is in [the ARM64 documentation](arm/README.md).
