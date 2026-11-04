@@ -25,6 +25,8 @@ See [provenance](provenance.md#entitlement-availability).
 
 Therefore the ARM64 lane must not depend on the entitlement.
 The lane is 64-bit only and uses 16K host pages, which need no entitlement.
+Distribution needs no paid account.
+See [signing and distribution](pipeline.md#signing-and-distribution).
 
 The primary plan is an entitlement-free WineCX ARM64 build with three ports:
 

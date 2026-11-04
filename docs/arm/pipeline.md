@@ -284,9 +284,51 @@ Arknights-MacOS-Runtime-vX.Y.Z.tar.gz
 Arknights-MacOS-Runtime-arm64-vX.Y.Z.tar.gz
 ```
 
-The `provenance.json` file gains a `target` field.
+`provenance.json` gains a `target` field.
 The capability manifest stays identical.
 Keep the ARM64 artifact out of the release until the manual canary passes.
+
+## Signing and distribution
+
+The project has no paid Apple Developer account.
+Neither target needs one, because no artifact uses the cross-architecture entitlement.
+
+| Item               | Rule                                                              |
+| ------------------ | ----------------------------------------------------------------- |
+| Signing            | Sign every Mach-O file ad hoc: `codesign --force --sign -`.       |
+| Notarization       | None. Notarization needs a paid Developer ID certificate.         |
+| Entitlement        | Never request one for a distributed artifact.                     |
+| i386, 4K pages     | Out of scope. Both need the entitlement.                          |
+| First-launch trust | The user completes Apple's **Open Anyway** flow for the launcher. |
+
+The launcher extracts the archive into application support.
+The launcher writes those files, so macOS does not quarantine them.
+The runtime therefore starts without a second trust prompt.
+
+The client publishes ad-hoc signed, non-notarized releases already.
+See `docs/development/releases-and-updates.md` in that repository.
+The ARM64 lane adds no signing requirement to that model.
+
+Ad-hoc signing does not change the redistribution terms.
+`provenance.json` records the pinned sources and the artifact hashes per target.
+The source offer stays as it is.
+
+Three conditions would break this model:
+
+1. macOS requires notarization for every executable, not only downloaded apps.
+2. Apple changes the 16K page or `PAGEZERO` behavior for unentitled processes.
+3. The client stops shipping an ad-hoc signed launcher.
+
+The first two affect both targets, not only ARM64.
+
+If Gatekeeper blocks a user, the fallback is a local build.
+`just build-release` on the user's Mac produces an artifact that macOS did not quarantine.
+
+A free Apple ID cannot authorize a distributed artifact.
+Apple documents `com.apple.developer.cross-architecture-support-unmanaged` for free accounts, but it is unreachable today.
+If Apple opens it, the profile stays bound to one team, one App ID, and one Mac.
+Use it only for a local canary with i386 or 4K pages, and never ship the result.
+See [provenance](provenance.md#entitlement-availability).
 
 ## CI
 
