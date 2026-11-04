@@ -1,0 +1,125 @@
+diff --git a/dlls/userenv/userenv.spec b/dlls/userenv/userenv.spec
+--- a/dlls/userenv/userenv.spec
++++ b/dlls/userenv/userenv.spec
+@@ -22,3 +22,7 @@
+ @ stdcall RegisterGPNotification(long long)
+ @ stdcall UnloadUserProfile(ptr ptr)
+ @ stdcall UnregisterGPNotification(long)
++@ stdcall DeleteAppContainerProfile(wstr)
++@ stdcall DeriveAppContainerSidFromAppContainerName(wstr ptr)
++@ stdcall GetAppContainerFolderPath(wstr ptr)
++@ stdcall GetAppContainerRegistryLocation(long ptr)
+diff --git a/dlls/userenv/userenv_main.c b/dlls/userenv/userenv_main.c
+--- a/dlls/userenv/userenv_main.c
++++ b/dlls/userenv/userenv_main.c
+@@ -26,6 +26,8 @@
+ #include "winreg.h"
+ #include "winternl.h"
+ #include "winnls.h"
++#include <wchar.h>
++#include <wincrypt.h>
+ #include "sddl.h"
+ #include "objbase.h"
+ #include "userenv.h"
+@@ -687,12 +689,100 @@ BOOL WINAPI USERENV_138( int csidl, LPCSTR lnk_dir, LPCSTR lnk_filename,
+     return FALSE;
+ }
+ 
++static HRESULT result_from_last_error(void)
++{
++    DWORD error = GetLastError();
++
++    if (error == ERROR_SUCCESS) error = ERROR_GEN_FAILURE;
++    return HRESULT_FROM_WIN32(error);
++}
++
++HRESULT WINAPI DeriveAppContainerSidFromAppContainerName(PCWSTR app_container_name, PSID *app_container_sid)
++{
++    SID_IDENTIFIER_AUTHORITY authority = SECURITY_APP_PACKAGE_AUTHORITY;
++    HCRYPTPROV provider = 0;
++    HCRYPTHASH hash = 0;
++    WCHAR *normalized_name = NULL;
++    DWORD digest[8];
++    DWORD digest_size = sizeof(digest);
++    SIZE_T name_length;
++    SIZE_T i;
++    HRESULT result = E_FAIL;
++
++    TRACE("(%s, %p)\n", debugstr_w(app_container_name), app_container_sid);
++
++    if (!app_container_sid) return E_POINTER;
++    *app_container_sid = NULL;
++    if (!app_container_name || !app_container_name[0]) return E_INVALIDARG;
++
++    name_length = wcslen(app_container_name);
++    if (name_length > (MAXDWORD / sizeof(*normalized_name)) - 1)
++        return HRESULT_FROM_WIN32(ERROR_ARITHMETIC_OVERFLOW);
++    normalized_name = HeapAlloc(GetProcessHeap(), 0, (name_length + 1) * sizeof(*normalized_name));
++    if (!normalized_name) return E_OUTOFMEMORY;
++    for (i = 0; i < name_length; i++) normalized_name[i] = towlower(app_container_name[i]);
++    normalized_name[name_length] = 0;
++
++    if (!CryptAcquireContextW(&provider, NULL, NULL, PROV_RSA_AES, CRYPT_VERIFYCONTEXT) ||
++        !CryptCreateHash(provider, CALG_SHA_256, 0, 0, &hash) ||
++        !CryptHashData(hash, (const BYTE *)normalized_name,
++                       (DWORD)(name_length * sizeof(*normalized_name)), 0) ||
++        !CryptGetHashParam(hash, HP_HASHVAL, (BYTE *)digest, &digest_size, 0))
++    {
++        result = result_from_last_error();
++        goto done;
++    }
++    if (digest_size != sizeof(digest))
++    {
++        result = E_UNEXPECTED;
++        goto done;
++    }
++    if (!AllocateAndInitializeSid(&authority, SECURITY_APP_PACKAGE_RID_COUNT,
++                                  SECURITY_APP_PACKAGE_BASE_RID,
++                                  digest[0], digest[1], digest[2], digest[3],
++                                  digest[4], digest[5], digest[6],
++                                  app_container_sid))
++    {
++        result = result_from_last_error();
++        goto done;
++    }
++    result = S_OK;
++
++done:
++    if (hash) CryptDestroyHash(hash);
++    if (provider) CryptReleaseContext(provider, 0);
++    HeapFree(GetProcessHeap(), 0, normalized_name);
++    return result;
++}
++
+ HRESULT WINAPI CreateAppContainerProfile(PCWSTR container_name, PCWSTR display_name, PCWSTR description,
+                                          SID_AND_ATTRIBUTES *capabilities, DWORD capability_count,
+                                          SID **container_sid)
+ {
+-    FIXME("(%s, %s, %s, %p, %ld, %p): stub\n", debugstr_w(container_name), debugstr_w(display_name),
++    TRACE("(%s, %s, %s, %p, %ld, %p)\n", debugstr_w(container_name), debugstr_w(display_name),
+           debugstr_w(description), capabilities, capability_count, container_sid);
+ 
++    return DeriveAppContainerSidFromAppContainerName(container_name, (PSID *)container_sid);
++}
++
++HRESULT WINAPI DeleteAppContainerProfile(PCWSTR container_name)
++{
++    TRACE("(%s)\n", debugstr_w(container_name));
++    return S_OK;
++}
++
++HRESULT WINAPI GetAppContainerRegistryLocation(REGSAM desired_access, PHKEY app_container_key)
++{
++    TRACE("(%lx, %p)\n", desired_access, app_container_key);
++    if (!app_container_key) return E_POINTER;
++    *app_container_key = NULL;
++    return E_NOTIMPL;
++}
++
++HRESULT WINAPI GetAppContainerFolderPath(PCWSTR app_container_sid, PWSTR *folder_path)
++{
++    TRACE("(%s, %p)\n", debugstr_w(app_container_sid), folder_path);
++    if (!folder_path) return E_POINTER;
++    *folder_path = NULL;
+     return E_NOTIMPL;
+ }
