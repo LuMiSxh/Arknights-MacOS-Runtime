@@ -3,33 +3,41 @@
 This document describes a second build target in this repository.
 The current target stays unchanged.
 The new target builds the native ARM64 runtime.
-All names in this document are proposals. No command in this document exists yet.
+The lock schema and the target-aware `prepare` and `validate-lock` commands exist.
+The build and release commands are proposals.
 
 ## Lock shape
 
 `runtime.lock.json` gains a target dimension.
 The archive schema stays at version 2, so the consumer contract does not change.
+The top level holds the default target's pins.
 
 ```json
 {
     "schemaVersion": 3,
     "archiveSchemaVersion": 2,
+    "defaultTarget": "rosetta-x86_64",
+    "deploymentTarget": "15.0",
+    "sources": { "wine": {}, "dxmt": {} },
+    "baseArtifact": {},
+    "interface": {},
     "patches": [],
     "targets": {
-        "rosetta-x86_64": {
-            "deploymentTarget": "15.0",
-            "sources": { "wine": {}, "dxmt": {} },
-            "baseArtifact": {},
-            "interface": {}
-        },
+        "rosetta-x86_64": {},
         "native-arm64": {
-            "deploymentTarget": "15.0",
             "sources": { "wine": {}, "dxmt": {}, "fex": {} },
+            "baseArtifact": null,
             "interface": {}
         }
     }
 }
 ```
+
+A `targets` entry replaces whole keys: `deploymentTarget`, `sources`, `interface`, and `baseArtifact`.
+An absent key is inherited from the top level.
+`baseArtifact` set to `null` means the target builds every component.
+`load_lock()` validates every target and returns the resolved view of one target.
+Without an argument it resolves `defaultTarget`.
 
 | Field          | Rosetta target                  | ARM64 target                              |
 | -------------- | ------------------------------- | ----------------------------------------- |
@@ -44,16 +52,23 @@ Add an optional `targets` list to each patch entry.
 A patch without the list applies to all targets.
 The ACE Rosetta patch applies to `rosetta-x86_64` only, because it changes `signal_x86_64.c`.
 
+`prepare` keeps the legacy source directory name for the default target.
+Another target adds its name: `wine-native-arm64-combined`.
+`update-pins` still rewrites the top-level pins only.
+Extend it with the target before the ARM64 lane builds.
+
 ## Commands
 
 | Command                                                                     | Purpose                                        |
 | --------------------------------------------------------------------------- | ---------------------------------------------- |
-| `just prepare arm64`                                                        | Clone and patch the ARM64 sources.             |
+| `uv run --locked scripts/runtime.py validate-lock`                          | Validate every target.                         |
+| `uv run --locked scripts/runtime.py validate-lock --target native-arm64`    | Validate the lock and resolve one target.      |
+| `uv run --locked scripts/runtime.py prepare combined --target native-arm64` | Clone and patch the ARM64 sources.             |
 | `just build arm64`                                                          | Build a canary ARM64 artifact.                 |
 | `just verify .build/stages/arm64/candidate/Libraries --target native-arm64` | Validate the artifact.                         |
 | `just build-release arm64`                                                  | Build a release artifact for the ARM64 target. |
 
-The current commands keep their behavior when the target is absent.
+A command without `--target` keeps its current behavior.
 The default target is `rosetta-x86_64` until the ARM64 canary passes.
 
 ## Build stages
@@ -75,7 +90,7 @@ flowchart LR
 
 ```sh
 uv run --locked scripts/runtime.py validate-lock
-uv run --locked scripts/runtime.py prepare arm64 --target native-arm64
+uv run --locked scripts/runtime.py prepare combined --target native-arm64
 ```
 
 Prepare clones each source at its pinned commit.

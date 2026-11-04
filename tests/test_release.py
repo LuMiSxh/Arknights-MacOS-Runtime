@@ -131,8 +131,10 @@ class ReleaseVerificationTests(unittest.TestCase):
                 }
             )
         lock = {
-            "schemaVersion": 2,
+            "schemaVersion": 3,
             "archiveSchemaVersion": 2,
+            "defaultTarget": "rosetta-x86_64",
+            "targets": {"rosetta-x86_64": {}},
             "deploymentTarget": "15.0",
             "sources": {
                 "wine": {

@@ -80,6 +80,42 @@ See [architecture](architecture.md) for the address space details.
 This project cannot obtain the same profile.
 Do not copy the reference loader into an artifact.
 
+## Entitlement availability
+
+The entitlement belongs to the team that owns the provisioning profile.
+Another team cannot reuse it, and the signature cannot be transplanted.
+Apple publishes two variants:
+
+| Entitlement                                                | Account                      |
+| ---------------------------------------------------------- | ---------------------------- |
+| `com.apple.developer.cross-architecture-support`           | Paid Apple Developer Program |
+| `com.apple.developer.cross-architecture-support-unmanaged` | Free developer account       |
+
+The signing process is the same for both variants:
+
+1. Create an App ID for the Wine loader.
+2. Enable the cross-architecture capability on that App ID.
+3. Add the provisioning UDID of the Mac to the account.
+4. Create a provisioning profile for the App ID.
+5. Put the profile in an app bundle with the Wine loader.
+
+The profile names one Mac.
+A signed loader is therefore device-bound and cannot be redistributed.
+MetalSharp-Wine also reports that macOS 27.2 kills a standalone executable that claims the entitlement without an embedded profile.
+
+A free account cannot reach Certificates, Identifiers & Profiles at present.
+A forum report from October 2026 records no capability in a Personal Team and no way to obtain the profile.
+The unmanaged variant is documented but not reachable today.
+
+Disabling System Integrity Protection and the entitlement checks at boot is possible.
+Do not use it for a distributed runtime.
+
+Sources:
+
+- Wine-devel, 2026-08-07, "Wine on ARM64 macOS": both entitlement names and the signing steps.
+- `metalsharp/MetalSharp-Wine` README: the bundle requirement and the macOS 27.2 behavior.
+- Apple Developer Forums, October 2026: a free Personal Team cannot obtain the entitlement.
+
 ## Reference FEX binaries
 
 The installed tree contains two PE modules with FEX code:

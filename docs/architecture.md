@@ -36,4 +36,4 @@ The launcher selects the remaining flags from the profile of the active client. 
 
 ## Native ARM64 target
 
-A second, planned target runs WineCX on ARM64 without Rosetta. It uses FEX for x86_64 programs and DXMT ARM64EC for Direct3D 10 and 11. The project has no Apple Developer account, so the target must not use the cross-architecture entitlement. The plan is in [the ARM64 documentation](arm/README.md).
+`runtime.lock.json` declares a second target, `native-arm64`. It runs WineCX on ARM64 without Rosetta, with FEX for x86_64 programs and DXMT ARM64EC for Direct3D 10 and 11. The project has no distributable signing identity, so the target must not use the cross-architecture entitlement. `rosetta-x86_64` stays the default until the ARM64 canary passes. The plan is in [the ARM64 documentation](arm/README.md).

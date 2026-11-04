@@ -70,6 +70,20 @@ Test with TSO enabled first. Disable it only after ACE and the game pass.
 The current x86_64 lane is blocked by the client on macOS 28 and later.
 The ARM64 lane must work on macOS 27 and 28.
 
+### Entitlement
+
+| Item       | Detail                                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Risk       | A future macOS release requires the entitlement for 64-bit processes as well.                                                   |
+| Impact     | The entitlement-free lane stops working.                                                                                        |
+| Evidence   | Apple has not published such a requirement. Both entitlements need a per-team profile that names one Mac.                       |
+| Mitigation | Keep the entitlement-compatible branches from the ported patches available behind their switches. Never vendor a signed loader. |
+| Decision   | Revisit only when Apple offers a path that a distributed artifact can use.                                                      |
+
+The free `cross-architecture-support-unmanaged` entitlement is documented but not reachable.
+Even when it becomes available, the profile is device-bound and cannot ship.
+It stays an option for a local canary only, and only for i386 or 4K pages.
+
 ## Maintenance
 
 | Item       | Detail                                                                               |
@@ -119,6 +133,7 @@ Do not redistribute it.
 5. Does the CN client need the CEF or layered window paths on ARM64?
 6. Does WineCX 11.17 accept the ported address space patches without a broad rebase?
 7. Does the MetalSharp FEX fork differ from `dappermint/FEX` in a way that matters for this game?
+8. Does Apple open a cross-architecture path that a distributed artifact can use?
 
 Answer question 1 and question 2 first.
 They decide whether the lane is viable at all.

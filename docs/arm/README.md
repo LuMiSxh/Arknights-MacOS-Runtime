@@ -6,11 +6,25 @@ macOS 28 removes general Rosetta 2 support, so the current lane has a fixed life
 
 ## Decision
 
-The project has no Apple Developer account.
-The `com.apple.developer.cross-architecture-support` entitlement needs an Apple-issued provisioning profile.
-A self-signed loader that claims the entitlement is refused at exec.
+The project has no distributable signing identity.
+An entitlement is only valid in a binary that embeds a provisioning profile for the same team and App ID.
+The loader in the reference runtime carries the profile of its distributor.
+This project cannot sign with that identity, and must not redistribute the file.
+
+Apple publishes two cross-architecture entitlements:
+
+| Entitlement                                                | Account                      |
+| ---------------------------------------------------------- | ---------------------------- |
+| `com.apple.developer.cross-architecture-support`           | Paid Apple Developer Program |
+| `com.apple.developer.cross-architecture-support-unmanaged` | Free developer account       |
+
+Both need your own App ID, a provisioning profile, and the provisioning UDID of your Mac.
+The profile names one Mac, so the signed loader is device-bound and cannot ship to users.
+Free accounts report no access to Certificates, Identifiers & Profiles to create that profile.
+See [provenance](provenance.md#entitlement-availability).
 
 Therefore the ARM64 lane must not depend on the entitlement.
+The lane is 64-bit only and uses 16K host pages, which need no entitlement.
 
 The primary plan is an entitlement-free WineCX ARM64 build with three ports:
 
@@ -46,16 +60,17 @@ Out of scope:
 
 ## Status
 
-| Item                             | State                                |
-| -------------------------------- | ------------------------------------ |
-| Reference ARM64 runtime captured | Complete                             |
-| Public sources identified        | Complete                             |
-| Entitlement lane                 | Rejected, no Apple Developer account |
-| Entitlement-free patch set       | Planned, not ported                  |
-| ARM64 build target               | Not implemented                      |
-| ARM64 canary artifact            | Not built                            |
-| ACE under FEX                    | Not tested                           |
-| Client ARM64 support             | Not implemented                      |
+| Item                             | State                               |
+| -------------------------------- | ----------------------------------- |
+| Reference ARM64 runtime captured | Complete                            |
+| Public sources identified        | Complete                            |
+| Lock target dimension            | Complete                            |
+| Entitlement lane                 | Rejected, no distributable identity |
+| Entitlement-free patch set       | Planned, not ported                 |
+| ARM64 build target               | Not implemented                     |
+| ARM64 canary artifact            | Not built                           |
+| ACE under FEX                    | Not tested                          |
+| Client ARM64 support             | Not implemented                     |
 
 The x86_64 Rosetta lane stays the default until the ARM64 canary passes the compatibility checks.
 
@@ -86,4 +101,6 @@ The x86_64 Rosetta lane stays the default until the ARM64 canary passes the comp
 
 - Upstream sources: `dappermint/winecx`, `dappermint/FEX`, `3Shain/dxmt`.
 - Entitlement-free reference: `metalsharp/MetalSharp-Wine`.
+- Entitlement facts: the [Wine on ARM64 macOS](https://list.winehq.org/hyperkitty/list/wine-devel@list.winehq.org/thread/CKG5CEN2BE5VRXZ7O7NX4YUSBH3247WH/) announcement on Wine-devel, 2026-08-07.
+- Free-account entitlement report: [Apple Developer Forums](https://developer.apple.com/forums/tags/provisioning-profiles), 2026-10.
 - Current runtime contract: [`runtime.lock.json`](../../runtime.lock.json) and [`docs/architecture.md`](../architecture.md).
