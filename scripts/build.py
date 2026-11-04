@@ -21,7 +21,7 @@ if str(ROOT) not in sys.path:
 from scripts.arm.build import build_arm64
 from scripts.shared.build import Builder, BuildError
 from scripts.shared.runtime import LockError
-from scripts.x86.build import build_canary
+from scripts.x86.build import StageError, build_canary
 
 
 def main(arguments: list[str] | None = None) -> int:
@@ -49,12 +49,10 @@ def main(arguments: list[str] | None = None) -> int:
             artifact = build_arm64(
                 builder, resume=parsed.resume, patched=not parsed.no_patches
             )
-    except BuildError as failure:
-        from scripts.x86.build import STAGE_HINT
-
+    except StageError as failure:
         print(f"error: {failure}", file=sys.stderr)
-        return 2 if str(failure) == STAGE_HINT else 1
-    except (LockError, OSError, subprocess.CalledProcessError) as failure:
+        return 2
+    except (BuildError, LockError, OSError, subprocess.CalledProcessError) as failure:
         from scripts.shared.lib.console import error
 
         error(str(failure))

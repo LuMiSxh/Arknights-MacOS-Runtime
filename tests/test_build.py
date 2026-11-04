@@ -5,7 +5,9 @@ import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
+from scripts.shared import build as build_helpers
 from scripts.shared.build import (
     CLEARED_DOS_STUB,
     Builder,
@@ -47,6 +49,21 @@ class BuildHelperTests(unittest.TestCase):
             self.assertIsNotNone(extracted)
             self.assertEqual(extracted.read(), b"x")
 
+    def test_archive_reads_members_from_another_content_root(self) -> None:
+        content = self.root / "candidate"
+        member = content / "Libraries" / "Wine"
+        member.mkdir(parents=True)
+        (member / "wine64").write_bytes(b"x")
+        self.root.mkdir(exist_ok=True)
+
+        path = write_archive(
+            self.root, "runtime.tar.gz", ("Libraries",), content_root=content
+        )
+
+        self.assertEqual(path.parent, self.root)
+        with tarfile.open(path) as archive:
+            self.assertEqual(archive.getnames()[0], "Libraries")
+
     def test_is_macho_reads_the_thin_magic(self) -> None:
         macho = self.root / "loader"
         macho.write_bytes(b"\xcf\xfa\xed\xfe" + bytes(60))
@@ -75,8 +92,22 @@ class BuildHelperTests(unittest.TestCase):
 
         environment = builder.without_host_build_variables()
 
-        self.assertEqual(environment, {"PATH": "/usr/bin", "KEPT": "1"})
+        self.assertNotIn("CFLAGS", environment)
+        self.assertNotIn("CC", environment)
+        self.assertNotIn("SDKROOT", environment)
+        self.assertNotIn("MACOSX_DEPLOYMENT_TARGET", environment)
+        self.assertEqual(environment["KEPT"], "1")
         self.assertEqual(builder.environment["CFLAGS"], "-O2")
+
+    def test_builder_uses_the_default_nix_profile_when_path_lacks_nix(self) -> None:
+        nix_directory = self.root / "nix-bin"
+        nix_directory.mkdir()
+        (nix_directory / "nix").touch()
+
+        with mock.patch.object(build_helpers, "NIX_DEFAULT_BIN", nix_directory):
+            builder = Builder(environment={"PATH": "/usr/bin"})
+
+        self.assertEqual(builder.environment["PATH"], f"{nix_directory}:/usr/bin")
 
     def test_sha256_reads_a_file_incrementally(self) -> None:
         path = self.root / "payload"

@@ -7,22 +7,33 @@ on:
                 description: Patch family to build
                 type: choice
                 default: combined
-                options: [base, audio, hardware-cursor, performance, ace, cef, cn, combined]
+                options:
+                    - base
+                    - audio
+                    - hardware-cursor
+                    - performance
+                    - ace
+                    - cef
+                    - cn
+                    - fullscreen
+                    - combined
 
 permissions:
     contents: read
 
 concurrency:
-    group: candidate-${{ inputs.stage || 'combined' }}
+    group: candidate-${{ github.ref }}
     cancel-in-progress: false
+
+env:
+    PYTHONDONTWRITEBYTECODE: "1"
 
 jobs:
     build:
         runs-on: xcode-27
         timeout-minutes: 300
         env:
-            RUNTIME_STAGE: ${{ inputs.stage || 'combined' }}
-            PYTHONDONTWRITEBYTECODE: "1"
+            RUNTIME_STAGE: ${{ inputs.stage }}
         steps:
             - name: Check out source
               uses: actions/checkout@v7.0.1

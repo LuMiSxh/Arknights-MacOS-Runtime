@@ -7,13 +7,11 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
 if __package__:
     from ..shared.build import (
-        ARCHIVE_BUNDLED_LIBRARIES,
         CLEARED_DOS_STUB,
         LICENSE_CLI,
         NIX_PACKAGES,
@@ -23,20 +21,21 @@ if __package__:
         VALIDATE_CLI,
         Builder,
         BuildError,
+        bundle_nix_libraries,
         clone_tree,
         extract_archive,
-        fix_release_macho,
+        library_flags,
         logical_cpu_count,
         nix_build,
         nix_package_outputs,
         references_in,
         write_archive,
+        write_dxmt_native_file,
     )
     from ..shared.runtime import BUILD_ROOT, fetch_base, load_lock, prepare
 else:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from scripts.shared.build import (
-        ARCHIVE_BUNDLED_LIBRARIES,
         CLEARED_DOS_STUB,
         LICENSE_CLI,
         NIX_PACKAGES,
@@ -46,14 +45,16 @@ else:
         VALIDATE_CLI,
         Builder,
         BuildError,
+        bundle_nix_libraries,
         clone_tree,
         extract_archive,
-        fix_release_macho,
+        library_flags,
         logical_cpu_count,
         nix_build,
         nix_package_outputs,
         references_in,
         write_archive,
+        write_dxmt_native_file,
     )
     from scripts.shared.runtime import BUILD_ROOT, fetch_base, load_lock, prepare
 
@@ -75,7 +76,8 @@ STAGE_HINT = (
 )
 
 
-CANARY_NIX_PACKAGES = NIX_PACKAGES
+class StageError(BuildError):
+    """The stage name is not part of the patch recipe."""
 
 
 def wine_overlay_artifacts(stage: str) -> tuple[str, ...]:
@@ -114,11 +116,11 @@ def patched_machos(stage: str) -> tuple[str, ...]:
 
 def validate_stage(stage: str) -> None:
     if stage not in STAGES:
-        raise BuildError(STAGE_HINT)
+        raise StageError(STAGE_HINT)
 
 
 def canary_environment(
-    builder: Builder, lock: dict[str, object], root: Path, stage: str
+    builder: Builder, lock: dict[str, object], stage: str
 ) -> tuple[str, list[Path]]:
     nixpkgs_revision = str(lock["build"]["nixpkgs"]["commit"])
     nixpkgs = f"github:NixOS/nixpkgs/{nixpkgs_revision}"
@@ -133,20 +135,9 @@ def canary_environment(
 
     outputs: list[Path] = []
     if stage != "hardware-cursor":
-        outputs = nix_package_outputs(
-            builder, nixpkgs, "x86_64-darwin", CANARY_NIX_PACKAGES
-        )
+        outputs = nix_package_outputs(builder, nixpkgs, "x86_64-darwin", NIX_PACKAGES)
 
-    pkg_config: list[str] = []
-    includes: list[str] = []
-    libraries: list[str] = []
-    for output in outputs:
-        if (output / "lib" / "pkgconfig").is_dir():
-            pkg_config.append(str(output / "lib" / "pkgconfig"))
-        if (output / "include").is_dir():
-            includes.append(f"-I{output / 'include'}")
-        if (output / "lib").is_dir():
-            libraries.append(f"-L{output / 'lib'}")
+    pkg_config, includes, libraries = library_flags(outputs)
 
     builder.environment.update(
         PATH=":".join(
@@ -156,13 +147,13 @@ def canary_environment(
         SDKROOT=builder.capture("xcrun", "--show-sdk-path").strip(),
         CC="ccache /usr/bin/clang -arch x86_64",
         CXX="ccache /usr/bin/clang++ -arch x86_64",
-        PKG_CONFIG_PATH=":".join(pkg_config),
+        PKG_CONFIG_PATH=pkg_config,
         CFLAGS=(
             "-O2 -Wno-error=implicit-function-declaration "
-            f"-Werror=unguarded-availability-new {' '.join(includes)}"
+            f"-Werror=unguarded-availability-new {includes}"
         ).strip(),
         CROSSCFLAGS="-O2",
-        LDFLAGS=" ".join(libraries),
+        LDFLAGS=libraries,
         ac_cv_func_pipe2="no",
         ac_cv_lib_soname_freetype="libfreetype.6.dylib",
         ac_cv_lib_soname_gnutls="libgnutls.30.dylib",
@@ -239,7 +230,7 @@ def overlay_wine_files(
         "lib/wine/x86_64-windows/ntoskrnl.exe",
     ):
         path = candidate / "Wine" / artifact
-        if path.is_file() and artifact.endswith((".dll", ".exe")):
+        if path.is_file():
             builder.run("x86_64-w64-mingw32-strip", "--strip-debug", path)
 
 
@@ -267,57 +258,6 @@ def fix_patched_machos(builder: Builder, candidate: Path, stage: str) -> None:
         builder.run("codesign", "--force", "--sign", "-", binary)
 
 
-def bundle_release_libraries(
-    builder: Builder, candidate: Path, root: Path, outputs: list[Path]
-) -> list[str]:
-    directory = candidate / "Wine" / "lib"
-    inventory: list[str] = []
-    queue: list[Path] = []
-    for output in outputs:
-        for name in ARCHIVE_BUNDLED_LIBRARIES:
-            if (output / "lib" / name).is_file():
-                queue.append(output / "lib" / name)
-    for module in sorted((directory / "wine").glob("*-unix/*.so")):
-        queue.extend(
-            Path(reference) for reference in references_in(builder, module, NIX_STORE)
-        )
-
-    while queue:
-        reference = queue.pop(0)
-        name = reference.name
-        if (directory / name).exists():
-            continue
-        shutil.copy2(reference, directory / name)
-        destination = directory / name
-        destination.chmod(0o644)
-        if reference.as_posix().startswith(NIX_STORE):
-            inventory.append(
-                NIX_STORE + reference.as_posix().split(NIX_STORE, 1)[1].split("/", 1)[0]
-            )
-        queue.extend(
-            Path(next_reference)
-            for next_reference in references_in(builder, destination, NIX_STORE)
-        )
-
-    for binary in sorted(directory.glob("*.dylib*")) + sorted(
-        (directory / "wine").glob("*-unix/*.so")
-    ):
-        fix_release_macho(builder, directory, binary)
-    link = directory / "libfreetype.dylib"
-    link.unlink(missing_ok=True)
-    link.symlink_to("libfreetype.6.dylib")
-    for binary in sorted((directory / "wine").glob("*-unix/*.so")):
-        result = subprocess.run(
-            ["otool", "-l", str(binary)], capture_output=True, text=True, check=False
-        )
-        if "@loader_path/../../" not in result.stdout:
-            builder.run(
-                "install_name_tool", "-add_rpath", "@loader_path/../../", binary
-            )
-        builder.run("codesign", "--force", "--sign", "-", binary)
-    return sorted(set(inventory))
-
-
 def build_dxmt_x86_64(
     builder: Builder,
     source: Path,
@@ -330,11 +270,16 @@ def build_dxmt_x86_64(
     install = root / "dxmt-install"
     build = root / "dxmt-build64"
     environment = builder.without_host_build_variables()
+    native_file = write_dxmt_native_file(
+        root, builder.environment["MACOSX_DEPLOYMENT_TARGET"]
+    )
     builder.run(
         "meson",
         "setup",
         "--cross-file",
         source / "build-win64.txt",
+        "--native-file",
+        native_file,
         f"-Dnative_llvm_path={llvm}",
         f"-Dwine_build_path={wine_build}",
         "--buildtype",
@@ -445,7 +390,12 @@ def build_canary(builder: Builder, stage: str, *, clean_release: bool = False) -
             "--baseline",
             root / "base" / "Libraries",
         )
-        return write_archive(root, f"Arknights-MacOS-Runtime-{stage}.tar.gz", members)
+        return write_archive(
+            root,
+            f"Arknights-MacOS-Runtime-{stage}.tar.gz",
+            members,
+            content_root=candidate.parent,
+        )
 
     builder.require("nix", "clang", "make", "x86_64-w64-mingw32-gcc")
     nixpkgs, outputs = canary_environment(builder, lock, stage)
@@ -513,7 +463,7 @@ def build_canary(builder: Builder, stage: str, *, clean_release: bool = False) -
 
     inventory: list[str] = []
     if clean_release:
-        inventory = bundle_release_libraries(builder, candidate, outputs)
+        inventory = bundle_nix_libraries(builder, candidate, outputs)
 
     if stage in ("performance", "combined"):
         llvm = llvm_native_tree(builder, nixpkgs, root)
@@ -545,4 +495,9 @@ def build_canary(builder: Builder, stage: str, *, clean_release: bool = False) -
             "--baseline",
             root / "base" / "Libraries",
         )
-    return write_archive(root, f"Arknights-MacOS-Runtime-{stage}.tar.gz", members)
+    return write_archive(
+        root,
+        f"Arknights-MacOS-Runtime-{stage}.tar.gz",
+        members,
+        content_root=candidate.parent,
+    )

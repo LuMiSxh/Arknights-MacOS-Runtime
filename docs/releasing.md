@@ -6,7 +6,8 @@ A build is promotable only after source and patch checks, a clean full build, ar
 
 Before a release, move the upstream pins with `just update-pins`. See [updating pins](updating-pins.md).
 
-1. Make sure the protected default branch is clean. Dispatch the workflow with one SemVer version, such as `0.5.0`. An optional leading `v` is removed. Do not create a tag first.
+1. Make sure the protected default branch is clean. Dispatch the workflow with one SemVer version, such as `0.5.0+x86`. An optional leading `v` is removed. Do not create a tag first.
+   Build metadata names the architecture: `+x86` for the Rosetta lane, and `+arm` once the ARM64 lane has a release build. A version without metadata counts as `x86` for older releases. One version and architecture pair is one tag, so `v0.5.0+x86` and `v0.5.0+arm` are distinct releases. SemVer forbids `_` in build metadata, so use `+x86`, not `+x86_64`.
 2. The workflow checks that the derived tag and GitHub Release do not exist, then builds the pinned inputs from the exact default-branch commit. The `build` job has read-only permissions and uploads the release assets as one workflow artifact. A failed build creates no tag and no release.
 3. After the clean-build, `releaseEligible`, checksum, provenance, notice, and corresponding-source gates pass, the `publish` job downloads the assets. It is the only job with write permission. It re-checks the tag and release and attests the assets. It then creates the tag and a draft release at the built SHA, non-latest and unpublished.
 4. Inspect and test those exact assets. Never substitute a local rebuild. Publish the unchanged draft only after the source, notice, and manual compatibility review.
@@ -17,9 +18,9 @@ Before a release, move the upstream pins with `just update-pins`. See [updating 
 
 The `publish` job creates a build provenance attestation for every release asset. The attestation links each asset to this repository, the workflow, and the built commit.
 
-1. Download a release asset, for example `Arknights-MacOS-Runtime-v0.7.0.tar.gz`.
+1. Download a release asset, for example `Arknights-MacOS-Runtime-v0.7.0+x86.tar.gz`.
 2. Install the GitHub CLI.
-3. Run `gh attestation verify Arknights-MacOS-Runtime-v0.7.0.tar.gz --repo LuMiSxh/Arknights-MacOS-Runtime`.
+3. Run `gh attestation verify Arknights-MacOS-Runtime-v0.7.0+x86.tar.gz --repo LuMiSxh/Arknights-MacOS-Runtime`.
 4. Trust the asset only if the command succeeds.
 
 The `provenance.json` asset records the versions of the Homebrew packages, Xcode, and macOS SDK of the build host. The build does not pin these tools.

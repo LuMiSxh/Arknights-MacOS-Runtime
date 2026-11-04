@@ -12,6 +12,9 @@ concurrency:
     group: runtime-source-monitor
     cancel-in-progress: true
 
+env:
+    PYTHONDONTWRITEBYTECODE: "1"
+
 jobs:
     monitor:
         runs-on: ubuntu-24.04
@@ -26,7 +29,6 @@ jobs:
             - name: Check pinned sources
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                  PYTHONDONTWRITEBYTECODE: "1"
               run: |
                   uv run --locked --no-dev scripts/shared/monitor.py \
                     --output .build/reports/source-monitor.json \
