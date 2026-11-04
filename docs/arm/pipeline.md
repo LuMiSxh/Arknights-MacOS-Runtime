@@ -59,14 +59,14 @@ Extend it with the target before the ARM64 lane builds.
 
 ## Commands
 
-| Command                                                                            | Purpose                                        |
-| ---------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `uv run --locked scripts/shared/runtime.py validate-lock`                          | Validate every target.                         |
-| `uv run --locked scripts/shared/runtime.py validate-lock --target native-arm64`    | Validate the lock and resolve one target.      |
-| `uv run --locked scripts/shared/runtime.py prepare combined --target native-arm64` | Clone and patch the ARM64 sources.             |
-| `just build arm64`                                                                 | Build a canary ARM64 artifact.                 |
-| `just verify .build/stages/arm64/candidate/Libraries --target native-arm64`        | Validate the artifact.                         |
-| `just build-release arm64`                                                         | Build a release artifact for the ARM64 target. |
+| Command                                                                            | Purpose                                   |
+| ---------------------------------------------------------------------------------- | ----------------------------------------- |
+| `uv run --locked scripts/shared/runtime.py validate-lock`                          | Validate every target.                    |
+| `uv run --locked scripts/shared/runtime.py validate-lock --target native-arm64`    | Validate the lock and resolve one target. |
+| `uv run --locked scripts/shared/runtime.py prepare combined --target native-arm64` | Clone and patch the ARM64 sources.        |
+| `just build-arm64`                                                                 | Build a canary ARM64 artifact.            |
+| `just verify-arm64`                                                                | Validate the artifact.                    |
+| `just build-release`                                                               | Build the release artifacts.              |
 
 A command without `--target` keeps its current behavior.
 The default target is `rosetta-x86_64` until the ARM64 canary passes.
@@ -237,7 +237,7 @@ Libraries/
     d3d11.dll
     dxgi.dll
     winemetal.dll
-  runtime-capabilities.json
+  runtime-capabilities-arm64.json
 ```
 
 Rules:
@@ -297,7 +297,8 @@ Arknights-MacOS-Runtime-arm64-vX.Y.Z.tar.gz
 ```
 
 `provenance.json` gains a `target` field.
-The capability manifest stays identical.
+The native-arm64 artifact ships `runtime-capabilities-arm64.json`.
+It differs from the x86_64 manifest in `aceCompat` and `nativeArm64`.
 Keep the ARM64 artifact out of the release until the manual canary passes.
 
 ## Signing and distribution

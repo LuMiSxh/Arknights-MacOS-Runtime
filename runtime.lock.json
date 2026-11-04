@@ -81,7 +81,7 @@
       "interface": {
         "wineDirectory": "Wine",
         "dxmtDirectory": "DXMT",
-        "runtimeCapabilities": "runtime-capabilities.json",
+        "runtimeCapabilities": "runtime-capabilities-arm64.json",
         "executables": [
           "Wine/bin/Arknights",
           "Wine/bin/wine64",
@@ -193,6 +193,36 @@
       "family": "fullscreen",
       "path": "patches/shared/wine/fullscreen/0001-winemac-native-fullscreen-space.patch",
       "sha256": "be5002957b5d7a5de5eae6ffe6d2a6df676efbce29152b6b34939bfa3869805f"
+    },
+    {
+      "id": "wine-arm64-address-space",
+      "component": "wine",
+      "family": "address-space",
+      "path": "patches/arm/wine/address-space/0001-ntdll-relocate-the-shared-user-data.patch",
+      "sha256": "55e99de2afcdbc685480886c6e79fa58b39623b2df7f2497d8952bc39e5d4694",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "wine-arm64-skip-mono",
+      "component": "wine",
+      "family": "mono",
+      "path": "patches/arm/wine/mono/0001-mscoree-skip-mono-on-native-arm64.patch",
+      "sha256": "b7d811fe95c916c377b9d7f812e0cb7781df2de2d363b92bf65316ff367ed7ed",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "wine-arm64-fex-modules",
+      "component": "wine",
+      "family": "fex",
+      "path": "patches/arm/wine/fex/0001-wine.inf-use-fex-modules.patch",
+      "sha256": "56e57f11c2950e5c45b141f2b9845391223ceab780b3d1a7369c9e7de9271a65",
+      "targets": [
+        "native-arm64"
+      ]
     }
   ]
 }

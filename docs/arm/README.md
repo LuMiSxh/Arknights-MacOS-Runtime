@@ -1,80 +1,37 @@
 # Native ARM64 runtime
 
-This directory holds the plan for a native ARM64 runtime lane.
-The current lane runs an x86_64 Wine under Rosetta 2.
-macOS 28 removes general Rosetta 2 support, so the current lane has a fixed lifetime.
+This directory holds the native ARM64 runtime lane.
+The x86_64 lane runs Wine under Rosetta 2 and remains the default.
 
 ## Decision
 
 The project has no distributable signing identity.
-An entitlement is only valid in a binary that embeds a provisioning profile for the same team and App ID.
-The loader in the reference runtime carries the profile of its distributor.
-This project cannot sign with that identity, and must not redistribute the file.
+Both cross-architecture entitlements need a provisioning profile that names one
+Mac, so a signed loader is device-bound and cannot ship.
+The lane therefore uses the entitlement-free address-space work.
 
-Apple publishes two cross-architecture entitlements:
-
-| Entitlement                                                | Account                      |
-| ---------------------------------------------------------- | ---------------------------- |
-| `com.apple.developer.cross-architecture-support`           | Paid Apple Developer Program |
-| `com.apple.developer.cross-architecture-support-unmanaged` | Free developer account       |
-
-Both need your own App ID, a provisioning profile, and the provisioning UDID of your Mac.
-The profile names one Mac, so the signed loader is device-bound and cannot ship to users.
-Free accounts report no access to Certificates, Identifiers & Profiles to create that profile.
-See [provenance](provenance.md#entitlement-availability).
-
-Therefore the ARM64 lane must not depend on the entitlement.
-The lane is 64-bit only and uses 16K host pages, which need no entitlement.
-Distribution needs no paid account.
-See [signing and distribution](pipeline.md#signing-and-distribution).
-
-The primary plan is an entitlement-free WineCX ARM64 build with three ports:
-
-1. WineCX `arm64-1117` (Wine 11.17, the current Wine version).
-2. FEX for x86_64 emulation through ARM64EC.
-3. DXMT ARM64EC for Direct3D 10 and 11.
-
-A small patch family from MetalSharp-Wine relocates the shared user data page and handles write and execute protection.
-The patches remove the dependency on the entitled loader.
-
-The fallback plan is MetalSharp-Wine as the ARM64 base.
-That project already runs without the entitlement, but it carries 129 Wine patches and needs a full rebase of this repository's patches.
-
-See [porting](porting.md) for the patch set and [risks](risks.md) for the open questions.
-
-## Scope
-
-In scope:
-
-- A native ARM64 build of WineCX and DXMT.
-- x86_64 Windows programs run by FEX.
-- The existing patch families, except the Rosetta-specific part of ACE.
-- A second build and release target in this repository.
-- The runtime interface that the client consumes.
-
-Out of scope:
-
-- i386 programs. They need the low 4 GB of address space and the entitlement.
-- 4K host pages. They need the entitlement.
-- Apple D3DMetal. It ships x86_64 only.
-- Rosetta 2 in any form.
-- A native version of the game.
+The lane is 64-bit only and uses 16K host pages.
+i386 programs, 4K host pages, Apple D3DMetal, Rosetta 2, and a native game build
+are out of scope.
+See [results](results.md#entitlement) and
+[provenance](provenance.md#entitlement-availability).
 
 ## Status
 
-| Item                             | State                               |
-| -------------------------------- | ----------------------------------- |
-| Reference ARM64 runtime captured | Complete                            |
-| Public sources identified        | Complete                            |
-| Lock target dimension            | Complete                            |
-| Entitlement lane                 | Rejected, no distributable identity |
-| Entitlement-free patch set       | Planned, not ported                 |
-| ARM64 build target               | Not implemented                     |
-| ARM64 canary artifact            | Not built                           |
-| ACE under FEX                    | Not tested                          |
-| Client ARM64 support             | Not implemented                     |
+| Item                            | State                                 |
+| ------------------------------- | ------------------------------------- |
+| ARM64 build target              | Works                                 |
+| Native ARM64 `wine cmd /c ver`  | Works                                 |
+| Shared user data and 4 GB floor | Ported                                |
+| Wow64 wiring to the FEX modules | Ported                                |
+| x86_64 program under FEX        | Loads, then hangs before entry        |
+| Game and ACE                    | Not started                           |
+| Client ARM64 support            | Local app works; game is not playable |
+| SDK 12 window-chrome bridge     | Prototyped, not shipped               |
 
-The x86_64 Rosetta lane stays the default until the ARM64 canary passes the compatibility checks.
+The x86_64 lane stays the default until a 64-bit program runs under FEX and the
+game passes the compatibility checks.
+See [results](results.md) for the experiment log and the current blockers.
 
 ## Terms
 
@@ -92,17 +49,17 @@ The x86_64 Rosetta lane stays the default until the ARM64 canary passes the comp
 
 ## Reading order
 
-1. [Provenance](provenance.md) records the reference runtime and the public sources.
-2. [Architecture](architecture.md) explains the process model and the address space.
-3. [Porting](porting.md) lists the patch family that removes the entitlement dependency.
-4. [Pipeline](pipeline.md) describes the second build target.
-5. [Client](client.md) lists the consumer changes and the local canary.
-6. [Risks](risks.md) lists the open compatibility and maintenance risks.
+1. [Results](results.md): what was tried and where it failed.
+2. [Provenance](provenance.md): the reference runtime and the public sources.
+3. [Architecture](architecture.md): the process model and the address space.
+4. [Porting](porting.md): the patch families and the remaining work.
+5. [Pipeline](pipeline.md): the second build target.
+6. [Client](client.md): the consumer changes and the local canary.
+7. [Risks](risks.md): the open compatibility and maintenance risks.
 
 ## References
 
 - Upstream sources: `dappermint/winecx`, `dappermint/FEX`, `3Shain/dxmt`.
 - Entitlement-free reference: `metalsharp/MetalSharp-Wine`.
-- Entitlement facts: the [Wine on ARM64 macOS](https://list.winehq.org/hyperkitty/list/wine-devel@list.winehq.org/thread/CKG5CEN2BE5VRXZ7O7NX4YUSBH3247WH/) announcement on Wine-devel, 2026-08-07.
-- Free-account entitlement report: [Apple Developer Forums](https://developer.apple.com/forums/tags/provisioning-profiles), 2026-10.
-- Current runtime contract: [`runtime.lock.json`](../../runtime.lock.json) and [`docs/architecture.md`](../architecture.md).
+- Current runtime contract: [`runtime.lock.json`](../../runtime.lock.json) and
+  [`docs/architecture.md`](../architecture.md).

@@ -1,118 +1,91 @@
 # Client changes for an ARM64 runtime
 
-This document lists the changes in the Arknights MacOS Client that an ARM64 runtime needs.
 Client paths are relative to the `Arknights-MacOS-Client` repository.
 None of these changes are part of the runtime repository.
 
-## Current contract
+## Contract
 
 The client reads two inputs:
 
-| Input                            | Current content                                                                |
+| Input                            | Content                                                                        |
 | -------------------------------- | ------------------------------------------------------------------------------ |
 | `runtime.json`                   | Archive URL and SHA-256, prefix revision, interface paths, component versions. |
 | `RUNTIME.json` in the app bundle | The same values after the build.                                               |
 
-`WineRuntime.discover()` checks `bin/Arknights` and decodes `RUNTIME.json`.
-It also reads `interface.runtimeCapabilities`.
+`WineRuntime.discover()` checks `bin/Arknights`, decodes `RUNTIME.json`, and reads
+`interface.runtimeCapabilities`.
 The Python build scripts validate the full interface before they embed the runtime.
 
-The runtime itself is launcher-agnostic.
-The client supplies the prefix, the display settings, the environment, and the log file.
+## Implemented
 
-## Required changes
+| Area                   | Change                                                                        |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| ARM64 interface        | `armInterface` uses `aarch64-unix`, `aarch64-windows`, and the ARM driver.    |
+| Architecture selection | `--runtime-architecture` selects the lane; `RUNTIME.json` records the label.  |
+| Embedded runtime       | The app no longer thins the runtime to x86_64.                                |
+| Injected libraries     | `GameIconBridge.dylib` and `PlatformProcessWindowBridge.dylib` are universal. |
+| Prefix identity        | Each target uses its own prefix.                                              |
+| Rosetta gate           | The ARM64 runtime reports `notRequired` and skips the probe.                  |
 
-| File                             | Change                                                                                                                    | Reason                                                                       |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `runtime.json`                   | Add an ARM64 interface: `lib/wine/aarch64-unix`, `lib/wine/aarch64-windows`, `macDriver`, `requiredFiles`, `executables`. | The paths are x86_64 only today.                                             |
-| `RuntimeSupport/support.toml`    | Build `GameIconBridge.dylib` and `PlatformProcessWindowBridge.dylib` for arm64, or as universal binaries.                 | The current build forces `-arch x86_64` in `scripts/build_compatibility.py`. |
-| `WineRuntime`                    | Record the runtime architecture. Use `lipo -archs` on `bin/wine64`, or a new `interface.architecture` field.              | The launcher must select the lane without guessing.                          |
-| `RosettaAvailability`            | Return `notRequired` for an ARM64 runtime and skip the probe.                                                             | Rosetta is irrelevant to this runtime.                                       |
-| `IntelTranslationController`     | Do not gate Play on Rosetta for an ARM64 runtime.                                                                         | The current gate blocks the game.                                            |
-| `GameRuntimeError`               | Keep the Rosetta errors for the x86_64 runtime only.                                                                      | The messages are wrong for ARM64.                                            |
-| `WinePrefixLibraryDeduplicator`  | Read the module directory from the runtime layout, or skip the pair when the directory is absent.                         | It hardcodes `x86_64-windows` and `i386-windows`.                            |
-| `WinePrefixLegacyLibraryCleaner` | Skip the cleaner when the runtime has no `x86_64-windows` directory.                                                      | The directory is the proof that the runtime is real.                         |
-| `scripts/build_app.py`           | Do not thin the embedded runtime to x86_64.                                                                               | `thin_universal_files()` currently removes the arm64 slice.                  |
-| `scripts/runtime_config.py`      | No code change if `runtime.json` names the ARM64 paths.                                                                   | The validator is layout driven.                                              |
-| `Sources/.../WinePrefix...`      | Give each runtime target its own prefix, or reset the prefix when the target changes.                                     | x86_64 and ARM64EC DLLs must not share `system32`.                           |
+## Capability manifest
 
-## Prefix identity
+The native-arm64 archive ships `runtime-capabilities-arm64.json`.
+Its `interface.runtimeCapabilities` value names that file.
+The x86_64 archive keeps `runtime-capabilities.json`.
 
-A prefix contains the PE modules that Wine installs during `wineboot`.
-The x86_64 runtime installs x86_64 modules.
-The ARM64 runtime installs ARM64EC and Aarch64 modules.
-A prefix must contain only one architecture.
+Schema version 2 adds two optional booleans:
 
-Use one of these options:
+| Key           | Meaning                                                         |
+| ------------- | --------------------------------------------------------------- |
+| `aceCompat`   | The full ACE patch set for the lane is present. `false` on ARM. |
+| `nativeArm64` | The runtime runs without Rosetta. `true` on ARM.                |
 
-1. A prefix path that includes the target name.
-2. A prefix revision bump that rebuilds the prefix on the target change.
-3. A migration that clears `drive_c/windows/system32` and `syswow64` before the first launch.
+The client must treat a missing key as `false`.
+Use `aceCompat` in the ACE warning and launch policy.
+Use `nativeArm64` for diagnostics and to keep the Rosetta copy off the ARM lane.
 
-Option 1 is the simplest. The game files stay outside the prefix.
-The client applies the display and font settings on each launch, so a new prefix only costs the first `wineboot`.
+The DXMT and Metal capabilities keep their current meaning.
+The ARM64 manifest advertises them as true because the payload is built and validated.
 
-## Injected macOS libraries
+## Window chrome and the SDK bridge
 
-Wine injects two Mach-O libraries into the game process:
+The x86_64 loader records the current SDK (`27.0`), so the game window uses the
+current macOS decorations.
+The ARM64 loader records SDK `12.0`, which the kernel requires to preserve x18.
+AppKit reads the SDK version when it creates a window and selects the legacy
+decorations.
 
-| Library                             | Injection                               | Architecture requirement            |
-| ----------------------------------- | --------------------------------------- | ----------------------------------- |
-| `GameIconBridge.dylib`              | `DYLD_INSERT_LIBRARIES`                 | Must match the Wine host, so arm64. |
-| `PlatformProcessWindowBridge.dylib` | Injected by the WineCX unix passthrough | Must match the Wine host, so arm64. |
+A prototype bridge exists but is not shipped:
 
-`DYLD_INSERT_LIBRARIES` with an x86_64 library stops an arm64 process at launch.
-For the first canary, build the two libraries for arm64.
-A universal build keeps both lanes on one artifact.
+1. Add a `macos-library` component in `RuntimeSupport/` that interposes
+   `dyld_get_program_sdk_version()` and returns the running OS version.
+2. Append its path to `DYLD_INSERT_LIBRARIES` in
+   `Sources/ArknightsGameRuntime/Runtime/WineRuntime+Environment.swift`.
+   Do not overwrite the existing `GameIconBridge` path; join with `:`.
+3. Build it universal so one bundle serves both lanes.
+4. If the app ever adopts the hardened runtime, add
+   `com.apple.security.cs.allow-dyld-environment-variables`.
 
-The Vuplex and Bilibili Windows executables are PE files.
-They run as x86_64 under FEX and need no change.
+The prototype returned the running OS version and AppKit called it during window
+creation.
+It stays out of the bundle until the ARM64 lane runs the game.
 
-## Proposed interface
-
-Use this interface block for the first canary.
-It keeps the client schema and changes only the architecture paths.
-
-```json
-"interface": {
-  "archive": { "wineDirectory": "Wine", "dxmtDirectory": "DXMT" },
-  "executables": ["bin/wine64", "bin/wineserver"],
-  "runtimeCapabilities": "runtime-capabilities.json",
-  "requiredFiles": [
-    "lib/wine/aarch64-unix/winecoreaudio.so",
-    "lib/wine/aarch64-windows/winemetal.dll"
-  ],
-  "macDriver": "lib/wine/aarch64-unix/winemac.so",
-  "launcher": { "path": "bin/Arknights", "target": "wine64" },
-  "dxmt": {
-    "payloadDirectory": "DXMT",
-    "destinations": { "x64": "system32" },
-    "libraries": ["d3d10core.dll", "d3d11.dll", "dxgi.dll", "winemetal.dll"]
-  }
-}
-```
-
-The DXMT destination stays `x64` and `system32`.
-Only the payload architecture changes.
-
-## Canary procedure
+## Local canary
 
 1. Build the ARM64 runtime archive and extract `Libraries/`.
-2. Copy `runtime.json` to a local branch.
-3. Replace the interface block with the ARM64 paths from the proposed interface above.
-4. Keep the archive URL and SHA-256 of the released runtime, or pin the canary values.
-5. Build the support libraries for arm64.
-6. Build the app with the extracted runtime:
+2. Point `runtime.json` at the archive and use `armInterface`.
+3. Confirm `interface.runtimeCapabilities` names `runtime-capabilities-arm64.json`.
+4. Build the app with the extracted runtime:
 
     ```sh
     just app /path/to/candidate/Libraries
     ```
 
-7. Start the app with a new prefix.
-8. Check the log for the runtime version, the DXMT version, and the Metal device.
-9. Run the game to the login screen.
-10. Run the ACE check.
-11. Record the frame time with the same scene and settings as the x86_64 control.
+5. Start the app with a new prefix.
+6. Check the log for the runtime version, the DXMT version, and the Metal device.
+7. Run the game to the login screen.
+8. Run the ACE check.
+9. Record the frame time with the same scene and settings as the x86_64 control.
 
 Do not use an existing x86_64 prefix.
 Do not compare frame time across different prefixes, display settings, or warm-up runs.
@@ -125,6 +98,7 @@ Add one test for each contract that the lane selection can break:
 - An x86_64 runtime still requires Rosetta.
 - A prefix does not mix module architectures.
 - The build fails when `runtime.json` and the runtime directory disagree.
+- A missing `aceCompat` or `nativeArm64` key decodes as `false`.
 
 Test the lane selection at the type level if possible.
 A small enum with an exhaustive `switch` is better than a Boolean.
@@ -135,6 +109,5 @@ The UI says "Rosetta" in the Intel translation state and in the runtime errors.
 Show this copy only for the x86_64 runtime.
 The ARM64 runtime has no translation step.
 
-Do not add a new support code for the ARM64 lane yet.
 Reuse `RT-BND` for a damaged runtime and `RT-SET` for a setup failure.
-Add a code only when the recovery action differs.
+Add a support code only when the recovery action differs.

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 2,
+  "capabilities": {
+    "hardwareCursor": true,
+    "metalFXSpatialUpscaling": true,
+    "nativeFullscreenSpace": true,
+    "aceCompat": false,
+    "nativeArm64": true
+  }
+}

@@ -264,8 +264,27 @@ def build_wine_arm64(
             "--prefix=/opt/whiskywine",
             cwd=build,
         )
-    builder.run("make", f"-j{logical_cpu_count()}", cwd=build)
-    builder.run("make", "install", f"DESTDIR={staging}", cwd=build)
+    # macOS clears x18, the Windows ARM64 TEB register, on exception return. The kernel
+    # preserves it only while the main executable records an LC_BUILD_VERSION SDK of 12.0
+    # or older, so lower the recorded SDK and keep the deployment target pinned.
+    target = builder.environment["MACOSX_DEPLOYMENT_TARGET"]
+    loader_ldflags = (
+        f"-Wl,-platform_version,macos,{target},12.0 "
+        "-Wl,-sectcreate,__TEXT,__info_plist,loader/wine_info.plist"
+    )
+    builder.run(
+        "make",
+        f"WINELOADER_LDFLAGS={loader_ldflags}",
+        f"-j{logical_cpu_count()}",
+        cwd=build,
+    )
+    builder.run(
+        "make",
+        "install",
+        f"WINELOADER_LDFLAGS={loader_ldflags}",
+        f"DESTDIR={staging}",
+        cwd=build,
+    )
     return staging / "opt" / "whiskywine"
 
 
@@ -309,6 +328,7 @@ def assemble_arm64(
     wine_install: Path,
     fex_install: Path,
     dxmt_install: Path,
+    capability_manifest: str,
 ) -> None:
     wine = candidate / "Wine"
     wine.mkdir(parents=True, exist_ok=True)
@@ -358,9 +378,9 @@ def assemble_arm64(
         with destination.open("r+b") as file:
             file.seek(64)
             file.write(CLEARED_DOS_STUB)
-    shutil.copy2(
-        ROOT / "runtime-capabilities.json", candidate / "runtime-capabilities.json"
-    )
+    for stale in candidate.glob("runtime-capabilities*.json"):
+        stale.unlink()
+    shutil.copy2(ROOT / capability_manifest, candidate / capability_manifest)
 
 
 def build_arm64(builder: Builder, *, resume: bool, patched: bool) -> Path:
@@ -402,7 +422,14 @@ def build_arm64(builder: Builder, *, resume: bool, patched: bool) -> Path:
         builder, fex_source, root, wine_install / "lib" / "wine" / "aarch64-unix"
     )
     dxmt_install = build_dxmt_arm64(builder, dxmt_source, root, wine_build)
-    assemble_arm64(builder, candidate, wine_install, fex_install, dxmt_install)
+    assemble_arm64(
+        builder,
+        candidate,
+        wine_install,
+        fex_install,
+        dxmt_install,
+        str(lock["interface"]["runtimeCapabilities"]),
+    )
     bundle_nix_libraries(builder, candidate, outputs)
     sign_directory(builder, candidate)
     builder.run(

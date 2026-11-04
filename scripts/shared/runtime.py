@@ -39,6 +39,7 @@ STAGES = (
 )
 PATCH_FAMILIES = frozenset(
     {
+        "address-space",
         "audio",
         "hardware-cursor",
         "performance",
@@ -47,6 +48,8 @@ PATCH_FAMILIES = frozenset(
         "cn",
         "menu",
         "fullscreen",
+        "fex",
+        "mono",
     }
 )
 SCHEMA_VERSION = 3

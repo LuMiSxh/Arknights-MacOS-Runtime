@@ -36,7 +36,7 @@ The filter matches the case-insensitive final basename `a9d41799f1af1868f2db4956
 
 ## Runtime capability manifest
 
-`Libraries/runtime-capabilities.json` is the versioned producer contract that consumers read from the packaged runtime tree. Schema version 2 advertises hardware-cursor support and MetalFX spatial-upscaling support. The optional `nativeFullscreenSpace` boolean advertises the fullscreen patch. Release validation checks the manifest against the pinned patch semantics and requires the packaged copy to match the source. Consumers use conservative defaults without the manifest.
+`Libraries/runtime-capabilities.json` is the versioned producer contract that consumers read from the packaged runtime tree. Schema version 2 advertises hardware-cursor support and MetalFX spatial-upscaling support. The optional `nativeFullscreenSpace` boolean advertises the fullscreen patch. The optional `aceCompat` boolean advertises the full ACE patch set for the lane, and `nativeArm64` identifies a runtime that runs without Rosetta. The native-arm64 archive ships `runtime-capabilities-arm64.json`, which differs from the x86_64 manifest. Release validation checks the manifest against the pinned patch semantics and requires the packaged copy to match the source. Consumers treat missing optional keys as false and use conservative defaults without the manifest.
 
 ## Performance
 
@@ -136,3 +136,52 @@ A window is a candidate only when the gate is on, it participates in the window 
 The patch enters the Space with a deferred `toggleFullScreen:` call. It never changes the window frame inside a Space. It reposts the actual frame to Wine at most twice for one requested rect. When the rect from Wine no longer covers the screen, the patch leaves the Space. A user exit blocks automatic re-entry until the rect changes or the window is ordered out. The patch logs decisions in the `macdrv` debug channel. In a Space the close button is enabled and sends the normal Win32 close.
 
 The patch turns the feature off for the whole process when the program is `PlatformProcess.exe` or `PlatformProcess.original.helper.exe`, because the notice helper inherits the gate. This check does not depend on `ARKNIGHTS_RUNTIME_CN_COMPAT`.
+
+## Address space
+
+- ID: `wine-arm64-address-space`
+- File: `patches/arm/wine/address-space/0001-ntdll-relocate-the-shared-user-data.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Port of [`metalsharp/MetalSharp-Wine`](https://github.com/metalsharp/MetalSharp-Wine) patches `0003`, `0008`, and `0016`, Avery Felts. See [provenance](../patches/arm/wine/address-space/provenance.md).
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The `native-arm64` target has no runtime flag, because the loader cannot start without the relocation.
+- Inactive behavior: The `rosetta-x86_64` target never receives the patch, and keeps `KUSER_SHARED_DATA` at `0x7ffe0000`.
+- Automated gate: Hash, clean `git apply --check` after the shared families, ARM64 build, and `wine cmd /c ver` without the cross-architecture entitlement
+- Manual gate: A 64-bit Windows program starts under FEX, and the game reaches the login screen.
+- Removal: Drop when macOS makes the low 4 GB mappable for an ad-hoc signed arm64 loader, or when a distributable signing identity carries the cross-architecture entitlement.
+
+macOS keeps the low 4 GB of an arm64 process as a hard pagezero. `KUSER_SHARED_DATA` and the first TEB block belong inside that range. The patch exports the page address to the PE side, moves the page to `MM_SHARED_USER_DATA_VA + 4 GB` when the canonical mapping fails, lets the first 64-bit TEB block take an address above 4 GB, and emulates ARM64 loads that fault on the canonical address.
+
+macOS also reserves the main executable's Mach-O region just above 4 GB. The patch probes upward from 4 GB for the first page that `mach_vm_map` accepts, then uses that address as the floor for thread data, stacks, and image fallbacks. A fixed `limit_4g` floor fails because the reservation covers unmapped holes too.
+
+The write and execute page handling of the reference patch is not ported: WineCX 11.17 already flips those pages in `virtual_handle_fault`.
+
+## FEX
+
+- ID: `wine-arm64-fex-modules`
+- File: `patches/arm/wine/fex/0001-wine.inf-use-fex-modules.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Registry part of [`metalsharp/MetalSharp-Wine`](https://github.com/metalsharp/MetalSharp-Wine) patch `0004`, Avery Felts. See [provenance](../patches/arm/wine/fex/provenance.md).
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The `native-arm64` target always uses the FEX modules.
+- Inactive behavior: The `rosetta-x86_64` target keeps `xtajit64.dll` and `xtajit.dll`.
+- Automated gate: Hash, clean `git apply --check`, ARM64 build, and a fresh prefix whose `Wow64` values name existing modules.
+- Manual gate: A minimal x86_64 PE starts under FEX.
+- Removal: Drop when WineCX ships ARM64 Wow64 values that name the FEX modules.
+
+Wine's `wine.inf` points `Wow64\amd64` at `xtajit64.dll` and `Wow64\x86` at `xtajit.dll`. The ARM64 build ships `libarm64ecfex.dll` and `libwow64fex.dll` instead. Without the wiring, an x86_64 image loads but never starts.
+
+## Mono
+
+- ID: `wine-arm64-skip-mono`
+- File: `patches/arm/wine/mono/0001-mscoree-skip-mono-on-native-arm64.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Original change for this repository.
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The `native-arm64` target always skips the Wine Mono install.
+- Inactive behavior: The `rosetta-x86_64` target keeps the stock `install_wine_mono()` path.
+- Automated gate: Hash, clean `git apply --check`, and a fresh ARM64 prefix that does not spawn `msiexec` or the Mono helpers.
+- Manual gate: `wine cmd /c ver` on a fresh prefix exits 0 without `WINEDLLOVERRIDES`.
+- Removal: Drop when the ARM64 lane can install Wine Mono without the entitlement, or when the runtime ships a 64-bit-only .NET replacement.
+
+Wine Mono's support package runs 32-bit and ARM64EC helper executables. The 32-bit helpers need memory below 4 GB, which macOS refuses without the cross-architecture entitlement. Wine retries the install on every prefix creation and opens a download dialog when the package is not cached. Arknights does not use .NET, so the ARM64 lane skips the install.
