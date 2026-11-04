@@ -195,6 +195,20 @@
       "sha256": "be5002957b5d7a5de5eae6ffe6d2a6df676efbce29152b6b34939bfa3869805f"
     },
     {
+      "id": "wine-winsock-address-list-sort",
+      "component": "wine",
+      "family": "winsock",
+      "path": "patches/shared/wine/winsock/0001-ws2_32-implement-address-list-sort.patch",
+      "sha256": "96e48271c950267501810a972c476a5c5dabbac3d6c94a875690fe4089a29ce5"
+    },
+    {
+      "id": "wine-userenv-appcontainer",
+      "component": "wine",
+      "family": "appcontainer",
+      "path": "patches/shared/wine/appcontainer/0001-userenv-implement-appcontainer-apis.patch",
+      "sha256": "5e46f78c0a09e4d27d2d38bbb5769c7216a886f8e660fe09e9994f8f95aad7c5"
+    },
+    {
       "id": "wine-arm64-address-space",
       "component": "wine",
       "family": "address-space",

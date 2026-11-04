@@ -50,6 +50,8 @@ PATCH_FAMILIES = frozenset(
         "fullscreen",
         "fex",
         "mono",
+        "winsock",
+        "appcontainer",
     }
 )
 SCHEMA_VERSION = 3

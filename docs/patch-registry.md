@@ -87,6 +87,36 @@ The CEF family uses the exact gate `ARKNIGHTS_RUNTIME_CEF_COMPAT=1`. An absent, 
 
 Add a regional descriptor only with reverse-engineering evidence for its complete hash/RVA/byte contract.
 
+## Winsock
+
+- ID: `wine-winsock-address-list-sort`
+- File: `patches/shared/wine/winsock/0001-ws2_32-implement-address-list-sort.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Original change for this repository.
+- License: LGPL-2.1-or-later (Wine)
+- Gate: None. Applies to both targets.
+- Inactive behavior: Not applicable; the ioctl exists in both lanes.
+- Automated gate: Hash, clean `git apply --check`, and builds for both targets.
+- Manual gate: Chromium asynchronous DNS uses the runtime resolver without `--disable-features=AsyncDns`.
+- Removal: Drop when WineCX implements `SIO_ADDRESS_LIST_SORT`.
+
+Chromium's asynchronous DNS resolver calls `WSAIoctl(SIO_ADDRESS_LIST_SORT)` to order IPv6 destinations. Wine returned `WSAEOPNOTSUPP`, so CEF retried the call and an OAuth page stayed blank. The patch adds the constant and handles the ioctl. The returned list keeps the supplied order; Windows applies RFC 6724 destination ordering, which needs the source addresses, and Chromium only needs a valid list.
+
+## AppContainer
+
+- ID: `wine-userenv-appcontainer`
+- File: `patches/shared/wine/appcontainer/0001-userenv-implement-appcontainer-apis.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Original change for this repository, derived from the client's scoped `UserenvCompat.c`.
+- License: LGPL-2.1-or-later (Wine)
+- Gate: None. Applies to both targets.
+- Inactive behavior: Not applicable; the exports exist in both lanes.
+- Automated gate: Hash, clean `git apply --check`, and builds for both targets.
+- Manual gate: Chromium's sandbox loads the AppContainer functions without a process-local `userenv.dll`.
+- Removal: Drop when WineCX implements the remaining AppContainer `userenv.dll` surface.
+
+Chromium's sandbox loads these functions by name and checks that they resolve. Wine 11.17 exports `CreateAppContainerProfile` only as a stub. The patch adds `DeriveAppContainerSidFromAppContainerName`, `DeleteAppContainerProfile`, `GetAppContainerRegistryLocation`, and `GetAppContainerFolderPath`. The SID uses SHA-256 of the lowercased container name folded into an `APP_PACKAGE` SID; the registry and folder locations return `E_NOTIMPL`, which the sandbox does not require.
+
 ## CN
 
 The CN family contains only the Bilibili windowing patches. They use the exact gate `ARKNIGHTS_RUNTIME_CN_COMPAT=1`. A missing, `0`, or other value keeps Wine's normal route.
