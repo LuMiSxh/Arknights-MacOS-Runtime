@@ -31,8 +31,8 @@ frametime-record case seconds:
 prepare-arm64:
     {{ uv }} scripts/runtime.py prepare combined --target native-arm64 --all-sources --destination-root .build/stages/arm64/sources
 
-build-arm64:
-    scripts/build-arm64.sh
+build-arm64 *args:
+    {{ uv }} scripts/build.py arm64 {{ args }}
 
 verify-arm64:
     {{ uv }} scripts/validate_runtime.py ".build/stages/arm64/candidate/Libraries" --target native-arm64
