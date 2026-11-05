@@ -37,12 +37,13 @@ class LicenseIndexTests(unittest.TestCase):
         self.index = load_index(ROOT / "LICENSES")
         self.packages = direct_nix_packages(ROOT / BUILD_SCRIPT)
 
-    def validate(self, index: dict) -> None:
+    def validate(self, index: dict, target: str = "rosetta-x86_64") -> None:
         validate_index(
             index,
             licenses_root=ROOT / "LICENSES",
             lock=LOCK,
             nix_packages=self.packages,
+            target=target,
         )
 
     def test_component_without_entry_fails(self) -> None:
@@ -96,6 +97,16 @@ class LicenseIndexTests(unittest.TestCase):
         statuses = {c["status"] for c in self.index["components"]}
         self.assertLessEqual(statuses, {"verified", "unverified"})
 
+    def test_target_required_component_fails(self) -> None:
+        index = copy.deepcopy(self.index)
+        index["components"] = [c for c in index["components"] if c["name"] != "FEX"]
+        with self.assertRaisesRegex(LicenseError, "FEX"):
+            self.validate(index, target="native-arm64")
+
+    def test_unknown_target_fails(self) -> None:
+        with self.assertRaisesRegex(LicenseError, "unknown target"):
+            self.validate(self.index, target="mystery")
+
     def test_spdx_expression_parsing(self) -> None:
         self.assertEqual(
             spdx_identifiers("Apache-2.0 WITH LLVM-exception"),
@@ -118,6 +129,40 @@ class LicenseAssemblyTests(unittest.TestCase):
         text = INVENTORY + "{}-mystery-1.0\tBundled Nix library\tx\n".format("c" * 32)
         with self.assertRaisesRegex(LicenseError, "mystery"):
             resolve_shipped(load_index(ROOT / "LICENSES"), parse_inventory(text))
+
+    def test_target_filters_the_shipped_components(self) -> None:
+        index = load_index(ROOT / "LICENSES")
+        libraries = parse_inventory(INVENTORY)
+        x86 = {c["name"] for c in resolve_shipped(index, libraries)["components"]}
+        arm = {
+            c["name"]
+            for c in resolve_shipped(index, libraries, target="native-arm64")[
+                "components"
+            ]
+        }
+        self.assertIn("MoltenVK", x86)
+        self.assertNotIn("FEX", x86)
+        self.assertIn("FEX", arm)
+        self.assertNotIn("MoltenVK", arm)
+
+    def test_generate_writes_the_target_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            inventory = Path(directory) / "inventory.tsv"
+            inventory.write_text(INVENTORY, encoding="utf-8")
+            output = Path(directory) / "out"
+            output.mkdir()
+            generate(ROOT, output, inventory=inventory, target="native-arm64")
+
+            archive_index = json.loads(
+                (output / ARCHIVE_LICENSES_DIRECTORY / "index.json").read_text("utf-8")
+            )
+            names = {item["name"] for item in archive_index["components"]}
+            self.assertIn("FEX", names)
+            self.assertNotIn("MoltenVK", names)
+            notice = (output / ARCHIVE_NOTICE).read_text(encoding="utf-8")
+            self.assertIn("| FEX |", notice)
+            self.assertNotIn("| MoltenVK |", notice)
+            self.assertIn("- FEX:", notice)
 
     def test_generate_writes_licenses_and_notice(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

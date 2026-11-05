@@ -190,6 +190,10 @@ Libraries/
     d3d11.dll
     dxgi.dll
     winemetal.dll
+  Licenses/
+    index.json
+    ...
+  NOTICE.md
   runtime-capabilities-arm64.json
 ```
 
@@ -239,7 +243,8 @@ Arknights-MacOS-Runtime-arm64-vX.Y.Z.tar.gz
 
 `provenance.json` gains a `target` field. The native-arm64 artifact ships
 `runtime-capabilities-arm64.json`, which differs from the x86_64 manifest in `aceCompat` and
-`nativeArm64`. Keep the ARM64 artifact out of the release until the manual canary passes.
+`nativeArm64`. It also ships `Licenses/` and `NOTICE.md` for the components of its target. Keep the
+ARM64 artifact out of the release until the manual canary passes.
 
 ## Signing and distribution
 

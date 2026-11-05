@@ -1,6 +1,6 @@
 # Runtime redistribution inventory
 
-The clean release build starts with an empty `Libraries/` directory. It installs Wine (64-bit only, without GStreamer or FFmpeg) and DXMT from the pinned patched source trees, copies MoltenVK from the third-party base archive (pinned by SHA-256, not built from source), and copies a dynamic library closure from the pinned Nixpkgs revision. It does not copy DXVK, Wine Mono, Wine Gecko, GStreamer plugins, FFmpeg or codec libraries, 32-bit payloads, or the product metadata of the base runtime.
+The clean release build starts with an empty `Libraries/` directory. It installs Wine (64-bit only, without GStreamer or FFmpeg) and DXMT from the pinned patched source trees, copies MoltenVK from the third-party base archive (pinned by SHA-256, not built from source), and copies a dynamic library closure from the pinned Nixpkgs revision. The native-arm64 canary installs Wine, FEX, and DXMT from their pinned sources and does not use the base archive. It does not copy DXVK, Wine Mono, Wine Gecko, GStreamer plugins, FFmpeg or codec libraries, 32-bit payloads, or the product metadata of the base runtime.
 
 ## Identified components
 
@@ -14,7 +14,11 @@ The clean release build starts with an empty `Libraries/` directory. It installs
     - Vendored code: `libs/DXBCParser` is MIT. The DXVK-derived code is Zlib. `include/tl/generator.hpp` is CC0-1.0. See [`LICENSES/notices/dxmt-vendored.txt`](../../LICENSES/notices/dxmt-vendored.txt). The `include/native/directx` headers (mingw-directx-headers) are `LGPL-2.1-or-later`, based on the upstream README and the WIDL-generated headers. See [`LICENSES/notices/dxmt-headers.txt`](../../LICENSES/notices/dxmt-headers.txt). The NVIDIA nvapi submodule is off by default and not in the release build.
     - Linked code: DXMT links LLVM 15 (Apache-2.0 WITH LLVM-exception) into `winemetal.so`. See [`LICENSES/notices/llvm.txt`](../../LICENSES/notices/llvm.txt). The `-static` link flag probably puts libstdc++, libgcc, and the mingw-w64 runtime into the DXMT DLLs. This is an inference from the link flag. The binaries are not verified. The expected licenses are `ZPL-2.1`, `MIT` (winpthreads), and `GPL-3.0-or-later WITH GCC-exception-3.1`. See [`LICENSES/notices/dxmt-toolchain.txt`](../../LICENSES/notices/dxmt-toolchain.txt).
     - Source obligation: Ship complete corresponding source for the modified build and the LGPL-2.1 text. The source archive contains the DXMT source.
-- MoltenVK: Vulkan-to-Metal dynamic library.
+- FEX: x86_64 emulator for the native ARM64 lane.
+    - Pinned source: [`dappermint/FEX@4efc3abc`](https://github.com/dappermint/FEX/tree/4efc3abc8aca8a0d3a8aca1f153ef6c4299f4426)
+    - License evidence: `MIT`; [`LICENSES/runtime/MIT.txt`](../../LICENSES/runtime/MIT.txt). The copyright notice is in [`LICENSES/notices/fex.txt`](../../LICENSES/notices/fex.txt).
+    - Source obligation: Ship the corresponding source and the FEX patches. The source archive of the same release contains the patches.
+- MoltenVK: Vulkan-to-Metal dynamic library. This component is x86_64 only.
     - Binary origin: the SHA-256-pinned third-party base archive. This project does not build MoltenVK.
     - Upstream source recorded by the base archive provider: [`KhronosGroup/MoltenVK@db66022`](https://github.com/KhronosGroup/MoltenVK/tree/db66022459ffb663aa2b50f6b018bc2e124f5edf). This project did not build this commit.
     - License evidence: `Apache-2.0`; [upstream license](https://github.com/KhronosGroup/MoltenVK/blob/db66022459ffb663aa2b50f6b018bc2e124f5edf/LICENSE)
@@ -32,8 +36,8 @@ The opt-in Hardware Cursor Wine patch filters the exact region-specific cursor a
 
 ## License files in the archive
 
-The file `LICENSES/index.json` lists every component with its version, SPDX identifier, source, license files, optional notice, and status. The status is `verified` or `unverified`. The script `scripts/shared/release/licenses.py` validates the index against `runtime.lock.json`, the build script, and the generated inventory. The clean build puts `Licenses/` (with `index.json`) and `NOTICE.md` at the root of the runtime archive. The release check fails when they are missing.
+The file `LICENSES/index.json` lists every component with its version, SPDX identifier, source, license files, optional notice, and status. The status is `verified` or `unverified`. A component can also name the targets that ship it. The script `scripts/shared/release/licenses.py` validates the index against `runtime.lock.json`, the build script, and the generated inventory. The clean build puts `Licenses/` (with `index.json`) and `NOTICE.md` at the root of the runtime archive. The native-arm64 canary build writes the same payload for its target, so it lists Wine, DXMT, FEX, and the Nix closure but not MoltenVK. The release check fails when the payload is missing.
 
 The corresponding-source offer for the Nix libraries is not yet in place.
 
-The clean build writes `runtime-component-inventory.tsv`. Wine and DXMT map to their locked source identities. MoltenVK maps to the SHA-256-pinned base archive. Each Nix library maps to the realised store output and the pinned Nixpkgs revision it came from. The release workflow includes the inventory in the source archive, as a separate draft asset, and in the generated third-party notices.
+The clean build writes `runtime-component-inventory.tsv`. Wine and DXMT map to their locked source identities. MoltenVK maps to the SHA-256-pinned base archive. FEX maps to its locked target source. Each Nix library maps to the realised store output and the pinned Nixpkgs revision it came from. The release workflow includes the inventory in the source archive, as a separate draft asset, and in the generated third-party notices.
