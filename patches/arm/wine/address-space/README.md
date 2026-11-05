@@ -19,8 +19,13 @@ The patch does five things:
 3. It probes upward from 4 GB for the first page that `mach_vm_map` accepts, because
    dyld reserves the main executable's Mach-O region there.
 4. It lets the first 64-bit TEB block take an address above 4 GB and uses the probed
-   floor for thread data, stacks, and image fallbacks.
+   floor for thread data, stacks, and image fallbacks. A 64-bit image whose preferred
+   base is below 4 GB also uses the floor instead of the reserved low range.
 5. It emulates ARM64 loads that fault on the canonical address from the moved page.
+
+`opengl32.dll` and `riched20.dll` are native ARM64 images with preferred bases below
+4 GB. The image fallback treats every 64-bit image as 64-bit, even when its preferred
+base is below 4 GB.
 
 Apply `0001-ntdll-relocate-the-shared-user-data.patch` to the pinned `arm64-1117`
 source after the shared families.

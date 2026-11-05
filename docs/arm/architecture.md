@@ -63,7 +63,8 @@ window.
 
 The emulation covers ordinary loads and the `LDAPUR` forms that an x86 emulator emits for TSO.
 Patches `0003`, `0005`, `0008`, and `0016` implement it. Patch `0018` keeps the standard layout when
-the process has the entitlement.
+the process has the entitlement. A 64-bit image with a preferred base below 4 GB uses the probed floor
+instead of the reserved low range.
 
 ### i386
 

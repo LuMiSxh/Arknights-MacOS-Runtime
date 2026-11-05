@@ -213,7 +213,7 @@
       "component": "wine",
       "family": "address-space",
       "path": "patches/arm/wine/address-space/0001-ntdll-relocate-the-shared-user-data.patch",
-      "sha256": "55e99de2afcdbc685480886c6e79fa58b39623b2df7f2497d8952bc39e5d4694",
+      "sha256": "29b2aa955e90641bba03f90e0b010c730e83f9e058e612fb7c5a02fa932c6de0",
       "targets": [
         "native-arm64"
       ]

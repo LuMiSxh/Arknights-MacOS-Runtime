@@ -249,13 +249,20 @@ diff --git a/dlls/ntdll/unix/virtual.c b/dlls/ntdll/unix/virtual.c
  
 @@ -3394,7 +3421,7 @@ static NTSTATUS map_image_view( struct file_view **view_ret, struct pe_image_inf
  
-     if (image_info->base >= limit_4g)
+-    if (image_info->base >= limit_4g)
++    if (image_info->base >= limit_4g || is_machine_64bit( image_info->machine ))
      {
 -        start = max( limit_low, limit_4g );
 +        start = max( limit_low, user_space_floor );
          end = limit_high;
      }
      else
+@@ -3443,4 +3470,4 @@ static NTSTATUS map_image_view( struct file_view **view_ret, struct pe_image_info *image_info, SIZE_T size,
+     /* then any suitable address */
+ 
+-    return map_view( view_ret, NULL, size, top_down ? MEM_TOP_DOWN : 0, vprot, limit_low, limit_high, 0 );
++    return map_view( view_ret, NULL, size, top_down ? MEM_TOP_DOWN : 0, vprot, (image_info->base >= limit_4g || is_machine_64bit( image_info->machine )) ? user_space_floor : limit_low, limit_high, 0 );
+ }
 @@ -3713,8 +3740,34 @@ static void free_pagezero(void)
          return;
      }

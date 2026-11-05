@@ -182,7 +182,7 @@ The patch turns the feature off for the whole process when the program is `Platf
 
 macOS keeps the low 4 GB of an arm64 process as a hard pagezero. `KUSER_SHARED_DATA` and the first TEB block belong inside that range. The patch exports the page address to the PE side, moves the page to `MM_SHARED_USER_DATA_VA + 4 GB` when the canonical mapping fails, lets the first 64-bit TEB block take an address above 4 GB, and emulates ARM64 loads that fault on the canonical address.
 
-macOS also reserves the main executable's Mach-O region just above 4 GB. The patch probes upward from 4 GB for the first page that `mach_vm_map` accepts, then uses that address as the floor for thread data, stacks, and image fallbacks. A fixed `limit_4g` floor fails because the reservation covers unmapped holes too.
+macOS also reserves the main executable's Mach-O region just above 4 GB. The patch probes upward from 4 GB for the first page that `mach_vm_map` accepts, then uses that address as the floor for thread data, stacks, and image fallbacks. A fixed `limit_4g` floor fails because the reservation covers unmapped holes too. The image fallback treats every 64-bit image as 64-bit, even when its preferred base is below 4 GB, so native ARM64 images such as `opengl32.dll` relocate above the floor.
 
 The write and execute page handling of the reference patch is split out. WineCX 11.17 already flips pages in `virtual_handle_fault`, and [`wine-arm64-wx-pages`](#write-and-execute-pages) adds the `mprotect_exec` half.
 
