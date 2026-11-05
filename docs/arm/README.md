@@ -22,9 +22,9 @@ entitlement details.
 | Shared user data and 4 GB floor | Ported                                |
 | Wow64 wiring to the FEX modules | Ported                                |
 | x86_64 program under FEX        | Runs; the probe prints `fex-ok`       |
-| Game and ACE                    | Not tested                            |
-| Client ARM64 support            | Local app works; game is not playable |
-| SDK 12 window-chrome bridge     | Prototyped, not shipped               |
+| Game                            | Opens; login and ACE not tested       |
+| Client ARM64 support            | Local app works; the game opens        |
+| SDK 12 window-chrome bridge     | Shipped, ARM64 lane only              |
 
 The x86_64 lane stays the default until the game passes the compatibility checks.
 

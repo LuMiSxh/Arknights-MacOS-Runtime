@@ -44,9 +44,10 @@ capabilities keep their current meaning.
 The x86_64 loader records SDK 27.0, so the game window uses the current macOS decorations. The ARM64
 loader records SDK 12.0, which selects the legacy decorations.
 
-A prototype bridge interposes `dyld_get_program_sdk_version()` and returns the running OS version.
-Inject it through `DYLD_INSERT_LIBRARIES` without overwriting the `GameIconBridge` path, and build it
-universal. The prototype works but is not shipped.
+The client ships `SdkBridge.dylib` for the ARM64 lane only. It interposes
+`dyld_get_program_sdk_version()` and returns the running system version. The client appends it to
+`DYLD_INSERT_LIBRARIES` after `GameIconBridge.dylib`. The bridge reads the version through
+`kern.osproductversion`; a framework call in the interposed path recurses back into it and hangs.
 
 ## Local canary
 
