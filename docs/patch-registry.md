@@ -274,7 +274,7 @@ ARM64EC compiles with `__x86_64__` defined. The PE side called `unix_pe_module_l
 - Manual gate: The x86_64 PE starts under FEX.
 - Removal: Drop when WineCX handles mixed host pages on arm64 macOS.
 
-macOS refuses RWX without `MAP_JIT`. A 16K host page can mix executable 4K pages with writable ones, so `NtProtectVirtualMemory(PAGE_READWRITE)` on an image section failed with `STATUS_ACCESS_DENIED`. Write faults on the mixed page were not delivered to the signal handler, so the patch drops `PROT_EXEC` instead of `PROT_WRITE`. The page stays writable, and `virtual_handle_fault` flips it for an execute fault. The flip works in a normal Terminal; the agent shell suppresses synchronous signals. FEX code buffers use the separate `map-jit` patch. See [`docs/arm/results.md`](arm/results.md#16k-host-pages-and-the-jit-code-buffer).
+macOS refuses RWX without `MAP_JIT`. A 16K host page can mix executable 4K pages with writable ones, so `NtProtectVirtualMemory(PAGE_READWRITE)` on an image section failed with `STATUS_ACCESS_DENIED`. Write faults on the mixed page were not delivered to the signal handler, so the patch drops `PROT_EXEC` instead of `PROT_WRITE`. The page stays writable, and `virtual_handle_fault` flips it for an execute fault. The flip works in a normal Terminal; the agent shell suppresses synchronous signals. FEX code buffers use the separate `map-jit` patch.
 
 ## ARM64 ID registers
 

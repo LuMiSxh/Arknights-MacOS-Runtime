@@ -6,4 +6,4 @@ Original change for this repository.
 - License: MIT (FEX).
 - Scope: Windows only. `FEXCore::Allocator::VirtualAlloc` ignores the commit
   flag on every other host.
-- Evidence: `docs/arm/results.md#lookup-cache-commit`.
+- Evidence: observed in the native ARM64 canary; the probe compiles the entry block and prints `fex-ok`.
