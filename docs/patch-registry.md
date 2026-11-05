@@ -231,6 +231,21 @@ FEX reserves the lookup cache with `Commit=false` and commits faulting pages fro
 
 FEX allocates the dispatcher and the shared code buffer with `PAGE_EXECUTE_READWRITE`. macOS refuses RWX without `MAP_JIT`, so Wine maps them writable-only and the JIT cannot run. The unix library maps those buffers with `MAP_JIT` and keeps them RWX. FEX toggles `pthread_jit_write_protect_np` around code writes. The x86_64 probe prints `fex-ok`.
 
+## FEX unaligned atomic code write window
+
+- ID: `fex-arm64ec-code-write-window`
+- File: `patches/arm/fex/code-write-window/0001-arm64-open-a-code-write-window-around-unaligned-handling.patch`
+- Component/base: FEX `4efc3abc8aca8a0d3a8aca1f153ef6c4299f4426` (fork `dappermint/FEX`)
+- Source/author: Original change for this repository.
+- License: MIT (FEX)
+- Gate: Target only. The `native-arm64` target always opens the write window.
+- Inactive behavior: Other hosts leave both hooks null and write code directly.
+- Automated gate: Hash, clean `git apply --check`, and ARM64 build.
+- Manual gate: The game handles an unaligned atomic and keeps running.
+- Removal: Drop when FEX opens a code write window around its own back-patching.
+
+FEX handles an unaligned atomic by back-patching the JIT block in place. The block tail spin lock and the instruction words are write-protected while guest code runs, so the first store faulted inside the handler. FEX passed that fault to Windows as a native exception and the process exited with status 5. The patch opens the existing code write window for the whole handler.
+
 ## Mono
 
 - ID: `wine-arm64-skip-mono`

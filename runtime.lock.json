@@ -287,6 +287,16 @@
       "targets": [
         "native-arm64"
       ]
+    },
+    {
+      "id": "fex-arm64ec-code-write-window",
+      "component": "fex",
+      "family": "fex",
+      "path": "patches/arm/fex/code-write-window/0001-arm64-open-a-code-write-window-around-unaligned-handling.patch",
+      "sha256": "6b8a0fcb5a9f04aa7794b027af5f4142b630bf33f9578cd9a9133fb84419c2f9",
+      "targets": [
+        "native-arm64"
+      ]
     }
   ]
 }
