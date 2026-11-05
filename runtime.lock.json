@@ -269,6 +269,16 @@
       ]
     },
     {
+      "id": "wine-arm64-ec-code-bitmap",
+      "component": "wine",
+      "family": "arm64ec",
+      "path": "patches/arm/wine/ec-code-bitmap/0001-ntdll-map-the-arm64ec-code-bitmap-writable.patch",
+      "sha256": "179815692b70cdc5e194713b13c2409aae867255686cd4a7da88ae925537f0d7",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
       "id": "fex-arm64ec-lookup-cache-commit",
       "component": "fex",
       "family": "fex",
@@ -294,6 +304,16 @@
       "family": "fex",
       "path": "patches/arm/fex/code-write-window/0001-arm64-open-a-code-write-window-around-unaligned-handling.patch",
       "sha256": "6b8a0fcb5a9f04aa7794b027af5f4142b630bf33f9578cd9a9133fb84419c2f9",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "fex-arm64ec-ec-code-marking",
+      "component": "fex",
+      "family": "fex",
+      "path": "patches/arm/fex/ec-code-marking/0001-arm64ec-publish-jit-buffers-as-ec-code.patch",
+      "sha256": "2cbf4dd5092eb214232ad6d2f3f3d02dda9fe3b0ec7ad5de8f9d88904ecfa384",
       "targets": [
         "native-arm64"
       ]

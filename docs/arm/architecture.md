@@ -101,6 +101,8 @@ entitlement. Patches `0011` and `0019` apply only to an entitled process.
 | FEX features    | FEX reads the synthesized registers to select LSE, LRCPC, AFP, and other paths.                                    |
 | TSO             | FEX emulates the x86 memory ordering model by default. Some programs need it. It costs performance.                |
 | Synchronization | `WINEMSYNC=1` selects msync. The current client sets it by default.                                                |
+| Native code map | `PEB->EcCodeBitMap` marks native ARM64EC pages. Wine resumes a continuation natively only for those pages.        |
+| FEX code pages  | FEX publishes every code buffer in that bitmap. Without it, a handled fault resumes as emulation and the thread hangs. |
 
 ## Limits
 

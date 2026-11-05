@@ -276,6 +276,21 @@ Wine Mono's support package runs 32-bit and ARM64EC helper executables. The 32-b
 
 ARM64EC compiles with `__x86_64__` defined. The PE side called `unix_pe_module_loaded`, but the aarch64 `ntdll.so` table has no such entry. The call read past the table and jumped into unrelated data. The guard keeps the hook on x86_64 and excludes it from ARM64EC.
 
+## ARM64EC code bitmap
+
+- ID: `wine-arm64-ec-code-bitmap`
+- File: `patches/arm/wine/ec-code-bitmap/0001-ntdll-map-the-arm64ec-code-bitmap-writable.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Original change for this repository.
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The bitmap only exists on ARM64EC hosts.
+- Inactive behavior: Other hosts never allocate the bitmap.
+- Automated gate: Hash, clean `git apply --check`, and ARM64 build.
+- Manual gate: The game opens its window.
+- Removal: Drop when Wine maps the bitmap writable by default.
+
+`PEB->EcCodeBitMap` records which pages hold native ARM64EC code. Wine maps it read-only and only makes the pages of a view writable when an image publishes its ARM64EC ranges, so the emulator cannot publish its own JIT pages. The patch maps the bitmap writable up front. The pages stay demand-zero.
+
 ## Mixed host pages
 
 - ID: `wine-arm64-wx-pages`
