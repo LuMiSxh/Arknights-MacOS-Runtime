@@ -53,6 +53,7 @@ PATCH_FAMILIES = frozenset(
         "arm64ec",
         "wx",
         "id-registers",
+        "loader",
         "winsock",
         "appcontainer",
     }

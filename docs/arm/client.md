@@ -37,17 +37,19 @@ The native-arm64 archive ships `runtime-capabilities-arm64.json`; the x86_64 arc
 
 The client treats a missing key as `false`. Use `aceCompat` in the ACE warning and launch policy. Use
 `nativeArm64` for diagnostics and to keep the Rosetta copy off the ARM lane. The DXMT and Metal
-capabilities keep their current meaning.
+capabilities keep their current meaning. The ARM64 archive keeps `aceCompat` false until the ACE
+test passes. ACE is untested on ARM; the compact patches are present and gated by
+`ARKNIGHTS_RUNTIME_ACE_COMPACT=1`.
 
-## Window chrome and the SDK bridge
+## Window chrome
 
-The x86_64 loader records SDK 27.0, so the game window uses the current macOS decorations. The ARM64
-loader records SDK 12.0, which selects the legacy decorations.
+The ARM64 loader records SDK 12.0. The window server selects the legacy title bar for that process.
+The client has no chrome bridge. In-process interposition and AppKit appearance changes do not change
+the real frame. See [entitlements](entitlements.md#window-chrome).
 
-The client ships `SdkBridge.dylib` for the ARM64 lane only. It interposes
-`dyld_get_program_sdk_version()` and returns the running system version. The client appends it to
-`DYLD_INSERT_LIBRARIES` after `GameIconBridge.dylib`. The bridge reads the version through
-`kern.osproductversion`; a framework call in the interposed path recurses back into it and hangs.
+With `com.apple.private.custom-x18-abi`, the loader can record the current SDK and keep `x18`. The
+window then uses the current design. Test the change after the signing identity carries the
+entitlement.
 
 ## Local canary
 

@@ -206,7 +206,7 @@
       "component": "wine",
       "family": "appcontainer",
       "path": "patches/shared/wine/appcontainer/0001-userenv-implement-appcontainer-apis.patch",
-      "sha256": "5e46f78c0a09e4d27d2d38bbb5769c7216a886f8e660fe09e9994f8f95aad7c5"
+      "sha256": "f8b131f10c4f02303b4386227b01830ce74403b0104d7f28a67a646262e4e5f2"
     },
     {
       "id": "wine-arm64-address-space",
@@ -214,6 +214,36 @@
       "family": "address-space",
       "path": "patches/arm/wine/address-space/0001-ntdll-relocate-the-shared-user-data.patch",
       "sha256": "29b2aa955e90641bba03f90e0b010c730e83f9e058e612fb7c5a02fa932c6de0",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "wine-arm64-ace-context",
+      "component": "wine",
+      "family": "ace",
+      "path": "patches/arm/wine/ace-context/0001-ntdll-carry-eflags-af-df.patch",
+      "sha256": "51401e3af39b328daf0da061f321c006aaa45dffb5ba6306c3f27483b7042201",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "wine-arm64-ace-thread-entry",
+      "component": "wine",
+      "family": "ace",
+      "path": "patches/arm/wine/ace-thread-entry/0001-ntdll-hybrid-thread-entry.patch",
+      "sha256": "73de3d7cdaec6fb864b8c014cb3b7652a3c68be5cd717cd745cd117df78e2ff4",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "wine-arm64-loader-name",
+      "component": "wine",
+      "family": "loader",
+      "path": "patches/arm/wine/loader-name/0001-loader-bake-app-name.patch",
+      "sha256": "db49f46068f74989bed5a5e4346b7e99bd7c97aa7f23e754aec7039cdb06436e",
       "targets": [
         "native-arm64"
       ]

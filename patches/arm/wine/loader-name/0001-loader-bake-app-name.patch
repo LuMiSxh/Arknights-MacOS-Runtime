@@ -1,0 +1,13 @@
+diff --git a/loader/wine_info.plist.in b/loader/wine_info.plist.in
+index beb1c33b..68ff0cf0 100644
+--- a/loader/wine_info.plist.in
++++ b/loader/wine_info.plist.in
+@@ -13,7 +13,7 @@
+     <key>CFBundleInfoDictionaryVersion</key>
+     <string>6.0</string>
+     <key>CFBundleName</key>
+-    <string>CrossOver-Hosted Application</string><!-- CrossOver Hack 10913 -->
++    <string>Arknights</string><!-- CrossOver Hack 10913 -->
+     <key>CFBundlePackageType</key>
+     <string>APPL</string>
+     <key>CFBundleShortVersionString</key>

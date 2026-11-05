@@ -5,9 +5,10 @@ the default.
 
 ## Decision
 
-The project has no distributable signing identity. Both cross-architecture entitlements need a
-provisioning profile that binds a loader to one Mac, so no signed loader can ship. The lane uses the
-entitlement-free address-space work instead.
+The project has no distributable signing identity. The two restricted entitlements need an Apple
+approved signing identity, so the current ad-hoc build cannot use them. The lane uses the
+entitlement-free address-space work instead. See [entitlements](entitlements.md) for the two
+entitlements and the workarounds they can remove.
 
 The lane is 64-bit only and uses 16K host pages. i386, 4K host pages, Apple D3DMetal, Rosetta 2, and a
 native game build are out of scope. See [provenance](provenance.md#entitlement-availability) for the
@@ -15,16 +16,18 @@ entitlement details.
 
 ## Status
 
-| Item                            | State                                 |
-| ------------------------------- | ------------------------------------- |
-| ARM64 build target              | Works                                 |
-| Native ARM64 `wine cmd /c ver`  | Works                                 |
-| Shared user data and 4 GB floor | Ported                                |
-| Wow64 wiring to the FEX modules | Ported                                |
-| x86_64 program under FEX        | Runs; the probe prints `fex-ok`       |
-| Game                            | Opens; login and ACE not tested       |
-| Client ARM64 support            | Local app works; the game opens        |
-| SDK 12 window-chrome bridge     | Shipped, ARM64 lane only              |
+| Item                            | State                                                                   |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| ARM64 build target              | Works                                                                   |
+| Native ARM64 `wine cmd /c ver`  | Works                                                                   |
+| Shared user data and 4 GB floor | Ported                                                                  |
+| Wow64 wiring to the FEX modules | Ported                                                                  |
+| x86_64 program under FEX        | Runs; the probe prints `fex-ok`                                         |
+| ACE                             | Untested; the ARM patches are ported and the compact gate is active     |
+| Game                            | Opens; Global login works                                               |
+| Client ARM64 support            | Local app works; the game opens                                         |
+| Dock and menu-bar name          | Baked into the loader as `Arknights`                                    |
+| Window chrome                   | Legacy; the custom x18 ABI entitlement should select the current design |
 
 The x86_64 lane stays the default until the game passes the compatibility checks.
 
@@ -46,9 +49,10 @@ The x86_64 lane stays the default until the game passes the compatibility checks
 
 1. [Architecture](architecture.md): the process model and the address space.
 2. [Porting](porting.md): the patch families and the remaining work.
-3. [Provenance](provenance.md): the reference runtime and its public sources.
-4. [Pipeline](pipeline.md): the second build target.
-5. [Client](client.md): the consumer changes and the local canary.
+3. [Entitlements](entitlements.md): the removable workarounds and the window chrome.
+4. [Provenance](provenance.md): the reference runtime and its public sources.
+5. [Pipeline](pipeline.md): the second build target.
+6. [Client](client.md): the consumer changes and the local canary.
 
 ## References
 

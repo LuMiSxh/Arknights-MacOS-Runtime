@@ -30,6 +30,9 @@ conflict check, a build, and a run test.
 | —         | ARM64EC unix-call guard                       | `patches/arm/wine/arm64ec-unix-call/` |
 | `0003`    | Keep mixed host pages writable                | `patches/arm/wine/wx-pages/`          |
 | `0004`    | Synthesize the ARM64 ID registers             | `patches/arm/wine/id-registers/`      |
+| `0017`    | Carry `EFlags` AF and DF through ARM64EC      | `patches/arm/wine/ace-context/`       |
+| `0126`    | Start an x64 thread from a hybrid module      | `patches/arm/wine/ace-thread-entry/`  |
+| —         | Bake the game name into the loader            | `patches/arm/wine/loader-name/`       |
 
 The address-space patch also adds the 4 GB floor probe and moves the first TEB block above 4 GB. The
 `wx-pages` patch carries the `mprotect_exec` half of the reference W^X handling; WineCX already flips
@@ -41,11 +44,10 @@ Terminal; the agent shell suppresses synchronous signals.
 
 | Reference | Subject                                       | Needed for          |
 | --------- | --------------------------------------------- | ------------------- |
-| `0017`    | Carry `EFlags` AF and DF through ARM64EC      | Game and ACE        |
-| `0126`    | Start an x64 thread from a hybrid module      | Game and ACE        |
 | `0128`    | Tell the emulator about executable data views | Self-modifying code |
 
-The x86_64 probe prints `fex-ok`. These patches are candidates for the game and ACE.
+The x86_64 probe prints `fex-ok`. `0017` and `0126` are ported; `0128` is still a candidate for the
+game and ACE.
 
 Patch `0004` sets these values in `loader/wine.inf.in`:
 
@@ -62,14 +64,17 @@ The ARM64 loader needs `-platform_version macos,15.0,12.0` to preserve x18. The 
 the kernel's page-fault behavior. The x86_64 loader keeps the current SDK. The 4 GB `__PAGEZERO` stays
 in the reference.
 
+With `com.apple.private.custom-x18-abi`, link the loader with the current SDK and remove the
+override. The window then uses the current design. See [entitlements](entitlements.md).
+
 ## Not ported
 
-| Group                                       | Reason                            |
-| ------------------------------------------- | --------------------------------- |
-| `0011`, `0019`, and other 4K page work      | Needs the entitlement.            |
-| Steam, Epic, Battle.net, Rockstar patches   | Not used by Arknights.            |
-| Mullion, VKD3D-Proton, DXVK, WineMetalGL    | This runtime uses DXMT only.      |
-| MetalSharp application and tracing controls | Not part of the runtime contract. |
+| Group                                       | Reason                                                      |
+| ------------------------------------------- | ----------------------------------------------------------- |
+| `0011`, `0019`, and other 4K page work      | Needs the entitlement. See [entitlements](entitlements.md). |
+| Steam, Epic, Battle.net, Rockstar patches   | Not used by Arknights.                                      |
+| Mullion, VKD3D-Proton, DXVK, WineMetalGL    | This runtime uses DXMT only.                                |
+| MetalSharp application and tracing controls | Not part of the runtime contract.                           |
 
 FEX tuning belongs in the client environment, not in Wine patches:
 
@@ -90,7 +95,8 @@ Test ACE with TSO enabled first.
 | `vtool -show-build`   | `minos 15.0`, `sdk 12.0`.            |
 | `wine cmd /c ver`     | Exit 0 on a fresh prefix.            |
 | 64-bit PE under FEX   | Starts and prints its output. Works. |
-| Game                  | Reaches the login screen. Not yet.   |
+| Game                  | Opens; Global login works.           |
+| ACE                   | Untested on ARM.                     |
 
 Add one offline test for each contract that a port can break:
 
