@@ -100,17 +100,19 @@ WineCX and the reference solve the difference with faults:
 3. On an execute fault, change the host page back to read and execute and invalidate the instruction cache.
 4. Keep the write protection of each 4K Windows page exact inside a 16K host page.
 
-macOS 27.2 does not deliver these protection faults to the process.
-The thread retries the faulting instruction forever.
-The fault model therefore cannot run FEX on this host.
-The lane maps FEX code buffers with `MAP_JIT` instead, keeps them `rwx`, and
-toggles `pthread_jit_write_protect_np` around JIT writes.
-Wine still needs the 4K write-protection rule for guest pages.
+A normal Terminal delivers these protection faults.
+The agent shell used for earlier probes suppresses synchronous signals, so a
+faulting process hangs there.
+Measure fault behavior from a normal Terminal.
+
+The lane maps FEX code buffers with `MAP_JIT`: the unix library keeps them `rwx`
+and FEX toggles `pthread_jit_write_protect_np` around JIT writes.
+Wine keeps the 4K write-protection rule for guest pages.
 See [results](results.md#16k-host-pages-and-the-jit-code-buffer).
 
 WineCX ARM64 has a writable and executable flip for the CodeWeavers hacks.
 MetalSharp-Wine replaces it with a more complete fault path.
-Do not port the fault path until the host delivers the faults.
+The lane keeps the WineCX path for mixed PE host pages.
 
 Host pages are 16K on Apple Silicon.
 A 4K page mode exists on macOS 26 and later, but it needs the entitlement.

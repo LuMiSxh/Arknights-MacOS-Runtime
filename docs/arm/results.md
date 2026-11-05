@@ -2,7 +2,7 @@
 
 This page records what was tried, what worked, and what failed.
 It is the evidence behind the decisions in the other ARM64 documents.
-Last updated: 2026-11-04.
+Last updated: 2026-11-05.
 
 ## Entitlement
 
@@ -66,8 +66,8 @@ Arknights does not use .NET.
 A minimal x86_64 PE loads at `0x140000000`.
 The process loads `libarm64ecfex.dll`, patches its hybrid metadata, resolves the
 module's imports, and completes FEX `ProcessInit` and `ThreadInit`.
-The guest entry call reaches the FEX JIT dispatcher, but no guest block is
-compiled, so the probe does not print its output yet.
+The guest entry call reaches the FEX JIT dispatcher.
+FEX compiles the entry block and the probe prints `fex-ok`.
 
 `ThreadInit` only runs when `pThreadInit` resolves.
 An installed `ntdll.dll` that predates the current tree resolved it to NULL and
@@ -102,9 +102,9 @@ The `arm64ec-unix-call` patch gates the hook on `!defined(__arm64ec__)`.
 with `STATUS_ACCESS_DENIED`.
 A 16K host page mixed executable 4K pages with writable ones, so Wine asked
 for RWX, which macOS refuses.
-Write faults on the mixed page were not delivered to the signal handler.
 The `wx-pages` patch drops `PROT_EXEC` instead, so the page stays writable and
-the handler can flip it for an execute fault.
+`virtual_handle_fault` can flip it for an execute fault.
+Measure the flip from a normal Terminal.
 
 Both fixes are in the native-arm64 patch set.
 
@@ -118,38 +118,29 @@ FEX `ProcessInit`, feature detection, the cross-process work list, and
 
 ## 16K host pages and the JIT code buffer
 
-FEX maps its JIT code buffer with `PAGE_EXECUTE_READWRITE`.
-The `wx-pages` patch maps that request writable-only, so the dispatcher and the
-compiled blocks start without execute permission.
-The intended recovery was an execute fault that flips the host page to `r-x`.
+FEX asks for `PAGE_EXECUTE_READWRITE` for its code buffers.
+The `wx-pages` patch maps such a Wine request writable-only and lets
+`virtual_handle_fault` flip the host page for an execute fault.
+The rule remains for mixed PE host pages.
 
-That recovery does not happen on this host.
-A standalone process that executes an `rw-` page receives no `SIGBUS` or `SIGSEGV`.
-The same process that writes an `r-x` page receives no signal.
-A plain NULL store also does not signal.
-The thread retries the faulting instruction; only an asynchronous signal ends the loop.
-The signal mask is clear and the handlers are installed.
-`lldb` reports the fault as `EXC_BAD_ACCESS` and can pass it to Wine, which is why
-some earlier probe runs showed a handler.
+FEX code buffers use the `map-jit` patch instead.
+The unix library maps the dispatcher and the shared code buffer with `MAP_JIT`
+and keeps them `rwx`.
+FEX toggles `pthread_jit_write_protect_np` around code writes.
 
-Therefore neither direction of the fault-driven W^X model can work:
+The fault flip works in a normal Terminal.
+The earlier probes ran under the agent shell, which suppresses synchronous
+signals; a fixed address and a NULL store both hang there.
+A standalone test launched from a normal Terminal prints `FAULT sig=11` for the
+same NULL store.
+Run every fault-delivery measurement from a normal Terminal, never from the
+agent shell.
 
-- Keep the page writable and flip it on an execute fault (`wx-pages`).
-- Keep the page executable and flip it on a write fault (reference `0007` and `0013`).
-
-Protection follows the 16K host page, not the 4K Windows page.
-An explicit `NtProtectVirtualMemory(PAGE_EXECUTE_READ)` on the 4K page that
-holds the dispatcher returns success and leaves the host page writable, because
-the other three 4K pages in the same host page are still writable.
-
-`MAP_JIT` is the remaining host mechanism that allows writes and execution.
 A standalone test mapped a page with `MAP_JIT`, wrote a `ret` instruction with
 `pthread_jit_write_protect_np(0)`, switched to `pthread_jit_write_protect_np(1)`,
 and executed it.
 `mmap(PROT_READ | PROT_WRITE, MAP_JIT)` followed by
 `mprotect(PROT_READ | PROT_WRITE | PROT_EXEC)` also succeeds.
-The next design maps the FEX code buffers with `MAP_JIT`, keeps them `rwx`, and
-toggles the per-thread write protection around JIT writes.
 
 ## Lookup cache commit
 
@@ -165,8 +156,8 @@ and is a no-op outside Windows.
 
 With it, FEX compiles the guest block at `0x140000000 + 0x13b0`
 (`PreCompile` and `LookupExecutableFileSection` both run).
-When the dispatcher page is made executable, the JIT advances through the
-dispatcher.
+The probe then prints `fex-ok`; the trace shows `PRECOMPILE`,
+`LOOKUP-SEC 0x1400013b0`, and many `CODE-WRITE`/`CODE-FLUSH` pairs.
 
 The dispatcher trace shows the entry address is not truncated.
 At `DispatcherLoopTopEnterEC`, `x1` and `x9` are both `0x1400013b0`.
@@ -174,13 +165,12 @@ The stack holds the return addresses of `RtlUserThreadStart`,
 `BaseThreadInitThunk`, and the kernel32 exit thunk.
 The earlier `x9 = 0x400013b0` reading does not reproduce on this path.
 
-Runs vary. Some reach `PreCompile`; others stall on the dispatcher page before
-it.
-The difference depends on whether a debugger delivers the execute fault.
-Without a debugger the page stays `rw-` and the thread retries the first
-dispatcher instruction.
+The first runs stalled in the scratch `fprintf(stderr, "FEXTRACE CompileBlock ...")`
+in `Core.cpp`, before `PreCompile`.
+Removing that diagnostic let the block compile.
+The tracer is not part of the patch set.
 
-When a debugger delivers the fault, FEX reports this chain:
+The earlier debugger trace showed this reset chain:
 
 | Trace                                  | Meaning                                                               |
 | -------------------------------------- | --------------------------------------------------------------------- |
@@ -193,11 +183,10 @@ When a debugger delivers the fault, FEX reports this chain:
 The guest has no handler for it, so the thread repeats the fault.
 Disabling the dispatcher's opportunistic call-ret pop does not change it.
 
-A second code buffer sits at `0x7ffeabf00000`, below the lookup cache.
-It is 16 MB and `vmmap` reports the whole region as reserved and unallocated;
-reading it returns zeros.
-`NtProtectVirtualMemory` cannot commit a reserved page, so a write-protect hook
-alone cannot make it usable; the region needs `NtAllocateVirtualMemory(MEM_COMMIT)`.
+The earlier debugger run also found a second code buffer at `0x7ffeabf00000`
+that was reserved-only.
+The `MAP_JIT` allocator maps every code buffer afresh, so the lane no longer
+commits that region.
 
 ## Window chrome
 
@@ -211,12 +200,12 @@ The x86_64 lane does not need it.
 
 ## Summary
 
-| Item                   | State                                                            |
-| ---------------------- | ---------------------------------------------------------------- |
-| Native ARM64 Wine boot | Works                                                            |
-| Shared user data       | Relocated                                                        |
-| Mono                   | Skipped                                                          |
-| x86_64 under FEX       | Entry path reaches the dispatcher; host W^X blocks JIT execution |
-| Game                   | Not started                                                      |
-| ACE                    | Not tested                                                       |
-| Window chrome          | Legacy on ARM; bridge prototyped                                 |
+| Item                   | State                                                  |
+| ---------------------- | ------------------------------------------------------ |
+| Native ARM64 Wine boot | Works                                                  |
+| Shared user data       | Relocated                                              |
+| Mono                   | Skipped                                                |
+| x86_64 under FEX       | Prints fex-ok; the first x86_64 program runs under FEX |
+| Game                   | Not started                                            |
+| ACE                    | Not tested                                             |
+| Window chrome          | Legacy on ARM; bridge prototyped                       |

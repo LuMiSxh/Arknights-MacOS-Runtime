@@ -42,14 +42,14 @@ A passing Wine start is not a passing ACE start.
 
 ### 16K host pages
 
-| Item       | Detail                                                                                                      |
-| ---------- | ----------------------------------------------------------------------------------------------------------- |
-| Risk       | A program assumes a 4K page size and fails on a 16K host page.                                              |
-| Impact     | Crashes in memory allocation, JIT code, or anti-cheat checks.                                               |
-| Evidence   | Arknights runs on Windows with 4K pages. The lane emulates 4K inside 16K host pages.                        |
-| Evidence   | On this host neither an execute fault on an `rw-` page nor a write fault on an `r-x` page becomes a signal. |
-| Mitigation | Map FEX code buffers with `MAP_JIT` and toggle `pthread_jit_write_protect_np` around writes.                |
-| Decision   | If `MAP_JIT` is refused, the lane needs the JIT entitlement or a 4K host.                                   |
+| Item       | Detail                                                                                          |
+| ---------- | ----------------------------------------------------------------------------------------------- |
+| Risk       | A program assumes a 4K page size and fails on a 16K host page.                                  |
+| Impact     | Crashes in memory allocation, JIT code, or anti-cheat checks.                                   |
+| Evidence   | Arknights runs on Windows with 4K pages. The lane emulates 4K inside 16K host pages.            |
+| Evidence   | The agent shell suppresses synchronous signals; a normal Terminal delivers them. Measure there. |
+| Mitigation | Map FEX code buffers with `MAP_JIT` and toggle `pthread_jit_write_protect_np` around writes.    |
+| Decision   | If `MAP_JIT` is refused, the lane needs the JIT entitlement or a 4K host.                       |
 
 ## Performance
 
@@ -73,12 +73,22 @@ Test with TSO enabled first.
 | Risk       | Apple changes the ARM64 process layout or the fault behavior.                               |
 | Impact     | The relocation and the 4 GB floor stop working.                                             |
 | Evidence   | The lane depends on `PAGEZERO` and the Mach-O reservation above 4 GB.                       |
-| Evidence   | macOS 27.2 does not deliver protection faults as `SIGBUS` or `SIGSEGV` to this lane.        |
+| Evidence   | A normal Terminal delivers protection faults; the agent shell suppresses them.              |
 | Mitigation | Validate on every macOS major version. Keep the entitlement-compatible branches available.  |
 | Decision   | If a macOS release breaks the layout, evaluate the entitlement lane or the MetalSharp base. |
 
 The x86_64 lane is blocked by the client on macOS 28 and later.
 The ARM64 lane must work on macOS 27 and 28.
+
+### MAP_JIT signing
+
+| Item       | Detail                                                                      |
+| ---------- | --------------------------------------------------------------------------- |
+| Risk       | The client adopts the hardened runtime and `MAP_JIT` is refused.            |
+| Impact     | FEX code buffers cannot be both writable and executable.                    |
+| Evidence   | The runtime is ad-hoc signed and not hardened today.                        |
+| Mitigation | Add `com.apple.security.cs.allow-jit` before enabling the hardened runtime. |
+| Decision   | Keep the non-hardened signing path until the client adds the entitlement.   |
 
 ### Entitlement
 

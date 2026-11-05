@@ -277,6 +277,16 @@
       "targets": [
         "native-arm64"
       ]
+    },
+    {
+      "id": "fex-arm64ec-map-jit",
+      "component": "fex",
+      "family": "fex",
+      "path": "patches/arm/fex/map-jit/0001-fex-map-jit-code-buffers.patch",
+      "sha256": "08c345b70011901ffb70c4e0f5b95780b06aed498fb596138f7c45e2845b0523",
+      "targets": [
+        "native-arm64"
+      ]
     }
   ]
 }

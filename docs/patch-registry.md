@@ -216,6 +216,21 @@ Wine's `wine.inf` points `Wow64\amd64` at `xtajit64.dll` and `Wow64\x86` at `xta
 
 FEX reserves the lookup cache with `Commit=false` and commits faulting pages from its `ResetToConsistentState` callback. Wine returns `STATUS_ACCESS_VIOLATION` instead and never calls the callback, so the first block lookup faulted on the same instruction forever. The patch commits the region up front.
 
+## FEX MAP_JIT code buffers
+
+- ID: `fex-arm64ec-map-jit`
+- File: `patches/arm/fex/map-jit/0001-fex-map-jit-code-buffers.patch`
+- Component/base: FEX `4efc3abc8aca8a0d3a8aca1f153ef6c4299f4426` (fork `dappermint/FEX`)
+- Source/author: Original change for this repository.
+- License: MIT (FEX)
+- Gate: Target only. The `native-arm64` target always maps FEX code buffers with `MAP_JIT`.
+- Inactive behavior: Other hosts use `VirtualAlloc`; the unix library JIT handlers return `STATUS_NOT_SUPPORTED`.
+- Automated gate: Hash, clean `git apply --check`, and ARM64 build.
+- Manual gate: The x86_64 PE prints `fex-ok` from a normal Terminal.
+- Removal: Drop when FEX supports `MAP_JIT` code buffers natively, or when Wine can host a writable and executable code buffer on this host.
+
+FEX allocates the dispatcher and the shared code buffer with `PAGE_EXECUTE_READWRITE`. macOS refuses RWX without `MAP_JIT`, so Wine maps them writable-only and the JIT cannot run. The unix library maps those buffers with `MAP_JIT` and keeps them RWX. FEX toggles `pthread_jit_write_protect_np` around code writes. The x86_64 probe prints `fex-ok`.
+
 ## Mono
 
 - ID: `wine-arm64-skip-mono`
@@ -259,7 +274,7 @@ ARM64EC compiles with `__x86_64__` defined. The PE side called `unix_pe_module_l
 - Manual gate: The x86_64 PE starts under FEX.
 - Removal: Drop when WineCX handles mixed host pages on arm64 macOS.
 
-macOS refuses RWX without `MAP_JIT`. A 16K host page can mix executable 4K pages with writable ones, so `NtProtectVirtualMemory(PAGE_READWRITE)` on an image section failed with `STATUS_ACCESS_DENIED`. Write faults on the mixed page were not delivered to the signal handler, so the patch drops `PROT_EXEC` instead of `PROT_WRITE`. The page stays writable, and `virtual_handle_fault` flips it for an execute fault. On macOS 27.2 the execute fault is also not delivered to the process, so this patch is necessary but not sufficient for JIT code. See [`docs/arm/results.md`](arm/results.md#16k-host-pages-and-the-jit-code-buffer).
+macOS refuses RWX without `MAP_JIT`. A 16K host page can mix executable 4K pages with writable ones, so `NtProtectVirtualMemory(PAGE_READWRITE)` on an image section failed with `STATUS_ACCESS_DENIED`. Write faults on the mixed page were not delivered to the signal handler, so the patch drops `PROT_EXEC` instead of `PROT_WRITE`. The page stays writable, and `virtual_handle_fault` flips it for an execute fault. The flip works in a normal Terminal; the agent shell suppresses synchronous signals. FEX code buffers use the separate `map-jit` patch. See [`docs/arm/results.md`](arm/results.md#16k-host-pages-and-the-jit-code-buffer).
 
 ## ARM64 ID registers
 

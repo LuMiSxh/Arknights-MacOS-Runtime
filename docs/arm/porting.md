@@ -37,22 +37,23 @@ The address-space patch also adds the 4 GB floor probe and moves the first TEB
 block above 4 GB.
 The `mprotect_exec` half of the reference W^X handling is in the `wx-pages`
 patch; WineCX 11.17 already flips pages in `virtual_handle_fault`.
-That flip assumes the execute fault reaches the process.
-On this host an execute fault on an `rw-` page, and a write fault on an `r-x`
-page, never become `SIGBUS` or `SIGSEGV`; the thread retries the instruction.
-The patch is still needed to avoid refused RWX mappings, but it is not enough to
-run JIT code. See [results](results.md#16k-host-pages-and-the-jit-code-buffer).
+That flip works in a normal Terminal.
+The agent shell used for earlier probes suppresses synchronous signals; measure
+fault behavior from a normal Terminal.
+FEX code buffers use `MAP_JIT` through the [`map-jit`](../../patches/arm/fex/map-jit/README.md) patch.
+The `wx-pages` patch still avoids refused RWX mappings for mixed PE host pages.
+See [results](results.md#16k-host-pages-and-the-jit-code-buffer).
 
 ## Remaining
 
 | Reference | Subject                                       | Needed for          |
 | --------- | --------------------------------------------- | ------------------- |
-| `0017`    | Carry `EFlags` AF and DF through ARM64EC      | x86_64 startup      |
-| `0126`    | Start an x64 thread from a hybrid module      | x86_64 startup      |
+| `0017`    | Carry `EFlags` AF and DF through ARM64EC      | Game and ACE        |
+| `0126`    | Start an x64 thread from a hybrid module      | Game and ACE        |
 | `0128`    | Tell the emulator about executable data views | Self-modifying code |
 
-The current x86_64 PE test loads at `0x140000000` and stops before entry.
-These patches are the next candidates.
+The x86_64 probe now prints `fex-ok`.
+These patches remain candidates for the game and ACE.
 
 Patch `0004` changes `loader/wine.inf.in` in two places:
 
