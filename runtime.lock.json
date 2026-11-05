@@ -206,14 +206,44 @@
       "component": "wine",
       "family": "appcontainer",
       "path": "patches/shared/wine/appcontainer/0001-userenv-implement-appcontainer-apis.patch",
-      "sha256": "5e46f78c0a09e4d27d2d38bbb5769c7216a886f8e660fe09e9994f8f95aad7c5"
+      "sha256": "f8b131f10c4f02303b4386227b01830ce74403b0104d7f28a67a646262e4e5f2"
     },
     {
       "id": "wine-arm64-address-space",
       "component": "wine",
       "family": "address-space",
       "path": "patches/arm/wine/address-space/0001-ntdll-relocate-the-shared-user-data.patch",
-      "sha256": "55e99de2afcdbc685480886c6e79fa58b39623b2df7f2497d8952bc39e5d4694",
+      "sha256": "29b2aa955e90641bba03f90e0b010c730e83f9e058e612fb7c5a02fa932c6de0",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "wine-arm64-ace-context",
+      "component": "wine",
+      "family": "ace",
+      "path": "patches/arm/wine/ace-context/0001-ntdll-carry-eflags-af-df.patch",
+      "sha256": "51401e3af39b328daf0da061f321c006aaa45dffb5ba6306c3f27483b7042201",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "wine-arm64-ace-thread-entry",
+      "component": "wine",
+      "family": "ace",
+      "path": "patches/arm/wine/ace-thread-entry/0001-ntdll-hybrid-thread-entry.patch",
+      "sha256": "73de3d7cdaec6fb864b8c014cb3b7652a3c68be5cd717cd745cd117df78e2ff4",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "wine-arm64-loader-name",
+      "component": "wine",
+      "family": "loader",
+      "path": "patches/arm/wine/loader-name/0001-loader-bake-app-name.patch",
+      "sha256": "db49f46068f74989bed5a5e4346b7e99bd7c97aa7f23e754aec7039cdb06436e",
       "targets": [
         "native-arm64"
       ]
@@ -234,6 +264,86 @@
       "family": "fex",
       "path": "patches/arm/wine/fex/0001-wine.inf-use-fex-modules.patch",
       "sha256": "56e57f11c2950e5c45b141f2b9845391223ceab780b3d1a7369c9e7de9271a65",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "wine-arm64-unix-call",
+      "component": "wine",
+      "family": "arm64ec",
+      "path": "patches/arm/wine/arm64ec-unix-call/0001-ntdll-fix-the-arm64ec-unix-call-table.patch",
+      "sha256": "d8ebf89ae787e7c6645131063bb1acd95450d3c19673efd9de2f8dac2107bf73",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "wine-arm64-wx-pages",
+      "component": "wine",
+      "family": "wx",
+      "path": "patches/arm/wine/wx-pages/0001-ntdll-keep-mixed-host-pages-writable.patch",
+      "sha256": "0dfda7cf0d49221ccf7d9c1d9bb82c95397c7b658e05552ce9b2af1b82e2945e",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "wine-arm64-id-registers",
+      "component": "wine",
+      "family": "id-registers",
+      "path": "patches/arm/wine/id-registers/0001-ntdll-synthesize-arm64-id-registers.patch",
+      "sha256": "aa67d12796bca881bada8e5491619499d6116a1c15212d6b472efc385c04608f",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "wine-arm64-ec-code-bitmap",
+      "component": "wine",
+      "family": "arm64ec",
+      "path": "patches/arm/wine/ec-code-bitmap/0001-ntdll-map-the-arm64ec-code-bitmap-writable.patch",
+      "sha256": "179815692b70cdc5e194713b13c2409aae867255686cd4a7da88ae925537f0d7",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "fex-arm64ec-lookup-cache-commit",
+      "component": "fex",
+      "family": "fex",
+      "path": "patches/arm/fex/lookup-cache-commit/0001-lookup-cache-commit-eagerly.patch",
+      "sha256": "7c222b4607accb18671ee3599b9f7ae86d8ae870965a71fad255cbd6d58b4306",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "fex-arm64ec-map-jit",
+      "component": "fex",
+      "family": "fex",
+      "path": "patches/arm/fex/map-jit/0001-fex-map-jit-code-buffers.patch",
+      "sha256": "08c345b70011901ffb70c4e0f5b95780b06aed498fb596138f7c45e2845b0523",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "fex-arm64ec-code-write-window",
+      "component": "fex",
+      "family": "fex",
+      "path": "patches/arm/fex/code-write-window/0001-arm64-open-a-code-write-window-around-unaligned-handling.patch",
+      "sha256": "6b8a0fcb5a9f04aa7794b027af5f4142b630bf33f9578cd9a9133fb84419c2f9",
+      "targets": [
+        "native-arm64"
+      ]
+    },
+    {
+      "id": "fex-arm64ec-ec-code-marking",
+      "component": "fex",
+      "family": "fex",
+      "path": "patches/arm/fex/ec-code-marking/0001-arm64ec-publish-jit-buffers-as-ec-code.patch",
+      "sha256": "2cbf4dd5092eb214232ad6d2f3f3d02dda9fe3b0ec7ad5de8f9d88904ecfa384",
       "targets": [
         "native-arm64"
       ]

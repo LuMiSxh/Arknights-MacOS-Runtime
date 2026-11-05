@@ -1,8 +1,7 @@
 # ARM64 runtime architecture
 
-This document describes how an ARM64 Wine runtime runs an x86_64 Windows program.
-It also describes the address space problem that the entitlement solves.
-The entitlement-free plan solves the same problem with relocation and fault handling.
+This document describes how an ARM64 Wine runtime runs an x86_64 Windows program. It also covers the
+address-space problem that the entitlement solves and the entitlement-free replacement.
 
 ## Process model
 
@@ -18,11 +17,9 @@ flowchart TD
     U --> S[wineserver]
 ```
 
-One Windows process contains native ARM64 code and emulated x86_64 code.
-The Wine PE modules that an x86_64 program loads are ARM64EC hybrids.
-Some other modules are native AArch64.
-The FEX frontend translates x86_64 instructions at run time.
-DXMT is an ARM64X payload, so the emulated game calls native Direct3D code.
+One Windows process contains native ARM64 and emulated x86_64 code. The Wine PE modules that an x86_64
+program loads are ARM64EC hybrids; other modules are native AArch64. FEX translates x86_64
+instructions at run time. DXMT is an ARM64X payload, so the emulated game calls native Direct3D code.
 `winemetal.so` is a native arm64 unix module that talks to Metal.
 
 ## Components
@@ -39,74 +36,60 @@ DXMT is an ARM64X payload, so the emulated game calls native Direct3D code.
 | `winemetal.dll`                           | PE ARM64X    | DXMT Metal bridge.                              |
 | `winemetal.so`                            | Mach-O arm64 | Metal access from the unix side.                |
 
-Wine loads the emulator from the registry values `HKLM\Software\Microsoft\Wow64\amd64` and `\x86`.
-The values must name the FEX modules, or the loader must install them under the `xtajit` names.
-The current WineCX ARM64 branch does not add these values. MetalSharp-Wine patch 0004 adds them.
-Packaging can also replace `xtajit64.dll` and `xtajit.dll` with the FEX modules.
+Wine loads the emulator from `HKLM\Software\Microsoft\Wow64\amd64` and `\x86`. The values must name the
+FEX modules, or packaging must install them under the `xtajit64.dll` and `xtajit.dll` names. WineCX
+does not add the values; the `fex` patch does. Use one method only.
 
 ## Address space
 
-### The macOS reservation
+### macOS reservation
 
-A native ARM64 process on macOS reserves the low 4 GB as `PAGEZERO`.
-Windows needs two regions in that range:
+A native ARM64 process reserves the low 4 GB as `PAGEZERO`. Windows needs two regions there:
+`KUSER_SHARED_DATA` at `0x7ffe0000`, and the 32-bit guest address space for WoW64.
 
-- `KUSER_SHARED_DATA` at `0x7ffe0000`.
-- The 32-bit guest address space below 4 GB, when WoW64 runs i386 programs.
+WineCX handles the reservation in `dlls/ntdll/unix/virtual.c`. `free_pagezero()` deallocates the
+loader's explicit 4 GB `__PAGEZERO` segment. Without the entitlement, the deallocation fails.
+`virtual_map_user_shared_data()` then cannot map `0x7ffe0000` and calls `exit(1)` before the first
+window.
 
-WineCX ARM64 handles the reservation in `dlls/ntdll/unix/virtual.c`:
-
-```c
-/* A loader signed with com.apple.developer.cross-architecture-support
- * is allowed to give it back; without the entitlement the deallocate fails
- * and nothing below 4GB is ever mappable. */
-static void free_pagezero(void) { ... mach_vm_deallocate(...) ... }
-```
-
-The loader must have an explicit 4 GB `__PAGEZERO` segment for this function to find.
-If the deallocation fails, `virtual_map_user_shared_data()` cannot map `0x7ffe0000`.
-That function calls `exit(1)` on failure, so the runtime stops before the first window.
-
-### The entitlement-free layout
-
-MetalSharp-Wine moves the shared page instead of the reservation:
+### Entitlement-free layout
 
 | Step     | Change                                                                                                  |
 | -------- | ------------------------------------------------------------------------------------------------------- |
 | Probe    | Try to map `0x7ffe0000` without `MAP_FIXED`. If it fails, the low 4 GB is not available.                |
-| Relocate | Map the shared page at `0x17ffe0000`, which is 4 GB above the canonical address.                        |
+| Relocate | Map the shared page at `0x17ffe0000`, 4 GB above the canonical address.                                 |
 | Publish  | Export `__wine_user_shared_data` from PE ntdll and `ntdll_get_user_shared_data()` from unix ntdll.      |
 | Emulate  | In the `SIGSEGV` handler, decode ARM64 loads from `0x7ffe0000` and redirect them to the relocated page. |
 
 The emulation covers ordinary loads and the `LDAPUR` forms that an x86 emulator emits for TSO.
-Patches 0003, 0005, 0008, and 0016 in MetalSharp-Wine implement this layout.
-Patch 0018 keeps the standard layout when the process does have the entitlement.
+Patches `0003`, `0005`, `0008`, and `0016` implement it. Patch `0018` keeps the standard layout when
+the process has the entitlement. A 64-bit image with a preferred base below 4 GB uses the probed floor
+instead of the reserved low range.
 
-### Consequence for i386
+### i386
 
-Without the entitlement, the region above 4 GB is available for the relocated page.
-The low 4 GB stays reserved, so 32-bit programs cannot work.
-The ARM64 lane therefore ships 64-bit only.
-This matches the existing `--require-64-bit-only` policy.
+The region above 4 GB is available, but the low 4 GB stays reserved. 32-bit programs cannot run, so
+the lane is 64-bit only. This matches the `--require-64-bit-only` policy.
 
 ## Memory protection
 
-macOS does not grant a page write and execute permission together without `MAP_JIT`.
-Windows code expects writable and executable pages. Wine handles the difference with faults:
+macOS does not grant write and execute permission together without `MAP_JIT`. WineCX and the
+reference solve this with faults:
 
 1. Map executable pages as read and execute.
-2. On a write fault, change the host page to read and write.
-3. On an execute fault, change the host page back to read and execute and invalidate the instruction cache.
-4. Keep the write protection of each 4K Windows page exact inside a 16K host page.
+2. On a write fault, make the host page read and write.
+3. On an execute fault, make it read and execute and invalidate the instruction cache.
+4. Keep the 4K Windows write protection exact inside a 16K host page.
 
-WineCX ARM64 has a writable and executable flip for the CodeWeavers hacks.
-MetalSharp-Wine replaces it with a more complete fault path.
-Evaluate the WineCX path first. Port MetalSharp-Wine patches 0006, 0007, 0010, 0013, and 0015 only for gaps.
+The lane keeps WineCX's writable and executable flip for mixed PE host pages; the reference has a more
+complete fault path. Measure fault behavior from a normal Terminal. The agent shell used for earlier
+probes suppresses synchronous signals, so a faulting process hangs there.
 
-Host pages are 16K on Apple Silicon.
-A 4K page mode exists on macOS 26 and later, but it needs the entitlement.
-The ARM64 lane therefore uses 16K pages and emulates 4K granularity.
-Patch 0011 and patch 0019 only apply to an entitled process.
+FEX code buffers are different. The `map-jit` patch keeps them `rwx` with `MAP_JIT`, and FEX toggles
+`pthread_jit_write_protect_np` around writes. Wine keeps the 4K write-protection rule for guest pages.
+
+Host pages are 16K on Apple Silicon. A 4K page mode exists on macOS 26 and later, but it needs the
+entitlement. Patches `0011` and `0019` apply only to an entitled process.
 
 ## CPU and startup
 
@@ -118,22 +101,8 @@ Patch 0011 and patch 0019 only apply to an entitled process.
 | FEX features    | FEX reads the synthesized registers to select LSE, LRCPC, AFP, and other paths.                                    |
 | TSO             | FEX emulates the x86 memory ordering model by default. Some programs need it. It costs performance.                |
 | Synchronization | `WINEMSYNC=1` selects msync. The current client sets it by default.                                                |
-
-## What WineCX ARM64 already provides
-
-| Area                    | State in `arm64-1117`                  | Still needed                         |
-| ----------------------- | -------------------------------------- | ------------------------------------ |
-| Low 4 GB release        | `free_pagezero()` with the entitlement | Relocation for an unentitled process |
-| Shared page mapping     | Fixed at `0x7ffe0000`                  | Probe and relocation                 |
-| Shared page loads       | No emulation                           | Fault handler                        |
-| Write and execute pages | CodeWeavers flip                       | Evaluate, then fill gaps             |
-| ARM64 D3DMetal hooks    | Present                                | None                                 |
-| Client surface presents | Present                                | None                                 |
-| Driver heap fallback    | Present                                | None                                 |
-| Metal shader cache      | Per process                            | None                                 |
-| FEX wiring              | None                                   | Registry values or file aliases      |
-| CPU ID registers        | None                                   | Synthesized registers                |
-| Loader build version    | Default SDK                            | Evaluate the `x18` effect            |
+| Native code map | `PEB->EcCodeBitMap` marks native ARM64EC pages. Wine resumes a continuation natively only for those pages.        |
+| FEX code pages  | FEX publishes every code buffer in that bitmap. Without it, a handled fault resumes as emulation and the thread hangs. |
 
 ## Limits
 
@@ -145,5 +114,5 @@ Patch 0011 and patch 0019 only apply to an entitled process.
 | Emulated x86_64    | FEX translates every x86_64 instruction.              |
 | No x86_64 Wine     | The lane is ARM64 only.                               |
 
-These limits are acceptable for Arknights, which is a 64-bit game.
-They are not acceptable for a general-purpose Wine runtime.
+These limits are acceptable for Arknights, a 64-bit game. They are not acceptable for a general Wine
+runtime.

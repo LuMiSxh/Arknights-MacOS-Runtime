@@ -12,6 +12,7 @@ from pathlib import Path
 if __package__:
     from ..shared.build import (
         CLEARED_DOS_STUB,
+        LICENSE_CLI,
         LOADER_SDK_VERSION,
         NIX_PACKAGES,
         ROOT,
@@ -33,6 +34,7 @@ else:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from scripts.shared.build import (
         CLEARED_DOS_STUB,
+        LICENSE_CLI,
         LOADER_SDK_VERSION,
         NIX_PACKAGES,
         ROOT,
@@ -383,6 +385,50 @@ def assemble_arm64(
     shutil.copy2(ROOT / capability_manifest, candidate / capability_manifest)
 
 
+def write_arm64_release_metadata(
+    builder: Builder,
+    candidate: Path,
+    inventory: list[str],
+    nixpkgs_revision: str,
+) -> None:
+    """Write the component inventory and the archive license payload."""
+    root = candidate.parent
+    inventory_path = root / "runtime-component-inventory.tsv"
+    rows = [
+        "component\trole\tsource",
+        (
+            "WineCX/Wine\tWindows compatibility runtime\t"
+            "runtime.lock.json:targets.native-arm64.sources.wine"
+        ),
+        (
+            "DXMT\tDirect3D-to-Metal payload\t"
+            "runtime.lock.json:targets.native-arm64.sources.dxmt"
+        ),
+        "FEX\tx86_64 emulator\truntime.lock.json:targets.native-arm64.sources.fex",
+    ]
+    for output in inventory:
+        rows.append(
+            f"{Path(output).name}\tBundled Nix library\t"
+            f"{output} (nixpkgs {nixpkgs_revision})"
+        )
+    inventory_path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    licenses_directory = root / "Licenses"
+    if licenses_directory.exists():
+        shutil.rmtree(licenses_directory)
+    (root / "NOTICE.md").unlink(missing_ok=True)
+    builder.run(
+        sys.executable,
+        LICENSE_CLI,
+        "generate",
+        "--target",
+        ARM64_TARGET,
+        "--inventory",
+        inventory_path,
+        "--output",
+        root,
+    )
+
+
 def build_arm64(builder: Builder, *, resume: bool, patched: bool) -> Path:
     """Build the native-arm64 canary from the pinned sources."""
 
@@ -430,7 +476,7 @@ def build_arm64(builder: Builder, *, resume: bool, patched: bool) -> Path:
         dxmt_install,
         str(lock["interface"]["runtimeCapabilities"]),
     )
-    bundle_nix_libraries(builder, candidate, outputs)
+    inventory = bundle_nix_libraries(builder, candidate, outputs)
     sign_directory(builder, candidate)
     builder.run(
         sys.executable,
@@ -441,9 +487,15 @@ def build_arm64(builder: Builder, *, resume: bool, patched: bool) -> Path:
         "--require-capabilities",
         "--require-64-bit-only",
     )
+    write_arm64_release_metadata(
+        builder,
+        candidate,
+        inventory,
+        str(lock["build"]["nixpkgs"]["commit"]),
+    )
     return write_archive(
         root,
         "Arknights-MacOS-Runtime-arm64-canary.tar.gz",
-        ("Libraries",),
+        ("Libraries", "Licenses", "NOTICE.md"),
         content_root=candidate.parent,
     )

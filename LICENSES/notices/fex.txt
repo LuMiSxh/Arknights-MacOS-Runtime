@@ -1,0 +1,8 @@
+FEX 4efc3abc8aca8a0d3a8aca1f153ef6c4299f4426
+Copyright (c) 2019 Ryan Houdek <Sonicadvance1@gmail.com> and the FEX contributors.
+
+FEX uses the MIT License. The canonical text is runtime/MIT.txt.
+The runtime contains libarm64ecfex.dll and libwow64fex.dll built from this source.
+The runtime applies the FEX patches that docs/patch-registry.md lists.
+The corresponding-source archive of the same release contains those patches.
+The upstream commit above identifies the source tree.

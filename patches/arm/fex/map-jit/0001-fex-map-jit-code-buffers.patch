@@ -1,0 +1,488 @@
+diff --git a/FEXCore/Source/Interface/Core/Dispatcher/Dispatcher.cpp b/FEXCore/Source/Interface/Core/Dispatcher/Dispatcher.cpp
+--- a/FEXCore/Source/Interface/Core/Dispatcher/Dispatcher.cpp
++++ b/FEXCore/Source/Interface/Core/Dispatcher/Dispatcher.cpp
+@@ -3,6 +3,7 @@
+ #include "Common/VectorRegType.h"
+ #include "Interface/Context/Context.h"
+ #include "Interface/Core/CPUBackend.h"
++#include "Interface/Core/SharedCodeBufferManager.h"
+ #include "Interface/Core/Dispatcher/Dispatcher.h"
+ #include "Interface/Core/LookupCache.h"
+ #include "Utils/MemberFunctionToPointer.h"
+@@ -36,9 +37,21 @@ static void SleepThread(FEXCore::Context::ContextImpl* CTX, FEXCore::Core::CpuSt
+ 
+ constexpr size_t MAX_DISPATCHER_CODE_SIZE = FEXCore::Utils::FEX_PAGE_SIZE * 4;
+ 
++static void* AllocDispatcherBuffer(size_t Size) {
++  if (CodeBufferAllocHook) {
++    return CodeBufferAllocHook(Size);
++  }
++  return FEXCore::Allocator::VirtualAlloc(Size, true);
++}
++
+ Dispatcher::Dispatcher(FEXCore::Context::ContextImpl* ctx)
+-  : Arm64Emitter(ctx, FEXCore::Allocator::VirtualAlloc(MAX_DISPATCHER_CODE_SIZE, true), MAX_DISPATCHER_CODE_SIZE)
++  : Arm64Emitter(ctx, AllocDispatcherBuffer(MAX_DISPATCHER_CODE_SIZE), MAX_DISPATCHER_CODE_SIZE)
+   , CTX {ctx} {
++  FromHook = CodeBufferAllocHook != nullptr;
++  if (FromHook && CodeWriteProtectHook) {
++    CodeWriteProtectHook(reinterpret_cast<void*>(GetBufferBase()), MAX_DISPATCHER_CODE_SIZE);
++  }
++
+   EmitDispatcher();
+ 
+   FEXCore::Allocator::VirtualName("FEXMem_Misc", reinterpret_cast<void*>(GetBufferBase()), MAX_DISPATCHER_CODE_SIZE);
+@@ -47,7 +60,11 @@ Dispatcher::Dispatcher(FEXCore::Context::ContextImpl* ctx)
+ Dispatcher::~Dispatcher() {
+   auto BufferSize = GetBufferSize();
+   if (BufferSize) {
+-    FEXCore::Allocator::VirtualFree(GetBufferBase(), BufferSize);
++    if (FromHook && CodeBufferFreeHook) {
++      CodeBufferFreeHook(reinterpret_cast<void*>(GetBufferBase()), BufferSize);
++    } else {
++      FEXCore::Allocator::VirtualFree(GetBufferBase(), BufferSize);
++    }
+   }
+ }
+ 
+@@ -601,6 +618,9 @@ void Dispatcher::EmitDispatcher() {
+   Start = reinterpret_cast<uint64_t>(DispatchPtr);
+   End = GetCursorAddress<uint64_t>();
+   ClearICache(reinterpret_cast<void*>(DispatchPtr), End - reinterpret_cast<uint64_t>(DispatchPtr));
++  if (FEXCore::CPU::CodeWriteFlushHook) {
++    FEXCore::CPU::CodeWriteFlushHook(reinterpret_cast<void*>(DispatchPtr), End - reinterpret_cast<uint64_t>(DispatchPtr));
++  }
+ 
+   if (CTX->Config.BlockJITNaming()) {
+     fextl::string Name = fextl::fmt::format("Dispatch_{}", FHU::Syscalls::gettid());
+diff --git a/FEXCore/Source/Interface/Core/Dispatcher/Dispatcher.h b/FEXCore/Source/Interface/Core/Dispatcher/Dispatcher.h
+--- a/FEXCore/Source/Interface/Core/Dispatcher/Dispatcher.h
++++ b/FEXCore/Source/Interface/Core/Dispatcher/Dispatcher.h
+@@ -69,6 +69,7 @@ protected:
+ 
+   AsmDispatch DispatchPtr;
+   JITCallback CallbackPtr;
++  bool FromHook {};
+ private:
+   /**
+    * @name Dispatch Helper functions
+diff --git a/FEXCore/Source/Interface/Core/JIT/JIT.cpp b/FEXCore/Source/Interface/Core/JIT/JIT.cpp
+--- a/FEXCore/Source/Interface/Core/JIT/JIT.cpp
++++ b/FEXCore/Source/Interface/Core/JIT/JIT.cpp
+@@ -15,6 +15,7 @@ $end_info$
+ #include "Interface/Core/LookupCache.h"
+ #include "Interface/Core/Dispatcher/Dispatcher.h"
+ #include "Interface/Core/Interpreter/InterpreterOps.h"
++#include "Interface/Core/SharedCodeBufferManager.h"
+ #include "Interface/Core/JIT/DebugData.h"
+ #include "Interface/Core/JIT/JITClass.h"
+ #include "Interface/IR/Passes/RegisterAllocationPass.h"
+@@ -511,8 +512,14 @@ static void DirectBlockDelinker(FEXCore::Context::ExitFunctionLinkData* Record,
+     BranchEmit.b(BranchOffset);
+   }
+ 
++  if (FEXCore::CPU::CodeWriteProtectHook) {
++    FEXCore::CPU::CodeWriteProtectHook(reinterpret_cast<void*>(CallerAddress), 4);
++  }
+   std::atomic_ref<uint32_t>(*reinterpret_cast<uint32_t*>(CallerAddress)).store(BranchInst, std::memory_order::relaxed);
+   ARMEmitter::Emitter::ClearICache(reinterpret_cast<void*>(CallerAddress), 4);
++  if (FEXCore::CPU::CodeWriteFlushHook) {
++    FEXCore::CPU::CodeWriteFlushHook(reinterpret_cast<void*>(CallerAddress), 4);
++  }
+ }
+ 
+ static void IndirectBlockDelinker(FEXCore::Context::ExitFunctionLinkData* Record) {
+@@ -522,8 +529,14 @@ static void IndirectBlockDelinker(FEXCore::Context::ExitFunctionLinkData* Record
+   // Restore branch +2 instructions to jump to the linker block
+   BranchEmit.b(0x2);
+ 
++  if (FEXCore::CPU::CodeWriteProtectHook) {
++    FEXCore::CPU::CodeWriteProtectHook(reinterpret_cast<void*>(JumpThunkStartAddress), 4);
++  }
+   std::atomic_ref<uint32_t>(*reinterpret_cast<uint32_t*>(JumpThunkStartAddress)).store(BranchInst, std::memory_order::relaxed);
+   ARMEmitter::Emitter::ClearICache(reinterpret_cast<void*>(JumpThunkStartAddress), 4);
++  if (FEXCore::CPU::CodeWriteFlushHook) {
++    FEXCore::CPU::CodeWriteFlushHook(reinterpret_cast<void*>(JumpThunkStartAddress), 4);
++  }
+ 
+   // No need to reset HostCode here as the exit linker pointer is stored separately, and if the block is relinked it will be updated.
+ }
+@@ -589,8 +602,14 @@ uint64_t Arm64JITCore::ExitFunctionLink(FEXCore::Core::CpuStateFrame* Frame, FEX
+         GuestRip, Record, [](FEXCore::Context::ExitFunctionLinkData* Record) { DirectBlockDelinker(Record, false); }, lk);
+     }
+ 
++    if (FEXCore::CPU::CodeWriteProtectHook) {
++      FEXCore::CPU::CodeWriteProtectHook(reinterpret_cast<void*>(CallerAddress), 4);
++    }
+     std::atomic_ref<uint32_t>(*reinterpret_cast<uint32_t*>(CallerAddress)).store(BranchInst, std::memory_order::relaxed);
+     ARMEmitter::Emitter::ClearICache(reinterpret_cast<void*>(CallerAddress), 4);
++    if (FEXCore::CPU::CodeWriteFlushHook) {
++      FEXCore::CPU::CodeWriteFlushHook(reinterpret_cast<void*>(CallerAddress), 4);
++    }
+   } else {
+     // This case is common between calls and jumps as the thunk callsite can be left untouched.
+     std::atomic_ref<uint64_t>(Record->HostCode).store(HostCode, std::memory_order::seq_cst);
+@@ -602,8 +621,14 @@ uint64_t Arm64JITCore::ExitFunctionLink(FEXCore::Core::CpuStateFrame* Frame, FEX
+     uint32_t LdrInst = 0;
+     ARMEmitter::Emitter LdrEmit(reinterpret_cast<uint8_t*>(&LdrInst), 4);
+     LdrEmit.ldr(TMP1, reinterpret_cast<uint64_t>(&Record->HostCode) - JumpThunkStartAddress);
++    if (FEXCore::CPU::CodeWriteProtectHook) {
++      FEXCore::CPU::CodeWriteProtectHook(reinterpret_cast<void*>(JumpThunkStartAddress), 4);
++    }
+     std::atomic_ref<uint32_t>(*reinterpret_cast<uint32_t*>(JumpThunkStartAddress)).store(LdrInst, std::memory_order::relaxed);
+     ARMEmitter::Emitter::ClearICache(reinterpret_cast<void*>(JumpThunkStartAddress), 4);
++    if (FEXCore::CPU::CodeWriteFlushHook) {
++      FEXCore::CPU::CodeWriteFlushHook(reinterpret_cast<void*>(JumpThunkStartAddress), 4);
++    }
+ 
+     Thread->LookupCache->AddBlockLink(GuestRip, Record, IndirectBlockDelinker, lk);
+   }
+@@ -1124,6 +1149,9 @@ CPUBackend::CompiledCode Arm64JITCore::CompileCode(uint64_t Entry, uint64_t Size
+   TempCodeBufferAllocator.DelayedDisownBuffer();
+ 
+   ClearICache(CodeBegin, CodeOnlySize);
++  if (FEXCore::CPU::CodeWriteFlushHook) {
++    FEXCore::CPU::CodeWriteFlushHook(CodeBegin, CodeOnlySize);
++  }
+ 
+ #ifdef VIXL_DISASSEMBLER
+   if (Disassemble() & FEXCore::Config::Disassemble::STATS) {
+@@ -1165,6 +1193,9 @@ CPUBackend::CompiledCode Arm64JITCore::LoadCachedCode(std::span<const uint8_t> H
+   uint8_t* Dest = AllocatedInfo.BufferAllocationOffset;
+   memcpy(Dest, HostBytes.data(), HostBytes.size());
+   ClearICache(Dest, HostBytes.size());
++  if (FEXCore::CPU::CodeWriteFlushHook) {
++    FEXCore::CPU::CodeWriteFlushHook(Dest, HostBytes.size());
++  }
+ 
+   CPUBackend::CompiledCode Result;
+   Result.BlockBegin = Dest;
+diff --git a/FEXCore/Source/Interface/Core/SharedCodeBufferManager.cpp b/FEXCore/Source/Interface/Core/SharedCodeBufferManager.cpp
+--- a/FEXCore/Source/Interface/Core/SharedCodeBufferManager.cpp
++++ b/FEXCore/Source/Interface/Core/SharedCodeBufferManager.cpp
+@@ -12,20 +12,32 @@
+ #endif
+ 
+ namespace FEXCore::CPU {
++void (*CodeWriteProtectHook)(void*, size_t) {};
++void (*CodeWriteFlushHook)(void*, size_t) {};
++void* (*CodeBufferAllocHook)(size_t) {};
++void (*CodeBufferFreeHook)(void*, size_t) {};
++
+ static constexpr size_t INITIAL_CODE_SIZE = 1024 * 1024 * 16;
+ // We don't want to move above 128MB atm because that means we will have to encode longer jumps
+ static constexpr size_t MAX_CODE_SIZE = 1024 * 1024 * 128;
+ 
+ CodeBuffer::CodeBuffer(size_t Size)
+   : AllocatedSize(Size) {
+-  Ptr = static_cast<uint8_t*>(FEXCore::Allocator::VirtualAlloc(Size, true));
++  FromHook = CodeBufferAllocHook != nullptr;
++  if (FromHook) {
++    Ptr = static_cast<uint8_t*>(CodeBufferAllocHook(Size));
++  } else {
++    Ptr = static_cast<uint8_t*>(FEXCore::Allocator::VirtualAlloc(Size, true));
++  }
+   LOGMAN_THROW_A_FMT(!!Ptr, "Couldn't allocate code buffer");
+ 
+-  // Protect the last page of the allocated buffer to trigger SIGSEGV on write access
+-  uintptr_t LastPageAddr = AlignDown(reinterpret_cast<uintptr_t>(Ptr) + Size - 1, FEXCore::Utils::FEX_PAGE_SIZE);
+-  if (!FEXCore::Allocator::VirtualProtect(reinterpret_cast<void*>(LastPageAddr), FEXCore::Utils::FEX_PAGE_SIZE,
+-                                          FEXCore::Allocator::ProtectOptions::None)) {
+-    LogMan::Msg::EFmt("Failed to mprotect last page of code buffer.");
++  if (!FromHook) {
++    // Protect the last page of the allocated buffer to trigger SIGSEGV on write access
++    uintptr_t LastPageAddr = AlignDown(reinterpret_cast<uintptr_t>(Ptr) + Size - 1, FEXCore::Utils::FEX_PAGE_SIZE);
++    if (!FEXCore::Allocator::VirtualProtect(reinterpret_cast<void*>(LastPageAddr), FEXCore::Utils::FEX_PAGE_SIZE,
++                                            FEXCore::Allocator::ProtectOptions::None)) {
++      LogMan::Msg::EFmt("Failed to mprotect last page of code buffer.");
++    }
+   }
+ 
+   FEXCore::Allocator::VirtualName("FEXMemJIT", Ptr, Size);
+@@ -40,7 +52,11 @@ CodeBuffer::CodeBuffer(size_t Size)
+ }
+ 
+ CodeBuffer::~CodeBuffer() {
+-  FEXCore::Allocator::VirtualFree(Ptr, AllocatedSize);
++  if (FromHook && CodeBufferFreeHook) {
++    CodeBufferFreeHook(Ptr, AllocatedSize);
++  } else {
++    FEXCore::Allocator::VirtualFree(Ptr, AllocatedSize);
++  }
+ }
+ 
+ fextl::shared_ptr<CodeBuffer> SharedCodeBufferManager::AllocateNew(size_t Size) {
+diff --git a/FEXCore/Source/Interface/Core/SharedCodeBufferManager.h b/FEXCore/Source/Interface/Core/SharedCodeBufferManager.h
+--- a/FEXCore/Source/Interface/Core/SharedCodeBufferManager.h
++++ b/FEXCore/Source/Interface/Core/SharedCodeBufferManager.h
+@@ -20,6 +20,17 @@ struct GuestToHostMap;
+ }
+ 
+ namespace FEXCore::CPU {
++// Optional platform hook. Called with the exact range that is about to be written, so that
++// hosts which cannot map a page writable and executable at once can make it writable first.
++// Null on hosts where the code buffer is already writable.
++FEX_DEFAULT_VISIBILITY extern void (*CodeWriteProtectHook)(void* Address, size_t Size);
++// Paired with CodeWriteProtectHook. Called after code has been written and is about to run.
++FEX_DEFAULT_VISIBILITY extern void (*CodeWriteFlushHook)(void* Address, size_t Size);
++// Optional platform allocator for executable code buffers. When set, the buffer is mapped by
++// the platform and CodeBuffer skips the Windows guard-page protection.
++FEX_DEFAULT_VISIBILITY extern void* (*CodeBufferAllocHook)(size_t Size);
++FEX_DEFAULT_VISIBILITY extern void (*CodeBufferFreeHook)(void* Ptr, size_t Size);
++
+ struct CodeBuffer {
+   fextl::unique_ptr<GuestToHostMap> LookupCache;
+ 
+@@ -60,6 +71,10 @@ struct CodeBuffer {
+     }
+ 
+     // Managed to fit.
++    if (CodeWriteProtectHook) {
++      CodeWriteProtectHook(ExpectedOffset, Size);
++    }
++
+     return {
+       .BufferBase = Ptr,
+       .BufferAllocationOffset = ExpectedOffset,
+@@ -95,6 +110,7 @@ private:
+   uint8_t* Ptr;
+   uint8_t* CodeBufferEnd;
+   size_t AllocatedSize; // including guard page; see UsableSize()
++  bool FromHook {};
+ 
+   // Code buffer allocation information.
+   std::atomic<uint8_t*> CodeBufferOffset {};
+diff --git a/Source/Windows/ARM64EC/Module.cpp b/Source/Windows/ARM64EC/Module.cpp
+--- a/Source/Windows/ARM64EC/Module.cpp
++++ b/Source/Windows/ARM64EC/Module.cpp
+@@ -66,6 +66,13 @@ namespace Exception {
+ class ECSyscallHandler;
+ }
+ 
++namespace FEXCore::CPU {
++extern void (*CodeWriteProtectHook)(void*, size_t);
++extern void (*CodeWriteFlushHook)(void*, size_t);
++extern void* (*CodeBufferAllocHook)(size_t);
++extern void (*CodeBufferFreeHook)(void*, size_t);
++}
++
+ extern "C" {
+ extern IMAGE_DOS_HEADER __ImageBase; // Provided by the linker
+ 
+@@ -608,6 +615,23 @@ NTSTATUS ProcessInit() {
+   FEX::Windows::UnixLib::Init(NtDll);
+ 
+   {
++    if (FEX::Windows::UnixLib::JitAvailable()) {
++      // macOS enforces write-xor-execute. The unix library maps the code buffers with MAP_JIT,
++      // so they stay RWX and only the per-thread write protection changes around code writes.
++      FEXCore::CPU::CodeWriteProtectHook = [](void*, size_t) {
++        FEX::Windows::UnixLib::JitWriteProtect(false);
++      };
++      FEXCore::CPU::CodeWriteFlushHook = [](void*, size_t) {
++        FEX::Windows::UnixLib::JitWriteProtect(true);
++      };
++      FEXCore::CPU::CodeBufferAllocHook = [](size_t Size) -> void* {
++        return FEX::Windows::UnixLib::JitAlloc(Size);
++      };
++      FEXCore::CPU::CodeBufferFreeHook = [](void* Ptr, size_t Size) {
++        FEX::Windows::UnixLib::JitFree(Ptr, Size);
++      };
++    }
++
+     auto HostFeatures = FEX::Windows::CPUFeatures::FetchHostFeatures(IsWine, FEXCore::HostFeatures::HostTypeEnum::Arm64ec);
+     CTX = FEXCore::Context::Context::CreateNewContext(HostFeatures);
+   }
+diff --git a/Source/Windows/Common/FEXUnixLib.cpp b/Source/Windows/Common/FEXUnixLib.cpp
+--- a/Source/Windows/Common/FEXUnixLib.cpp
++++ b/Source/Windows/Common/FEXUnixLib.cpp
+@@ -168,6 +168,50 @@ bool SetKernelUnalignedAtomicControl(uint64_t Flags) {
+   return NtSetInformationProcess(NtCurrentProcess(), ProcessFexUnalignAtomic, &Flags, sizeof(Flags)) == STATUS_SUCCESS;
+ }
+ 
++void JitWriteProtect(bool Enable) {
++  if (UnixLibAvailable()) {
++    FEXUnixLib_JitWriteProtect Args {
++      .Enable = Enable,
++    };
++
++    Call(FEXUnixLibFunctions::JitWriteProtect, &Args);
++  }
++}
++
++bool JitAvailable() {
++  return UnixLibAvailable();
++}
++
++void* JitAlloc(size_t Size) {
++  if (!UnixLibAvailable()) {
++    return nullptr;
++  }
++
++  FEXUnixLib_JitAlloc Args {
++    .Size = Size,
++    .Ptr = nullptr,
++  };
++
++  if (Call(FEXUnixLibFunctions::JitAlloc, &Args) != STATUS_SUCCESS) {
++    return nullptr;
++  }
++
++  return Args.Ptr;
++}
++
++void JitFree(void* Ptr, size_t Size) {
++  if (!UnixLibAvailable()) {
++    return;
++  }
++
++  FEXUnixLib_JitFree Args {
++    .Ptr = Ptr,
++    .Size = Size,
++  };
++
++  Call(FEXUnixLibFunctions::JitFree, &Args);
++}
++
+ void VirtualTHPControl(const void* Ptr, size_t Size, FEXCore::Allocator::THPControl Control) {
+   if (UnixLibAvailable()) {
+     // UnixLib path.
+diff --git a/Source/Windows/Common/FEXUnixLib.h b/Source/Windows/Common/FEXUnixLib.h
+--- a/Source/Windows/Common/FEXUnixLib.h
++++ b/Source/Windows/Common/FEXUnixLib.h
+@@ -36,6 +36,26 @@ bool TryEnableHardwareTSO();
+  */
+ bool SetKernelUnalignedAtomicControl(uint64_t Flags);
+ 
++/**
++ * @brief Toggle the per-thread MAP_JIT write protection on macOS.
++ */
++void JitWriteProtect(bool Enable);
++
++/**
++ * @brief Whether the unix library can allocate MAP_JIT memory.
++ */
++bool JitAvailable();
++
++/**
++ * @brief Allocate executable code memory that permits writes through the MAP_JIT toggle.
++ */
++void* JitAlloc(size_t Size);
++
++/**
++ * @brief Release memory returned by JitAlloc.
++ */
++void JitFree(void* Ptr, size_t Size);
++
+ void VirtualTHPControl(const void* Ptr, size_t Size, FEXCore::Allocator::THPControl Control);
+ void VirtualName(const char* Name, const void* Ptr, size_t Size);
+ 
+diff --git a/Source/Windows/UnixLib/FEXUnixLib.cpp b/Source/Windows/UnixLib/FEXUnixLib.cpp
+--- a/Source/Windows/UnixLib/FEXUnixLib.cpp
++++ b/Source/Windows/UnixLib/FEXUnixLib.cpp
+@@ -4,6 +4,9 @@
+ #include <fcntl.h>
+ #include <string>
+ #include <sys/mman.h>
++#ifdef __APPLE__
++#include <pthread.h>
++#endif
+ #ifndef __APPLE__
+ #include <sys/prctl.h>
+ #endif
+@@ -24,6 +27,7 @@ using unixlib_entry_t = NTSTATUS (*)(void*);
+ [[maybe_unused]] constexpr NTSTATUS STATUS_SUCCESS = 0;
+ [[maybe_unused]] constexpr NTSTATUS STATUS_NOT_SUPPORTED = 0xC00000BB;
+ [[maybe_unused]] constexpr NTSTATUS STATUS_INTERNAL_ERROR = 0xC00000E5;
++[[maybe_unused]] constexpr NTSTATUS STATUS_NO_MEMORY = 0xC0000017;
+ 
+ #ifndef __APPLE__
+ #ifndef PR_GET_MEM_MODEL
+@@ -217,6 +221,43 @@ static NTSTATUS FEXUnixLib_DeleteSHMStatsFileHandler([[maybe_unused]] void* _Arg
+ #endif
+ }
+ 
++static NTSTATUS FEXUnixLib_JitWriteProtectHandler([[maybe_unused]] void* _Args) {
++  auto Args = reinterpret_cast<const FEXUnixLib_JitWriteProtect*>(_Args);
++#ifdef __APPLE__
++  pthread_jit_write_protect_np(Args->Enable ? 1 : 0);
++  return STATUS_SUCCESS;
++#else
++  return STATUS_NOT_SUPPORTED;
++#endif
++}
++
++static NTSTATUS FEXUnixLib_JitAllocHandler(void* _Args) {
++  auto Args = reinterpret_cast<FEXUnixLib_JitAlloc*>(_Args);
++#ifdef __APPLE__
++  void* Ptr = mmap(nullptr, static_cast<size_t>(Args->Size), PROT_READ | PROT_WRITE | PROT_EXEC,
++                   MAP_PRIVATE | MAP_ANON | MAP_JIT, -1, 0);
++  if (Ptr == MAP_FAILED) {
++    return STATUS_NO_MEMORY;
++  }
++  Args->Ptr = Ptr;
++  return STATUS_SUCCESS;
++#else
++  return STATUS_NOT_SUPPORTED;
++#endif
++}
++
++static NTSTATUS FEXUnixLib_JitFreeHandler(void* _Args) {
++  auto Args = reinterpret_cast<const FEXUnixLib_JitFree*>(_Args);
++#ifdef __APPLE__
++  if (munmap(Args->Ptr, static_cast<size_t>(Args->Size))) {
++    return STATUS_INTERNAL_ERROR;
++  }
++  return STATUS_SUCCESS;
++#else
++  return STATUS_NOT_SUPPORTED;
++#endif
++}
++
+ extern "C" const unixlib_entry_t __wine_unix_call_funcs[] = {
+   FEXUnixLib_SetHardwareTSOControlHandler,
+   FEXUnixLib_SetKernelUnalignedAtomicControlHandler,
+@@ -224,6 +265,9 @@ extern "C" const unixlib_entry_t __wine_unix_call_funcs[] = {
+   FEXUnixLib_SetVMANameHandler,
+   FEXUnixLib_GetSHMStatsVMAHandler,
+   FEXUnixLib_DeleteSHMStatsFileHandler,
++  FEXUnixLib_JitWriteProtectHandler,
++  FEXUnixLib_JitAllocHandler,
++  FEXUnixLib_JitFreeHandler,
+ };
+ 
+ static_assert(sizeof(__wine_unix_call_funcs) / sizeof(__wine_unix_call_funcs[0]) == ToUnderlying(FEXUnixLibFunctions::MAX));
+diff --git a/Source/Windows/UnixLib/FEXUnixLib.h b/Source/Windows/UnixLib/FEXUnixLib.h
+--- a/Source/Windows/UnixLib/FEXUnixLib.h
++++ b/Source/Windows/UnixLib/FEXUnixLib.h
+@@ -10,6 +10,9 @@ enum class FEXUnixLibFunctions : uint32_t {
+   SetVMAName,
+   GetSHMStatsVMA,
+   DeleteSHMStatsFile,
++  JitWriteProtect,
++  JitAlloc,
++  JitFree,
+   MAX,
+ };
+ 
+@@ -51,3 +54,20 @@ struct FEXUnixLib_GetSHMStatsVMA {
+   uint32_t MaxSize;
+ };
+ static_assert(sizeof(FEXUnixLib_GetSHMStatsVMA) == 16);
++
++struct FEXUnixLib_JitWriteProtect {
++  bool Enable;
++};
++static_assert(sizeof(FEXUnixLib_JitWriteProtect) == 1);
++
++struct FEXUnixLib_JitAlloc {
++  uint64_t Size;
++  void* Ptr;
++};
++static_assert(sizeof(FEXUnixLib_JitAlloc) == 16);
++
++struct FEXUnixLib_JitFree {
++  void* Ptr;
++  uint64_t Size;
++};
++static_assert(sizeof(FEXUnixLib_JitFree) == 16);

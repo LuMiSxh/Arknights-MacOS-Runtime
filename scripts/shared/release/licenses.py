@@ -35,7 +35,14 @@ SCHEMA_VERSION = 1
 BUILD_SCRIPT = "scripts/shared/build.py"
 NIX_INVENTORY_ROLE = "Bundled Nix library"
 BUILD_ONLY_NIX_PACKAGES = frozenset(("vulkan-headers",))
-REQUIRED_COMPONENTS = frozenset(("Wine", "DXMT", "MoltenVK"))
+TARGET_COMPONENTS = {
+    "rosetta-x86_64": frozenset(("Wine", "DXMT", "MoltenVK")),
+    "native-arm64": frozenset(("Wine", "DXMT", "FEX")),
+}
+TARGETS = tuple(TARGET_COMPONENTS)
+DEFAULT_TARGET = "rosetta-x86_64"
+# The x86_64 release verifier uses the default target's components.
+REQUIRED_COMPONENTS = TARGET_COMPONENTS[DEFAULT_TARGET]
 STATUSES = frozenset(("verified", "unverified"))
 BASES = frozenset(("upstream-declared",))
 UNKNOWN_LICENSE = "NOASSERTION"
@@ -219,6 +226,15 @@ def _component_problems(
     ):
         problem("nixPackages must be a non-empty list of names")
 
+    targets = component.get("targets")
+    if targets is not None and (
+        not isinstance(targets, list)
+        or not targets
+        or not all(isinstance(item, str) and item in TARGETS for item in targets)
+        or len(targets) != len(set(targets))
+    ):
+        problem("targets must be a non-empty list of known target names")
+
     lock_key = component.get("lock")
     if isinstance(lock_key, str):
         pin = _lock_entry(lock, lock_key)
@@ -251,9 +267,12 @@ def validate_index(
     licenses_root: Path,
     lock: dict[str, Any],
     nix_packages: set[str],
+    target: str = DEFAULT_TARGET,
 ) -> None:
     """Raise `LicenseError` with every problem found in the index."""
 
+    if target not in TARGETS:
+        raise LicenseError(f"unknown target: {target}")
     problems: list[str] = []
     if index.get("schemaVersion") != SCHEMA_VERSION:
         problems.append(f"schemaVersion must be {SCHEMA_VERSION}")
@@ -287,7 +306,7 @@ def validate_index(
         for item in index.get("excluded", [])
         if isinstance(item, dict)
     }
-    for required in sorted(REQUIRED_COMPONENTS - seen):
+    for required in sorted(TARGET_COMPONENTS[target] - seen):
         problems.append(f"shipped component has no entry: {required}")
     for package in sorted(nix_packages - covered):
         if package not in BUILD_ONLY_NIX_PACKAGES:
@@ -327,13 +346,22 @@ def parse_inventory(text: str) -> list[dict[str, str]]:
 
 
 def resolve_shipped(
-    index: dict[str, Any], libraries: list[dict[str, str]]
+    index: dict[str, Any],
+    libraries: list[dict[str, str]],
+    target: str = DEFAULT_TARGET,
 ) -> dict[str, Any]:
     """Return the index of the shipped components with the realised Nix versions."""
 
+    if target not in TARGETS:
+        raise LicenseError(f"unknown target: {target}")
+    shipping = [
+        component
+        for component in index["components"]
+        if target in component.get("targets", [target])
+    ]
     by_package = {
         package: component
-        for component in index["components"]
+        for component in shipping
         for package in component.get("nixPackages", [])
     }
     realised: dict[str, list[dict[str, str]]] = {}
@@ -349,7 +377,7 @@ def resolve_shipped(
             "shipped Nix library has no license entry: " + ", ".join(sorted(unknown))
         )
     shipped = []
-    for component in index["components"]:
+    for component in shipping:
         if "nixPackages" not in component:
             shipped.append(component)
         elif component["name"] in realised:
@@ -403,16 +431,34 @@ def render_notice(index: dict[str, Any], licenses_root: Path) -> str:
             "",
             *(f"    {line}".rstrip() for line in text.splitlines()),
         ]
-    lines += [
-        "",
-        "## Source code",
-        "",
-        "- Wine and DXMT: The corresponding-source archive of the same release contains the modified source and the build scripts.",
-        "- MoltenVK: This project does not build MoltenVK. The upstream commit in the table identifies the source.",
-        f"- Nix libraries: The release does not contain their source. The nixpkgs revision `{index['nixpkgs']['commit']}` identifies the exact packages.",
-        "  An offer of the corresponding source for these libraries is not yet in place.",
-        "",
-    ]
+    names = {item["name"] for item in components}
+    sources: list[str] = []
+    if {"Wine", "DXMT"} & names:
+        sources.append(
+            "- Wine and DXMT: The corresponding-source archive of the same release "
+            "contains the modified source and the build scripts."
+        )
+    if "FEX" in names:
+        sources.append(
+            "- FEX: The corresponding-source archive contains the patches. "
+            "The upstream commit in the table identifies the source."
+        )
+    if "MoltenVK" in names:
+        sources.append(
+            "- MoltenVK: This project does not build MoltenVK. "
+            "The upstream commit in the table identifies the source."
+        )
+    if any("nixPackages" in item for item in components):
+        sources.extend(
+            [
+                (
+                    f"- Nix libraries: The release does not contain their source. "
+                    f"The nixpkgs revision `{index['nixpkgs']['commit']}` identifies the exact packages."
+                ),
+                "  An offer of the corresponding source for these libraries is not yet in place.",
+            ]
+        )
+    lines += ["", "## Source code", "", *sources, ""]
     return "\n".join(lines)
 
 
@@ -421,6 +467,7 @@ def generate(
     output: Path | None,
     *,
     inventory: Path | None = None,
+    target: str = DEFAULT_TARGET,
 ) -> dict[str, Any]:
     """Validate the index. If `output` is set, write `Licenses/` and `NOTICE.md` there."""
 
@@ -435,6 +482,7 @@ def generate(
         licenses_root=licenses_root,
         lock=lock,
         nix_packages=direct_nix_packages(repository_root / BUILD_SCRIPT),
+        target=target,
     )
     shipped = index
     if inventory is not None:
@@ -442,7 +490,7 @@ def generate(
             text = inventory.read_text(encoding="utf-8")
         except OSError as problem:
             raise LicenseError(f"cannot read inventory: {inventory}") from problem
-        shipped = resolve_shipped(index, parse_inventory(text))
+        shipped = resolve_shipped(index, parse_inventory(text), target=target)
     if output is None:
         return shipped
 
@@ -487,6 +535,12 @@ def main() -> int:
         "--inventory", type=Path, help="runtime-component-inventory.tsv"
     )
     command.add_argument(
+        "--target",
+        choices=TARGETS,
+        default=DEFAULT_TARGET,
+        help="runtime target whose licenses to assemble",
+    )
+    command.add_argument(
         "--output", type=Path, help="directory for Licenses/ and NOTICE.md"
     )
     command.add_argument(
@@ -502,6 +556,7 @@ def main() -> int:
             REPOSITORY_ROOT,
             None if arguments.check else arguments.output,
             inventory=arguments.inventory,
+            target=arguments.target,
         )
     except (LicenseError, OSError) as problem:
         for line in str(problem).splitlines():

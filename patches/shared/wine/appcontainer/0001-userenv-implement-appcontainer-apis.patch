@@ -123,3 +123,57 @@ diff --git a/dlls/userenv/userenv_main.c b/dlls/userenv/userenv_main.c
 +    *folder_path = NULL;
      return E_NOTIMPL;
  }
+diff --git a/dlls/kernelbase/kernelbase.spec b/dlls/kernelbase/kernelbase.spec
+index ae8f3486..dc4c04aa 100644
+--- a/dlls/kernelbase/kernelbase.spec
++++ b/dlls/kernelbase/kernelbase.spec
+@@ -177,7 +177,7 @@
+ @ stdcall CopySid(long ptr ptr)
+ # @ stub CouldMultiUserAppsBehaviorBePossibleForPackage
+ @ stdcall CreateActCtxW(ptr)
+-# @ stub CreateAppContainerToken
++@ stdcall CreateAppContainerToken(long ptr ptr)
+ @ stdcall CreateBoundaryDescriptorW(wstr long)
+ @ stdcall CreateConsoleScreenBuffer(long long ptr long ptr)
+ @ stdcall CreateDirectoryA(str ptr)
+@@ -421,7 +421,7 @@
+ # @ stub GetAdjustObjectAttributesForPrivateNamespaceRoutine
+ # @ stub GetAlternatePackageRoots
+ # @ stub GetAppContainerAce
+-# @ stub GetAppContainerNamedObjectPath
++@ stdcall GetAppContainerNamedObjectPath(long ptr long ptr ptr)
+ # @ stub GetAppDataFolder
+ # @ stub GetAppModelVersion
+ # @ stub GetApplicationRecoveryCallback
+diff --git a/dlls/kernelbase/security.c b/dlls/kernelbase/security.c
+index 7642574f..34382b29 100644
+--- a/dlls/kernelbase/security.c
++++ b/dlls/kernelbase/security.c
+@@ -1607,3 +1607,27 @@ done:
+     }
+     return set_ntstatus( status );
+ }
++
++
++/***********************************************************************
++ *           CreateAppContainerToken   (kernelbase.@)
++ */
++BOOL WINAPI CreateAppContainerToken( HANDLE token, void *capabilities, PHANDLE out_token )
++{
++    FIXME( "(%p, %p, %p): stub\n", token, capabilities, out_token );
++    if (out_token) *out_token = NULL;
++    SetLastError( ERROR_CALL_NOT_IMPLEMENTED );
++    return FALSE;
++}
++
++/***********************************************************************
++ *           GetAppContainerNamedObjectPath   (kernelbase.@)
++ */
++BOOL WINAPI GetAppContainerNamedObjectPath( HANDLE token, PSID sid, ULONG length,
++                                            LPWSTR path, PULONG return_length )
++{
++    FIXME( "(%p, %p, %lu, %p, %p): stub\n", token, sid, length, path, return_length );
++    if (return_length) *return_length = 0;
++    SetLastError( ERROR_CALL_NOT_IMPLEMENTED );
++    return FALSE;
++}

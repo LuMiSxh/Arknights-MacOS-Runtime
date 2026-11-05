@@ -76,6 +76,10 @@ All ACE patches use the exact gate `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`. A missing,
     - Scope: ACE gate and negative relative waits only; other waits are unchanged.
     - Checks: focused wait tests.
 
+The `native-arm64` target also carries [`wine-arm64-ace-context`](#arm64-ace-eflags) and
+[`wine-arm64-ace-thread-entry`](#arm64-ace-thread-entry). Both are target-only and have no runtime
+gate.
+
 ## CEF
 
 The CEF family uses the exact gate `ARKNIGHTS_RUNTIME_CEF_COMPAT=1`. An absent, `0`, or invalid value keeps Wine's normal route. If the CEF variable is absent, `ARKNIGHTS_RUNTIME_CN_COMPAT=1` keeps the legacy Bilibili behavior.
@@ -113,9 +117,11 @@ Chromium's asynchronous DNS resolver calls `WSAIoctl(SIO_ADDRESS_LIST_SORT)` to 
 - Inactive behavior: Not applicable; the exports exist in both lanes.
 - Automated gate: Hash, clean `git apply --check`, and builds for both targets.
 - Manual gate: Chromium's sandbox loads the AppContainer functions without a process-local `userenv.dll`.
-- Removal: Drop when WineCX implements the remaining AppContainer `userenv.dll` surface.
+- Removal: Drop when WineCX implements the remaining AppContainer surface.
 
 Chromium's sandbox loads these functions by name and checks that they resolve. Wine 11.17 exports `CreateAppContainerProfile` only as a stub. The patch adds `DeriveAppContainerSidFromAppContainerName`, `DeleteAppContainerProfile`, `GetAppContainerRegistryLocation`, and `GetAppContainerFolderPath`. The SID uses SHA-256 of the lowercased container name folded into an `APP_PACKAGE` SID; the registry and folder locations return `E_NOTIMPL`, which the sandbox does not require.
+
+The patch also exports `CreateAppContainerToken` and `GetAppContainerNamedObjectPath` from `kernelbase.dll` as stubs. Chromium resolves both names before it creates a renderer. Without the exports, the `GetProcAddress` check aborts the browser with `app_container_base.cc:54 Check failed: fn`. The stubs return `FALSE` with `ERROR_CALL_NOT_IMPLEMENTED`; the sandbox falls back instead of aborting.
 
 ## CN
 
@@ -178,13 +184,13 @@ The patch turns the feature off for the whole process when the program is `Platf
 - Inactive behavior: The `rosetta-x86_64` target never receives the patch, and keeps `KUSER_SHARED_DATA` at `0x7ffe0000`.
 - Automated gate: Hash, clean `git apply --check` after the shared families, ARM64 build, and `wine cmd /c ver` without the cross-architecture entitlement
 - Manual gate: A 64-bit Windows program starts under FEX, and the game reaches the login screen.
-- Removal: Drop when macOS makes the low 4 GB mappable for an ad-hoc signed arm64 loader, or when a distributable signing identity carries the cross-architecture entitlement.
+- Removal: Drop when macOS makes the low 4 GB mappable for an ad-hoc signed arm64 loader, or when a distributable signing identity carries `com.apple.developer.cross-architecture-support-unmanaged`. See [entitlements](arm/entitlements.md#workarounds-to-remove).
 
 macOS keeps the low 4 GB of an arm64 process as a hard pagezero. `KUSER_SHARED_DATA` and the first TEB block belong inside that range. The patch exports the page address to the PE side, moves the page to `MM_SHARED_USER_DATA_VA + 4 GB` when the canonical mapping fails, lets the first 64-bit TEB block take an address above 4 GB, and emulates ARM64 loads that fault on the canonical address.
 
-macOS also reserves the main executable's Mach-O region just above 4 GB. The patch probes upward from 4 GB for the first page that `mach_vm_map` accepts, then uses that address as the floor for thread data, stacks, and image fallbacks. A fixed `limit_4g` floor fails because the reservation covers unmapped holes too.
+macOS also reserves the main executable's Mach-O region just above 4 GB. The patch probes upward from 4 GB for the first page that `mach_vm_map` accepts, then uses that address as the floor for thread data, stacks, and image fallbacks. A fixed `limit_4g` floor fails because the reservation covers unmapped holes too. The image fallback treats every 64-bit image as 64-bit, even when its preferred base is below 4 GB, so native ARM64 images such as `opengl32.dll` relocate above the floor.
 
-The write and execute page handling of the reference patch is not ported: WineCX 11.17 already flips those pages in `virtual_handle_fault`.
+The write and execute page handling of the reference patch is split out. WineCX 11.17 already flips pages in `virtual_handle_fault`, and [`wine-arm64-wx-pages`](#write-and-execute-pages) adds the `mprotect_exec` half.
 
 ## FEX
 
@@ -201,6 +207,51 @@ The write and execute page handling of the reference patch is not ported: WineCX
 
 Wine's `wine.inf` points `Wow64\amd64` at `xtajit64.dll` and `Wow64\x86` at `xtajit.dll`. The ARM64 build ships `libarm64ecfex.dll` and `libwow64fex.dll` instead. Without the wiring, an x86_64 image loads but never starts.
 
+## FEX lookup cache
+
+- ID: `fex-arm64ec-lookup-cache-commit`
+- File: `patches/arm/fex/lookup-cache-commit/0001-lookup-cache-commit-eagerly.patch`
+- Component/base: FEX `4efc3abc8aca8a0d3a8aca1f153ef6c4299f4426` (fork `dappermint/FEX`)
+- Source/author: Original change for this repository.
+- License: MIT (FEX)
+- Gate: Target only. The `native-arm64` target always commits the lookup cache eagerly.
+- Inactive behavior: Other hosts ignore the commit flag in `FEXCore::Allocator::VirtualAlloc`.
+- Automated gate: Hash, clean `git apply --check`, ARM64 build, and an x86_64 PE that compiles its first block.
+- Manual gate: The x86_64 PE reaches its entry point.
+- Removal: Drop when FEX commits the lookup cache on Windows, or when Wine runs the `ResetToConsistentState` callback for reserved pages.
+
+FEX reserves the lookup cache with `Commit=false` and commits faulting pages from its `ResetToConsistentState` callback. Wine returns `STATUS_ACCESS_VIOLATION` instead and never calls the callback, so the first block lookup faulted on the same instruction forever. The patch commits the region up front.
+
+## FEX MAP_JIT code buffers
+
+- ID: `fex-arm64ec-map-jit`
+- File: `patches/arm/fex/map-jit/0001-fex-map-jit-code-buffers.patch`
+- Component/base: FEX `4efc3abc8aca8a0d3a8aca1f153ef6c4299f4426` (fork `dappermint/FEX`)
+- Source/author: Original change for this repository.
+- License: MIT (FEX)
+- Gate: Target only. The `native-arm64` target always maps FEX code buffers with `MAP_JIT`.
+- Inactive behavior: Other hosts use `VirtualAlloc`; the unix library JIT handlers return `STATUS_NOT_SUPPORTED`.
+- Automated gate: Hash, clean `git apply --check`, and ARM64 build.
+- Manual gate: The x86_64 PE prints `fex-ok` from a normal Terminal.
+- Removal: Drop when FEX supports `MAP_JIT` code buffers natively, or when Wine can host a writable and executable code buffer on this host.
+
+FEX allocates the dispatcher and the shared code buffer with `PAGE_EXECUTE_READWRITE`. macOS refuses RWX without `MAP_JIT`, so Wine maps them writable-only and the JIT cannot run. The unix library maps those buffers with `MAP_JIT` and keeps them RWX. FEX toggles `pthread_jit_write_protect_np` around code writes. The x86_64 probe prints `fex-ok`.
+
+## FEX unaligned atomic code write window
+
+- ID: `fex-arm64ec-code-write-window`
+- File: `patches/arm/fex/code-write-window/0001-arm64-open-a-code-write-window-around-unaligned-handling.patch`
+- Component/base: FEX `4efc3abc8aca8a0d3a8aca1f153ef6c4299f4426` (fork `dappermint/FEX`)
+- Source/author: Original change for this repository.
+- License: MIT (FEX)
+- Gate: Target only. The `native-arm64` target always opens the write window.
+- Inactive behavior: Other hosts leave both hooks null and write code directly.
+- Automated gate: Hash, clean `git apply --check`, and ARM64 build.
+- Manual gate: The game handles an unaligned atomic and keeps running.
+- Removal: Drop when FEX opens a code write window around its own back-patching.
+
+FEX handles an unaligned atomic by back-patching the JIT block in place. The block tail spin lock and the instruction words are write-protected while guest code runs, so the first store faulted inside the handler. FEX passed that fault to Windows as a native exception and the process exited with status 5. The patch opens the existing code write window for the whole handler.
+
 ## Mono
 
 - ID: `wine-arm64-skip-mono`
@@ -215,3 +266,108 @@ Wine's `wine.inf` points `Wow64\amd64` at `xtajit64.dll` and `Wow64\x86` at `xta
 - Removal: Drop when the ARM64 lane can install Wine Mono without the entitlement, or when the runtime ships a 64-bit-only .NET replacement.
 
 Wine Mono's support package runs 32-bit and ARM64EC helper executables. The 32-bit helpers need memory below 4 GB, which macOS refuses without the cross-architecture entitlement. Wine retries the install on every prefix creation and opens a download dialog when the package is not cached. Arknights does not use .NET, so the ARM64 lane skips the install.
+
+## ARM64EC unix calls
+
+- ID: `wine-arm64-unix-call`
+- File: `patches/arm/wine/arm64ec-unix-call/0001-ntdll-fix-the-arm64ec-unix-call-table.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Original change for this repository.
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The `native-arm64` target always applies the guard.
+- Inactive behavior: The `rosetta-x86_64` target keeps the CodeWeavers `unix_pe_module_loaded` hook.
+- Automated gate: Hash, clean `git apply --check`, ARM64 build, and an x86_64 PE that loads `libarm64ecfex.dll`.
+- Manual gate: The x86_64 PE reaches its entry point.
+- Removal: Drop when WineCX guards the hook with `__arm64ec__` or moves it into the ARM64EC table.
+
+ARM64EC compiles with `__x86_64__` defined. The PE side called `unix_pe_module_loaded`, but the aarch64 `ntdll.so` table has no such entry. The call read past the table and jumped into unrelated data. The guard keeps the hook on x86_64 and excludes it from ARM64EC.
+
+## ARM64EC code bitmap
+
+- ID: `wine-arm64-ec-code-bitmap`
+- File: `patches/arm/wine/ec-code-bitmap/0001-ntdll-map-the-arm64ec-code-bitmap-writable.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Original change for this repository.
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The bitmap only exists on ARM64EC hosts.
+- Inactive behavior: Other hosts never allocate the bitmap.
+- Automated gate: Hash, clean `git apply --check`, and ARM64 build.
+- Manual gate: The game opens its window.
+- Removal: Drop when Wine maps the bitmap writable by default.
+
+`PEB->EcCodeBitMap` records which pages hold native ARM64EC code. Wine maps it read-only and only makes the pages of a view writable when an image publishes its ARM64EC ranges, so the emulator cannot publish its own JIT pages. The patch maps the bitmap writable up front. The pages stay demand-zero.
+
+## Mixed host pages
+
+- ID: `wine-arm64-wx-pages`
+- File: `patches/arm/wine/wx-pages/0001-ntdll-keep-mixed-host-pages-writable.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Port of the `mprotect_exec` hunk in [`metalsharp/MetalSharp-Wine`](https://github.com/metalsharp/MetalSharp-Wine) patch `0003`, Avery Felts. See [provenance](../patches/arm/wine/wx-pages/provenance.md).
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The `native-arm64` target always applies the change.
+- Inactive behavior: Other hosts keep the existing `mprotect` request.
+- Automated gate: Hash, clean `git apply --check`, ARM64 build, and an ARM64EC image whose hybrid metadata is written at load time.
+- Manual gate: The x86_64 PE starts under FEX.
+- Removal: Drop after the reference 4K page and W^X model (`0011`, `0019`) replaces it. That work needs `com.apple.developer.cross-architecture-support-unmanaged`. See [entitlements](arm/entitlements.md#workarounds-to-remove).
+
+macOS refuses RWX without `MAP_JIT`. A 16K host page can mix executable 4K pages with writable ones, so `NtProtectVirtualMemory(PAGE_READWRITE)` on an image section failed with `STATUS_ACCESS_DENIED`. Write faults on the mixed page were not delivered to the signal handler, so the patch drops `PROT_EXEC` instead of `PROT_WRITE`. The page stays writable, and `virtual_handle_fault` flips it for an execute fault. The flip works in a normal Terminal; the agent shell suppresses synchronous signals. FEX code buffers use the separate `map-jit` patch.
+
+## ARM64 ID registers
+
+- ID: `wine-arm64-id-registers`
+- File: `patches/arm/wine/id-registers/0001-ntdll-synthesize-arm64-id-registers.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Port of the ID-register hunk in [`metalsharp/MetalSharp-Wine`](https://github.com/metalsharp/MetalSharp-Wine) patch `0004`, Avery Felts. See [provenance](../patches/arm/wine/id-registers/provenance.md).
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The `native-arm64` target always applies the implementation.
+- Inactive behavior: Linux keeps the `AT_HWCAP_CPUID` path; other hosts keep the stub.
+- Automated gate: Hash, clean `git apply --check`, ARM64 build, and a prefix whose `CentralProcessor\0` values include `CP 4030`.
+- Manual gate: FEX `ProcessInit` returns success and starts an x86_64 program.
+- Removal: Drop when WineCX carries the macOS ID-register implementation.
+
+macOS does not let EL0 read the ID registers. `get_core_id_regs_arm64` was a stub, so FEX read zero features from the processor registry key and hit its `FetchHostFeatures` assert. The patch builds the values from the `hw.optional.arm.*` sysctls and the cache line size.
+
+## ARM64 ACE EFlags
+
+- ID: `wine-arm64-ace-context`
+- File: `patches/arm/wine/ace-context/0001-ntdll-carry-eflags-af-df.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Port of [`metalsharp/MetalSharp-Wine`](https://github.com/metalsharp/MetalSharp-Wine) patch `0017`, Avery Felts. See [provenance](../patches/arm/wine/ace-context/provenance.md).
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The `native-arm64` target always carries the flags.
+- Inactive behavior: The `rosetta-x86_64` target keeps its existing context conversion.
+- Automated gate: Hash, clean `git apply --check`, ARM64 build, and a context round trip that keeps AF and DF.
+- Manual gate: ACE reads AF and DF after a context switch.
+- Removal: Drop when WineCX carries AF and DF in its ARM64EC context conversion.
+
+ARM64EC maps the x86 flags to NZCV. AF and DF have no NZCV bit, so Wine dropped them. The patch keeps them in RES0 CPSR bits 16 and 17; the hardware never reads those bits.
+
+## ARM64 ACE thread entry
+
+- ID: `wine-arm64-ace-thread-entry`
+- File: `patches/arm/wine/ace-thread-entry/0001-ntdll-hybrid-thread-entry.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Port of [`metalsharp/MetalSharp-Wine`](https://github.com/metalsharp/MetalSharp-Wine) patch `0126`, Avery Felts. See [provenance](../patches/arm/wine/ace-thread-entry/provenance.md).
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The `native-arm64` target always applies the fixup.
+- Inactive behavior: The `rosetta-x86_64` target keeps the existing thread entry.
+- Automated gate: Hash, clean `git apply --check`, ARM64 build, and an injected remote thread that loads a DLL.
+- Manual gate: ACE initializes and the CN client reaches the login screen.
+- Removal: Drop when WineCX resolves hybrid-module thread entries on its own.
+
+An x64 process can start a thread on the native ARM64 export of an ARM64X module. The thread then runs ARM64 code as x64 code and faults. ACE injects `kernel32!LoadLibraryW` with `CreateRemoteThread` and takes that path. The patch resolves the same export through `GetProcAddress` from the loaded module and starts the thread there.
+
+## Loader name
+
+- ID: `wine-arm64-loader-name`
+- File: `patches/arm/wine/loader-name/0001-loader-bake-app-name.patch`
+- Component/base: WineCX `c8ef4872c1d53120b80aa92185fc7e295d94d092` (Wine 11.17, branch `arm64-1117`)
+- Source/author: Original change for this repository. See [provenance](../patches/arm/wine/loader-name/provenance.md).
+- License: LGPL-2.1-or-later (Wine)
+- Gate: Target only. The `native-arm64` target always bakes the name.
+- Inactive behavior: Other targets keep `CrossOver-Hosted Application`.
+- Automated gate: Hash, clean `git apply --check`, ARM64 build, and the installed loader contains the baked name.
+- Manual gate: The Dock and menu bar show `Arknights` without a wrapper bundle.
+- Removal: Drop when WineCX lets the client set the embedded name, or when the loader can rewrite `__TEXT` on arm64.
+
+The loader rewrites `CFBundleName` in `__TEXT` from `WINEPRELOADERAPPNAME`. arm64 rejects that write, so the Dock falls back to the embedded `__info_plist`. The patch bakes `Arknights` into that plist. The client keeps `WINEPRELOADERAPPNAME=Arknights` for crash-report matching.

@@ -174,7 +174,10 @@
       "status": "verified",
       "basis": "upstream-declared",
       "notice": "notices/moltenvk.txt",
-      "lock": "baseProvenance.moltenvk"
+      "lock": "baseProvenance.moltenvk",
+      "targets": [
+        "rosetta-x86_64"
+      ]
     },
     {
       "name": "MoltenVK embedded libraries",
@@ -189,7 +192,10 @@
       "status": "verified",
       "basis": "upstream-declared",
       "notice": "notices/moltenvk.txt",
-      "note": "Upstream pins in ExternalRevisions at the MoltenVK commit: SPIRV-Cross and SPIRV-Tools Apache-2.0, cereal BSD-3-Clause, SPIRV-Headers MIT. The MoltenVK source was not read locally, and the dylib is not built here. The commit is the claim of the base archive provider. Which libraries the dylib contains is not verified."
+      "note": "Upstream pins in ExternalRevisions at the MoltenVK commit: SPIRV-Cross and SPIRV-Tools Apache-2.0, cereal BSD-3-Clause, SPIRV-Headers MIT. The MoltenVK source was not read locally, and the dylib is not built here. The commit is the claim of the base archive provider. Which libraries the dylib contains is not verified.",
+      "targets": [
+        "rosetta-x86_64"
+      ]
     },
     {
       "name": "FreeType",
@@ -430,6 +436,22 @@
         "zstd"
       ],
       "transitive": true
+    },
+    {
+      "name": "FEX",
+      "version": "4efc3abc",
+      "spdx": "MIT",
+      "source": "https://github.com/dappermint/FEX/tree/4efc3abc8aca8a0d3a8aca1f153ef6c4299f4426",
+      "files": [
+        "runtime/MIT.txt"
+      ],
+      "status": "verified",
+      "basis": "upstream-declared",
+      "notice": "notices/fex.txt",
+      "lock": "targets.native-arm64.sources.fex",
+      "targets": [
+        "native-arm64"
+      ]
     }
   ],
   "excluded": [

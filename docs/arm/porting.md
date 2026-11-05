@@ -1,9 +1,8 @@
 # Entitlement-free port
 
-This page describes the Wine changes that let the ARM64 lane run without the
-cross-architecture entitlement.
-The reference is MetalSharp-Wine.
-Its patch numbers refer to `patches/wine/` in that repository at the capture date.
+This page lists the Wine changes that let the ARM64 lane run without the cross-architecture
+entitlement. The reference is MetalSharp-Wine; its patch numbers refer to `patches/wine/` at the
+capture date.
 
 ## Baseline
 
@@ -15,65 +14,67 @@ Its patch numbers refer to `patches/wine/` in that repository at the capture dat
 | Reference fork        | `metalsharp/MetalSharp-Wine`, Wine 11.20   |
 | Reference patch count | 129                                        |
 
-The reference patches are written against Wine 11.20.
-WineCX has CodeWeavers changes that upstream Wine does not have.
-Every port needs a conflict check, a build, and a run test.
+The reference targets Wine 11.20. WineCX 11.17 carries CodeWeavers changes, so every port needs a
+conflict check, a build, and a run test.
 
 ## Ported
 
-| Reference | Subject                                       | Location                          |
-| --------- | --------------------------------------------- | --------------------------------- |
-| `0003`    | Address space, shared user data, PE consumers | `patches/arm/wine/address-space/` |
-| `0008`    | Canonical-address loads in the signal handler | Same patch                        |
-| `0016`    | Skip occupied regions in the free-area search | Same patch                        |
-| `0001`    | Loader SDK 12.0 relink                        | `scripts/arm/build.py`            |
-| `0004`    | Wow64 registry values name the FEX modules    | `patches/arm/wine/fex/`           |
-| —         | Skip Wine Mono                                | `patches/arm/wine/mono/`          |
+| Reference | Subject                                       | Location                              |
+| --------- | --------------------------------------------- | ------------------------------------- |
+| `0003`    | Address space, shared user data, PE consumers | `patches/arm/wine/address-space/`     |
+| `0008`    | Canonical-address loads in the signal handler | Same patch                            |
+| `0016`    | Skip occupied regions in the free-area search | Same patch                            |
+| `0001`    | Loader SDK 12.0 relink                        | `scripts/arm/build.py`                |
+| `0004`    | Wow64 registry values name the FEX modules    | `patches/arm/wine/fex/`               |
+| —         | Skip Wine Mono                                | `patches/arm/wine/mono/`              |
+| —         | ARM64EC unix-call guard                       | `patches/arm/wine/arm64ec-unix-call/` |
+| `0003`    | Keep mixed host pages writable                | `patches/arm/wine/wx-pages/`          |
+| `0004`    | Synthesize the ARM64 ID registers             | `patches/arm/wine/id-registers/`      |
+| `0017`    | Carry `EFlags` AF and DF through ARM64EC      | `patches/arm/wine/ace-context/`       |
+| `0126`    | Start an x64 thread from a hybrid module      | `patches/arm/wine/ace-thread-entry/`  |
+| —         | Bake the game name into the loader            | `patches/arm/wine/loader-name/`       |
 
-The address-space patch also adds the 4 GB floor probe and moves the first TEB
-block above 4 GB.
-The write and execute hunks are not ported: WineCX 11.17 already flips those
-pages in `virtual_handle_fault`.
+The address-space patch also adds the 4 GB floor probe and moves the first TEB block above 4 GB. The
+`wx-pages` patch carries the `mprotect_exec` half of the reference W^X handling; WineCX already flips
+pages in `virtual_handle_fault`. FEX code buffers use `MAP_JIT` through the
+[`map-jit`](../../patches/arm/fex/map-jit/README.md) patch. Measure fault behavior from a normal
+Terminal; the agent shell suppresses synchronous signals.
 
 ## Remaining
 
 | Reference | Subject                                       | Needed for          |
 | --------- | --------------------------------------------- | ------------------- |
-| `0004`    | ARM64 ID registers (Wow64 wiring is ported)   | x86_64 startup      |
-| `0017`    | Carry `EFlags` AF and DF through ARM64EC      | x86_64 startup      |
-| `0126`    | Start an x64 thread from a hybrid module      | x86_64 startup      |
 | `0128`    | Tell the emulator about executable data views | Self-modifying code |
 
-The current x86_64 PE test loads at `0x140000000` and stops before entry.
-These patches are the next candidates.
+The x86_64 probe prints `fex-ok`. `0017` and `0126` are ported; `0128` is still a candidate for the
+game and ACE.
 
-Patch `0004` changes `loader/wine.inf.in` in two places:
+Patch `0004` sets these values in `loader/wine.inf.in`:
 
 ```text
 HKLM,Software\Microsoft\Wow64\amd64,,2,"libarm64ecfex.dll"
 HKLM,Software\Microsoft\Wow64\x86,,2,"libwow64fex.dll"
 ```
 
-Packaging can install the FEX modules under the `xtajit` names instead.
-Use one method only.
+Packaging can install the modules as `xtajit` aliases instead. Use one method only.
 
 ## Loader
 
-The ARM64 loader needs `-platform_version macos,15.0,12.0` to preserve x18.
-The recorded SDK selects the kernel's page-fault behavior.
-The x86_64 loader keeps the current SDK.
+The ARM64 loader needs `-platform_version macos,15.0,12.0` to preserve x18. The recorded SDK selects
+the kernel's page-fault behavior. The x86_64 loader keeps the current SDK. The 4 GB `__PAGEZERO` stays
+in the reference.
 
-The 4 GB `__PAGEZERO` stays in the reference.
-The CGL OpenGL part is not needed; WineCX already builds without X11.
+With `com.apple.private.custom-x18-abi`, link the loader with the current SDK and remove the
+override. The window then uses the current design. See [entitlements](entitlements.md).
 
 ## Not ported
 
-| Group                                       | Reason                            |
-| ------------------------------------------- | --------------------------------- |
-| `0011`, `0019`, and other 4K page work      | Needs the entitlement.            |
-| Steam, Epic, Battle.net, Rockstar patches   | Not used by Arknights.            |
-| Mullion, VKD3D-Proton, DXVK, WineMetalGL    | This runtime uses DXMT only.      |
-| MetalSharp application and tracing controls | Not part of the runtime contract. |
+| Group                                       | Reason                                                      |
+| ------------------------------------------- | ----------------------------------------------------------- |
+| `0011`, `0019`, and other 4K page work      | Needs the entitlement. See [entitlements](entitlements.md). |
+| Steam, Epic, Battle.net, Rockstar patches   | Not used by Arknights.                                      |
+| Mullion, VKD3D-Proton, DXVK, WineMetalGL    | This runtime uses DXMT only.                                |
+| MetalSharp application and tracing controls | Not part of the runtime contract.                           |
 
 FEX tuning belongs in the client environment, not in Wine patches:
 
@@ -88,13 +89,14 @@ Test ACE with TSO enabled first.
 
 ## Validation
 
-| Check                 | Expected result                        |
-| --------------------- | -------------------------------------- |
-| `codesign -dv` loader | Ad-hoc signature, no entitlement.      |
-| `vtool -show-build`   | `minos 15.0`, `sdk 12.0`.              |
-| `wine cmd /c ver`     | Exit 0 on a fresh prefix.              |
-| 64-bit PE under FEX   | Starts and prints its output. Not yet. |
-| Game                  | Reaches the login screen. Not yet.     |
+| Check                 | Expected result                      |
+| --------------------- | ------------------------------------ |
+| `codesign -dv` loader | Ad-hoc signature, no entitlement.    |
+| `vtool -show-build`   | `minos 15.0`, `sdk 12.0`.            |
+| `wine cmd /c ver`     | Exit 0 on a fresh prefix.            |
+| 64-bit PE under FEX   | Starts and prints its output. Works. |
+| Game                  | Opens; Global login works.           |
+| ACE                   | Untested on ARM.                     |
 
 Add one offline test for each contract that a port can break:
 
