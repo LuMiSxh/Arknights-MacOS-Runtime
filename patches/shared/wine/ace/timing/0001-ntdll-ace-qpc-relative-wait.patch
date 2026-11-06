@@ -2,23 +2,24 @@ diff --git a/dlls/ntdll/unix/sync.c b/dlls/ntdll/unix/sync.c
 index cdea7b21..fe914cdb 100644
 --- a/dlls/ntdll/unix/sync.c
 +++ b/dlls/ntdll/unix/sync.c
-@@ -75,6 +75,24 @@
+@@ -75,6 +75,25 @@
  
  WINE_DEFAULT_DEBUG_CHANNEL(sync);
  
-+/* The QPC relative-wait variant is enabled by the ACE compact compatibility control.
-+ * Keep the upstream wall-clock implementation selected unless explicitly
-+ * enabled by the runtime launcher. */
-+static BOOL arknights_runtime_ace_compact_enabled(void)
++/* The QPC relative-wait variant is enabled by the ACE compatibility control.
++ * Keep the upstream wall-clock implementation selected unless the launcher
++ * enables the master switch and this modifier. */
++static BOOL lmisxh_akmocl_ace_enabled(void)
 +{
 +    static LONG state = -1;
 +    LONG value = state;
-+    const char *flag;
++    const char *master, *flag;
 +
 +    if (value == -1)
 +    {
-+        flag = getenv("ARKNIGHTS_RUNTIME_ACE_COMPACT");
-+        value = flag && !strcmp(flag, "1");
++        master = getenv("LMISXH_AKMOCL");
++        flag = master;
++        value = master && !strcmp(master, "1") && flag && !strcmp(flag, "1");
 +        InterlockedCompareExchange(&state, value, -1);
 +    }
 +    return value;
@@ -32,7 +33,7 @@ index cdea7b21..fe914cdb 100644
          for (;;) select( 0, NULL, NULL, NULL, NULL );
      }
 -    else
-+    else if (arknights_runtime_ace_compact_enabled() && timeout->QuadPart < 0)
++    else if (lmisxh_akmocl_ace_enabled() && timeout->QuadPart < 0)
      {
 +        timeout_t when = -timeout->QuadPart, diff;
          LARGE_INTEGER now;

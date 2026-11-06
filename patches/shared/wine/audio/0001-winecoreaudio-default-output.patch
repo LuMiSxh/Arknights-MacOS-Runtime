@@ -39,21 +39,23 @@ index e5791534..5d2d0217 100644
      EDataFlow flow;
      DWORD flags;
      AUDCLNT_SHAREMODE share;
-@@ -200,11 +212,35 @@ static BOOL device_has_channels(AudioDeviceID device, EDataFlow flow)
+@@ -200,11 +212,37 @@ static BOOL device_has_channels(AudioDeviceID device, EDataFlow flow)
      return ret;
  }
  
-+/* The runtime keeps the upstream device list unless the launcher explicitly
-+ * opts into following macOS's default output.  Read the process environment
-+ * at the call site so a missing or malformed value cannot enable the patch. */
++/* The runtime keeps the upstream device list unless the launcher enables the
++ * master switch and the audio modifier. Read the process environment at the
++ * call site so a missing or malformed value cannot enable the patch. */
 +static pthread_once_t audio_follow_env_once = PTHREAD_ONCE_INIT;
 +static BOOL audio_follow_default_output;
 +
 +static void init_audio_follow_default_output(void)
 +{
-+    const char *value = getenv("ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT");
++    const char *master = getenv("LMISXH_AKMOCL");
++    const char *value = getenv("LMISXH_AKMOCL_AUDIO");
 +
-+    audio_follow_default_output = value && value[0] == '1' && value[1] == '\0';
++    audio_follow_default_output = master && master[0] == '1' && master[1] == '\0' &&
++                                  value && value[0] == '1' && value[1] == '\0';
 +}
 +
 +static BOOL audio_follow_default_output_enabled(void)
@@ -1000,4 +1002,3 @@ index e5791534..5d2d0217 100644
      unix_not_implemented,
      unix_not_implemented,
      unix_wow64_get_endpoint_ids,
-

@@ -21,6 +21,11 @@ signed, so it cannot use them.
 | Shared-user-data relocation and 4 GB floor | `patches/arm/wine/address-space/` | `com.apple.developer.cross-architecture-support-unmanaged` | Remove the patch. Keep `KUSER_SHARED_DATA` at `0x7ffe0000` and the first TEB block below 4 GB.                   |
 | Mixed-host-page `PROT_EXEC` drop           | `patches/arm/wine/wx-pages/`      | `com.apple.developer.cross-architecture-support-unmanaged` | Port the reference 4K page and W^X model (`0011`, `0019`) first. Remove this patch only after that model passes. |
 
+The signed collaborator build in `wine-build-new` has the cross-architecture entitlement. The
+custom-x18 entitlement is still pending. The final profile must grant both before the loader
+relink and the address-space workarounds can be removed. See
+[collaborator runtime](wine-build-new.md).
+
 Keep these patches. The entitlements do not replace them:
 
 - `patches/arm/wine/ec-code-bitmap/`: the emulator must publish its JIT pages in the ARM64EC bitmap.

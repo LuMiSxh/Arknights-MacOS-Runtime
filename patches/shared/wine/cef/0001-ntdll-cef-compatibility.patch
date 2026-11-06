@@ -2,67 +2,57 @@ diff --git a/dlls/ntdll/loader.c b/dlls/ntdll/loader.c
 index 22d2ef7e..4bd6e0f9 100644
 --- a/dlls/ntdll/loader.c
 +++ b/dlls/ntdll/loader.c
-@@ -2991,6 +2991,185 @@ static void apply_fuzzy_binary_patches( WINE_MODREF *wm )
+@@ -2991,6 +2991,175 @@ static void apply_fuzzy_binary_patches( WINE_MODREF *wm )
  #endif
  
  #if defined(__i386__) || defined(__x86_64__)
 +#ifdef __x86_64__
-+/* CEF compatibility is opt-in and descriptor-driven. Explicit
-+ * ARKNIGHTS_RUNTIME_CEF_COMPAT=1 enables every regional descriptor;
-+ * ARKNIGHTS_RUNTIME_CN_COMPAT=1 remains a legacy fallback for the proven
-+ * Bilibili descriptor when CEF_COMPAT is absent. */
-+enum arknights_cef_compat_mode
++/* CEF compatibility is opt-in and descriptor-driven. The master switch and
++ * LMISXH_AKMOCL_CEF=1 enable every regional descriptor. */
++enum lmisxh_cef_compat_mode
 +{
-+    ARKNIGHTS_CEF_COMPAT_DISABLED,
-+    ARKNIGHTS_CEF_COMPAT_GENERIC,
-+    ARKNIGHTS_CEF_COMPAT_LEGACY_CN
++    LMISXH_CEF_COMPAT_DISABLED,
++    LMISXH_CEF_COMPAT_ENABLED
 +};
 +
-+enum arknights_cef_descriptor_region
++enum lmisxh_cef_descriptor_region
 +{
-+    ARKNIGHTS_CEF_REGION_CN
++    LMISXH_CEF_REGION_CN
 +};
 +
-+static const WCHAR arknights_runtime_cef_compat_nameW[] =
-+    {'A','R','K','N','I','G','H','T','S','_','R','U','N','T','I','M','E','_','C','E','F','_','C','O','M','P','A','T',0};
-+static const WCHAR arknights_runtime_cn_compat_nameW[] =
-+    {'A','R','K','N','I','G','H','T','S','_','R','U','N','T','I','M','E','_','C','N','_','C','O','M','P','A','T',0};
++static const WCHAR lmisxh_akmocl_nameW[] =
++    {'L','M','I','S','X','H','_','A','K','M','O','C','L',0};
++static const WCHAR lmisxh_cef_compat_nameW[] =
++    {'L','M','I','S','X','H','_','A','K','M','O','C','L','_','C','E','F',0};
 +
-+static BOOL arknights_runtime_query_flag( const WCHAR *name, USHORT name_length, BOOL *present )
++static BOOL lmisxh_akmocl_flag( const WCHAR *name, USHORT name_length )
 +{
-+    WCHAR flag[2] = {0};
++    WCHAR value[2] = {0};
 +    UNICODE_STRING nameW = {name_length, name_length + sizeof(WCHAR), (WCHAR *)name};
-+    UNICODE_STRING valueW = {0, sizeof(flag), flag};
++    UNICODE_STRING valueW = {0, sizeof(value), value};
 +    NTSTATUS status = RtlQueryEnvironmentVariable_U( NULL, &nameW, &valueW );
 +
-+    *present = status != STATUS_VARIABLE_NOT_FOUND;
-+    return status == STATUS_SUCCESS && valueW.Length == sizeof(WCHAR) && flag[0] == '1';
++    return status == STATUS_SUCCESS && valueW.Length == sizeof(WCHAR) && value[0] == '1';
 +}
 +
-+static enum arknights_cef_compat_mode arknights_runtime_cef_compat_mode(void)
++static enum lmisxh_cef_compat_mode lmisxh_cef_compat_mode(void)
 +{
 +    static LONG state = -1;
 +    LONG value = state;
-+    BOOL present;
 +
 +    if (value == -1)
 +    {
-+        if (arknights_runtime_query_flag( arknights_runtime_cef_compat_nameW,
-+                                          sizeof(arknights_runtime_cef_compat_nameW) - sizeof(WCHAR), &present ))
-+            value = ARKNIGHTS_CEF_COMPAT_GENERIC;
-+        else if (present)
-+            value = ARKNIGHTS_CEF_COMPAT_DISABLED;
-+        else if (arknights_runtime_query_flag( arknights_runtime_cn_compat_nameW,
-+                                               sizeof(arknights_runtime_cn_compat_nameW) - sizeof(WCHAR), &present ))
-+            value = ARKNIGHTS_CEF_COMPAT_LEGACY_CN;
-+        else
-+            value = ARKNIGHTS_CEF_COMPAT_DISABLED;
++        value = (lmisxh_akmocl_flag( lmisxh_akmocl_nameW,
++                                    sizeof(lmisxh_akmocl_nameW) - sizeof(WCHAR) ) &&
++                 lmisxh_akmocl_flag( lmisxh_cef_compat_nameW,
++                                    sizeof(lmisxh_cef_compat_nameW) - sizeof(WCHAR) ))
++            ? LMISXH_CEF_COMPAT_ENABLED : LMISXH_CEF_COMPAT_DISABLED;
 +        InterlockedCompareExchange(&state, value, -1);
 +    }
 +    return value;
 +}
 +
-+struct arknights_cef_patch
+++struct arknights_cef_patch
 +{
 +    ULONG_PTR offset;
 +    const char *before;
@@ -75,12 +65,12 @@ index 22d2ef7e..4bd6e0f9 100644
 +    const WCHAR *module_name;
 +    const struct arknights_cef_patch *patches;
 +    unsigned int patch_count;
-+    enum arknights_cef_descriptor_region region;
++    enum lmisxh_cef_descriptor_region region;
 +};
 +
 +static BOOL arknights_apply_cef_descriptor( WINE_MODREF *wm,
 +                                            const struct arknights_cef_descriptor *descriptor,
-+                                            enum arknights_cef_compat_mode mode )
++                                            enum lmisxh_cef_compat_mode mode )
 +{
 +    unsigned int i;
 +
@@ -179,9 +169,9 @@ index 22d2ef7e..4bd6e0f9 100644
 +        { 0x24c425f, before_stackbase_check, after_stackbase_check, sizeof(before_stackbase_check) }
 +    };
 +    static const struct arknights_cef_descriptor descriptor =
-+        {cef_name, patches, ARRAY_SIZE(patches), ARKNIGHTS_CEF_REGION_CN};
++        {cef_name, patches, ARRAY_SIZE(patches), LMISXH_CEF_REGION_CN};
 +
-+    arknights_apply_cef_descriptor( wm, &descriptor, arknights_runtime_cef_compat_mode() );
++    arknights_apply_cef_descriptor( wm, &descriptor, lmisxh_cef_compat_mode() );
 +}
 +#endif
 +

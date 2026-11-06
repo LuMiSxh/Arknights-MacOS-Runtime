@@ -21,7 +21,7 @@ Carries the non-X11 kernel surface that the ACE client needs:
 - current-thread process and process-ID accessors (unconditional aliases of the current-process functions)
 - unconditional image-name and exit-status accessors for valid process objects, without NULL checks on their `_In_` process parameters
 - the `KeCapturePersistentThreadState` export stub: logs its arguments, returns `STATUS_NOT_IMPLEMENTED`, never dereferences or writes through a pointer
-- the callable `SeSetAuditParameter` no-op: logs its arguments, returns `STATUS_SUCCESS` only when `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`, never dereferences or writes through its pointer arguments; otherwise the original Wine stub stays active
+- the callable `SeSetAuditParameter` no-op: logs its arguments, returns `STATUS_SUCCESS` when `LMISXH_AKMOCL=1`, never dereferences or writes through its pointer arguments; otherwise the original Wine stub stays active
 - physical-memory compatibility stubs
 - process-object metadata lifetime handling
 
@@ -29,7 +29,7 @@ Wine <!-- pin:wine.version -->11.17<!-- /pin --> already provides the process se
 
 ### `dispatcher`
 
-Carries the x86_64 `KiUserApcDispatcher` / `KiUserCallbackDispatcher` `GetProcAddress` int3-stub workaround. Only `ARKNIGHTS_RUNTIME_ACE_COMPACT=1` enables it. It uses no process-name heuristics. The patch is x86_64 only: its stub is x86 machine code, so it lives in [`patches/x86`](../../../x86/wine/ace/dispatcher/0001-kernel32-ace-dispatcher-spoof.patch).
+Carries the x86_64 `KiUserApcDispatcher` / `KiUserCallbackDispatcher` `GetProcAddress` int3-stub workaround. The `LMISXH_AKMOCL=1` master switch enables it. It uses no process-name heuristics. The patch is x86_64 only: its stub is x86 machine code, so it lives in [`patches/x86`](../../../x86/wine/ace/dispatcher/0001-kernel32-ace-dispatcher-spoof.patch).
 
 ### `rosetta`
 
