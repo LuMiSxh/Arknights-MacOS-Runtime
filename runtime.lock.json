@@ -164,7 +164,7 @@
       "component": "wine",
       "family": "cef",
       "path": "patches/shared/wine/cef/0001-ntdll-cef-compatibility.patch",
-      "sha256": "c74032eecca6cc287a2014c75af5ae9d2a6a7903e6e0569b71c9242ba46bf274"
+      "sha256": "75b5caf58967a489df07cc42592bab87293e81ab1fd2c3f83759cdf7050363aa"
     },
     {
       "id": "wine-cn-bilibili-layered-child",
