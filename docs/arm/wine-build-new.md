@@ -16,7 +16,8 @@ in this repository. The workspace receives a rebased copy and a Portfile entry.
 | FEX           | commit `14c92681f4d62cf84d901460e0358de09c8847a7`                 |
 | Hadron        | commit `6f401bcfcf4c1cbf7fbd724974fc8d3562262b1c`                 |
 | Endfield      | commit `568afd1a32e25e40170eb7484f6790d1e1d370fd`                 |
-| Export branch | `arknights-arm64`                                                 |
+| Workspace branch | `arknights-arm64`                                              |
+| Submodule branch | `arm-gates`                                                    |
 | Submodule path | `patches/wine/arknights-macos-runtime`                           |
 | Wine export   | `patches/wine-build-new/wine/`                                    |
 
@@ -37,7 +38,7 @@ reference the export as `arknights-macos-runtime/patches/wine-build-new/wine/...
 | `0005-ws2_32-address-list-sort.patch`              | `patches/shared/wine/winsock/`                | none (general)   |
 | `0006-ntdll-bilibili-cef80-stack-base.patch`       | `patches/shared/wine/cef/` (rebased)          | master + `_CEF`  |
 | `0007-win32u-winemac-bilibili-layered-child.patch` | `patches/shared/wine/cn/windowing/` (rebased) | master + `_CN`   |
-| `0008-winemac-bilibili-join-all-spaces.patch`      | `patches/shared/wine/cn/windowing/`           | master + `_CN`   |
+| `0008-winemac-bilibili-join-all-spaces.patch`      | `patches/shared/wine/cn/windowing/`           | master + `_CN` (optional) |
 
 `0003` is reduced. The workspace already has `PsGetProcessImageFileName`,
 `PsReferencePrimaryToken`, `PsGetProcessExitStatus`, `ObRegisterCallbacks`,
@@ -54,7 +55,7 @@ the same behavior.
 
 | Work                                                                       | Provided by                                                                               |
 | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| 4 GB `__PAGEZERO`, top-down allocations, cross-architecture loader         | Hadron wine `0001`, `0003`, `0005`, `0008`, `0040`                                        |
+| 4 GB `__PAGEZERO`, top-down allocations, cross-architecture loader         | Hadron wine `0001`, `0008`, `0040`; `local/0003`                                         |
 | Executable and writable host-page flips                                    | Hadron wine `0002`, `0006`, `0034`, `0035`, `0036`                                        |
 | ARM64 ID registers                                                         | Hadron wine `0020`                                                                        |
 | ARM64EC code bitmap, `RtlIsEcCode` bounds                                  | Hadron wine `0011`, `0041`                                                                |
@@ -75,8 +76,8 @@ The Arknights `address-space`, `wx-pages`, `id-registers`, `ec-code-bitmap`,
   bitmap itself, so `ec-code-marking` is unnecessary.
 - FEX 2610 and Wine 11.18 pass the workspace's x64/i386 FEX probes with the reserved lookup
   cache. The eager commit is not needed there.
-- The workspace has the cross-architecture entitlement, so the 32-bit Mono installer can use
-  low memory. The launcher can set `WINEDLLOVERRIDES=mscoree=d` for Arknights.
+- Mono remains an optional-component limitation in the workspace. Arknights does not use
+  .NET. The launcher can set `WINEDLLOVERRIDES=mscoree=d` instead of carrying a patch.
 
 ## Entitlements
 

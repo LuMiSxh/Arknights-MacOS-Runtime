@@ -57,7 +57,7 @@
       {
         "order": 78,
         "path": "patches/wine-build-new/wine/0006-ntdll-bilibili-cef80-stack-base.patch",
-        "sha256": "ade771d0d120e5b0260e0fdfd4ae5bf09f1bff1374b77fab9854fc31b1c604f4",
+        "sha256": "22a35c0c5b13953653aaab409b5f9fe5362366889c0d2497e0159f1331e68cd2",
         "modifier": "LMISXH_AKMOCL_CEF",
         "default": "off"
       },
@@ -73,7 +73,8 @@
         "path": "patches/wine-build-new/wine/0008-winemac-bilibili-join-all-spaces.patch",
         "sha256": "697cc61e8391b6a75bb01b429f4ac3830cc8062f74da257fd8f215e2cb0b2113",
         "modifier": "LMISXH_AKMOCL_CN",
-        "default": "off"
+        "default": "off",
+        "optional": true
       }
     ]
   },
@@ -86,5 +87,6 @@
       "patch": "mono/skip",
       "reason": "The workspace has the cross-architecture entitlement; use WINEDLLOVERRIDES=mscoree=d if needed."
     }
-  ]
+  ],
+  "export_branch": "arm-gates"
 }

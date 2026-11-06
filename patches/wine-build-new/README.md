@@ -26,17 +26,16 @@ See [collaborator runtime](../../docs/arm/wine-build-new.md) for the mapping and
 | `0005-ws2_32-address-list-sort.patch` | none | Implements `SIO_ADDRESS_LIST_SORT` for AsyncDns. |
 | `0006-ntdll-bilibili-cef80-stack-base.patch` | master + `_CEF` | Bilibili CEF 80.1.15 stack-base descriptors. |
 | `0007-win32u-winemac-bilibili-layered-child.patch` | master + `_CN` | Bilibili layered child window. |
-| `0008-winemac-bilibili-join-all-spaces.patch` | master + `_CN` | Bilibili payment window on every Space. |
+| `0008-winemac-bilibili-join-all-spaces.patch` | master + `_CN` (optional) | Bilibili payment window on every Space. |
 
 ## What is not in the export
 
 - **FEX lookup-cache eager commit.** This repository needs it on FEX 4efc3abc and WineCX
   11.17. The workspace uses FEX 2610 and Wine 11.18. Its recorded x64/i386 FEX probes pass
   with the reserved lookup cache, so the fault path works there.
-- **Mono skip.** The workspace is signed with the cross-architecture entitlement, so the
-  32-bit Mono installer can use low memory. Arknights does not need .NET. A launcher can set
-  `WINEDLLOVERRIDES=mscoree=d` without a runtime patch. This repository keeps the patch for
-  its entitlement-free local lane.
+- **Mono skip.** Mono remains an optional-component limitation in the workspace.
+  Arknights does not use .NET. A launcher can set `WINEDLLOVERRIDES=mscoree=d` without a
+  runtime patch. This repository keeps the patch for its entitlement-free local lane.
 - **Address space, W^X, ID registers, EC bitmap, and FEX JIT patches.** The Hadron queue
   already provides them.
 - **Loader name, fullscreen, hardware cursor, audio, and DXMT.** Not required for login or

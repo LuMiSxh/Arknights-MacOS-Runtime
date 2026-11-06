@@ -2,7 +2,7 @@ diff --git a/dlls/ntdll/loader.c b/dlls/ntdll/loader.c
 index b0b2392..15dc475 100644
 --- a/dlls/ntdll/loader.c
 +++ b/dlls/ntdll/loader.c
-@@ -2264,6 +2264,189 @@ done:
+@@ -2264,6 +2264,177 @@ done:
   *
   * Build the module data for a mapped dll.
   */
@@ -13,8 +13,7 @@ index b0b2392..15dc475 100644
 +enum arknights_cef_compat_mode
 +{
 +    ARKNIGHTS_CEF_COMPAT_DISABLED,
-+    ARKNIGHTS_CEF_COMPAT_GENERIC,
-+    ARKNIGHTS_CEF_COMPAT_LEGACY_CN
++    ARKNIGHTS_CEF_COMPAT_GENERIC
 +};
 +
 +enum arknights_cef_descriptor_region
@@ -26,8 +25,6 @@ index b0b2392..15dc475 100644
 +    {'L','M','I','S','X','H','_','A','K','M','O','C','L',0};
 +static const WCHAR arknights_runtime_cef_compat_nameW[] =
 +    {'L','M','I','S','X','H','_','A','K','M','O','C','L','_','C','E','F',0};
-+static const WCHAR arknights_runtime_cn_compat_nameW[] =
-+    {'L','M','I','S','X','H','_','A','K','M','O','C','L','_','C','N',0};
 +
 +static BOOL arknights_runtime_query_flag( const WCHAR *name, USHORT name_length, BOOL *present )
 +{
@@ -48,19 +45,11 @@ index b0b2392..15dc475 100644
 +
 +    if (value == -1)
 +    {
-+        if (!arknights_runtime_query_flag( arknights_runtime_master_nameW,
-+                                           sizeof(arknights_runtime_master_nameW) - sizeof(WCHAR), &present ))
-+            value = ARKNIGHTS_CEF_COMPAT_DISABLED;
-+        else if (arknights_runtime_query_flag( arknights_runtime_cef_compat_nameW,
++        value = (arknights_runtime_query_flag( arknights_runtime_master_nameW,
++                                               sizeof(arknights_runtime_master_nameW) - sizeof(WCHAR), &present ) &&
++                 arknights_runtime_query_flag( arknights_runtime_cef_compat_nameW,
 +                                               sizeof(arknights_runtime_cef_compat_nameW) - sizeof(WCHAR), &present ))
-+            value = ARKNIGHTS_CEF_COMPAT_GENERIC;
-+        else if (present)
-+            value = ARKNIGHTS_CEF_COMPAT_DISABLED;
-+        else if (arknights_runtime_query_flag( arknights_runtime_cn_compat_nameW,
-+                                               sizeof(arknights_runtime_cn_compat_nameW) - sizeof(WCHAR), &present ))
-+            value = ARKNIGHTS_CEF_COMPAT_LEGACY_CN;
-+        else
-+            value = ARKNIGHTS_CEF_COMPAT_DISABLED;
++            ? ARKNIGHTS_CEF_COMPAT_GENERIC : ARKNIGHTS_CEF_COMPAT_DISABLED;
 +        InterlockedCompareExchange(&state, value, -1);
 +    }
 +    return value;
@@ -89,7 +78,6 @@ index b0b2392..15dc475 100644
 +    unsigned int i;
 +
 +    if (mode == ARKNIGHTS_CEF_COMPAT_DISABLED ||
-+        (mode == ARKNIGHTS_CEF_COMPAT_LEGACY_CN && descriptor->region != ARKNIGHTS_CEF_REGION_CN) ||
 +        wcscmp( wm->ldr.BaseDllName.Buffer, descriptor->module_name ))
 +        return FALSE;
 +
