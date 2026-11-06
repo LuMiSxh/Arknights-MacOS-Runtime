@@ -14,7 +14,9 @@
   "master_env": "LMISXH_AKMOCL",
   "modifiers": {
     "LMISXH_AKMOCL_CEF": "Enable the Bilibili CEF 80.1.15 descriptor.",
-    "LMISXH_AKMOCL_CN": "Enable the Bilibili window behavior."
+    "LMISXH_AKMOCL_CN": "Enable the Bilibili window behavior.",
+    "LMISXH_AKMOCL_FULLSCREEN": "Put fullscreen games in a native macOS Space.",
+    "LMISXH_AKMOCL_CURSOR": "Hide the two game software-cursor assets."
   },
   "wine": {
     "portfile": "overlay/emulators/wine-arm64ec/Portfile",
@@ -73,6 +75,22 @@
         "path": "patches/wine-build-new/wine/0008-winemac-bilibili-join-all-spaces.patch",
         "sha256": "697cc61e8391b6a75bb01b429f4ac3830cc8062f74da257fd8f215e2cb0b2113",
         "modifier": "LMISXH_AKMOCL_CN",
+        "default": "off",
+        "optional": true
+      },
+      {
+        "order": 81,
+        "path": "patches/wine-build-new/wine/0009-winemac-native-fullscreen-space.patch",
+        "sha256": "724b54a3b41d6e7a83c809ab4bbb58e6372e95e5aaa83d9161ff89f710382e2d",
+        "modifier": "LMISXH_AKMOCL_FULLSCREEN",
+        "default": "off",
+        "optional": true
+      },
+      {
+        "order": 82,
+        "path": "patches/wine-build-new/wine/0010-ntdll-hide-software-cursor-asset.patch",
+        "sha256": "f76d6feaa0f1274d930f3b7501f99cfa4cc9e514453b325ba417c45b0bcd43b1",
+        "modifier": "LMISXH_AKMOCL_CURSOR",
         "default": "off",
         "optional": true
       }

@@ -39,6 +39,8 @@ reference the export as `arknights-macos-runtime/patches/wine-build-new/wine/...
 | `0006-ntdll-bilibili-cef80-stack-base.patch`       | `patches/shared/wine/cef/` (rebased)          | master + `_CEF`  |
 | `0007-win32u-winemac-bilibili-layered-child.patch` | `patches/shared/wine/cn/windowing/` (rebased) | master + `_CN`   |
 | `0008-winemac-bilibili-join-all-spaces.patch`      | `patches/shared/wine/cn/windowing/`           | master + `_CN` (optional) |
+| `0009-winemac-native-fullscreen-space.patch`       | `patches/shared/wine/fullscreen/` (rebased)   | master + `_FULLSCREEN` (optional) |
+| `0010-ntdll-hide-software-cursor-asset.patch`      | `patches/shared/wine/hardware-cursor/`        | master + `_CURSOR` (optional) |
 
 `0003` is reduced. The workspace already has `PsGetProcessImageFileName`,
 `PsReferencePrimaryToken`, `PsGetProcessExitStatus`, `ObRegisterCallbacks`,
@@ -98,6 +100,8 @@ opts one behavior in. An absent or invalid modifier leaves that behavior off.
 LMISXH_AKMOCL=1
 LMISXH_AKMOCL_CEF=1       # Bilibili CEF 80.1.15 descriptor
 LMISXH_AKMOCL_CN=1        # CN window behavior
+LMISXH_AKMOCL_FULLSCREEN=1  # Native fullscreen Space
+LMISXH_AKMOCL_CURSOR=1      # Hide the software cursor asset
 ```
 
 The general patches do not read `LMISXH_AKMOCL`. They are safe for any user of the runtime:
@@ -118,7 +122,7 @@ modifiers it needs. General patches must not depend on that client.
 
 ## Validation
 
-- All 80 Wine patches apply to a pristine Wine 11.18 tree with `patch -p1 -F0`.
+- All 82 Wine patches apply to a pristine Wine 11.18 tree with `patch -p1 -F0`.
 - The resulting tree is byte-identical to the branch the export was generated from.
 - No Wine build, prefix creation, game launch, or ACE run was performed for the export.
 - ACE remains untested. Complete the China update before judging an ACE result.

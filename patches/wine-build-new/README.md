@@ -12,7 +12,7 @@ See [collaborator runtime](../../docs/arm/wine-build-new.md) for the mapping and
 
 | Path | Content |
 | ---- | ------- |
-| `wine/` | Eight Wine patches, applied after the 72-patch queue |
+| `wine/` | Ten Wine patches, applied after the 72-patch queue |
 | `lock.json` | Machine-readable list of paths, hashes, and gates |
 
 ## What is in the export
@@ -27,6 +27,8 @@ See [collaborator runtime](../../docs/arm/wine-build-new.md) for the mapping and
 | `0006-ntdll-bilibili-cef80-stack-base.patch` | master + `_CEF` | Bilibili CEF 80.1.15 stack-base descriptors. |
 | `0007-win32u-winemac-bilibili-layered-child.patch` | master + `_CN` | Bilibili layered child window. |
 | `0008-winemac-bilibili-join-all-spaces.patch` | master + `_CN` (optional) | Bilibili payment window on every Space. |
+| `0009-winemac-native-fullscreen-space.patch` | master + `_FULLSCREEN` (optional) | Puts fullscreen games in a native macOS Space. |
+| `0010-ntdll-hide-software-cursor-asset.patch` | master + `_CURSOR` (optional) | Hides the two game software-cursor assets. |
 
 ## What is not in the export
 
@@ -38,8 +40,9 @@ See [collaborator runtime](../../docs/arm/wine-build-new.md) for the mapping and
   runtime patch. This repository keeps the patch for its entitlement-free local lane.
 - **Address space, W^X, ID registers, EC bitmap, and FEX JIT patches.** The Hadron queue
   already provides them.
-- **Loader name, fullscreen, hardware cursor, audio, and DXMT.** Not required for login or
-  ACE. The DXMT patch also targets a different DXMT pin.
+- **Loader name, audio, and DXMT.** Not required for login or ACE. The DXMT patch also
+  targets a different DXMT pin. Fullscreen and hardware cursor are optional; they are in
+  the export because the client uses them.
 
 ## Gates
 
@@ -50,6 +53,8 @@ in. An absent or invalid modifier leaves that behavior off.
 LMISXH_AKMOCL=1
 LMISXH_AKMOCL_CEF=1       # Bilibili CEF 80.1.15 descriptor
 LMISXH_AKMOCL_CN=1        # CN window behavior
+LMISXH_AKMOCL_FULLSCREEN=1  # Native fullscreen Space
+LMISXH_AKMOCL_CURSOR=1      # Hide the software cursor asset
 ```
 
 The general patches do not read `LMISXH_AKMOCL`. ACE is not separately gated.
@@ -67,6 +72,6 @@ The FEX port no longer needs an entry.
 
 ## Validation
 
-- All eight Wine patches apply with `patch -p1 -F0` after the workspace's 72-patch queue.
+- All ten Wine patches apply with `patch -p1 -F0` after the workspace's 72-patch queue.
 - No Wine build, prefix, game launch, or ACE run was performed for this export.
 - ACE remains unverified. Complete the China update before judging an ACE result.
