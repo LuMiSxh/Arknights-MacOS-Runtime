@@ -2,7 +2,7 @@
   "schema": 1,
   "kind": "arknights-patch-set",
   "generated_for": "wine-build-new",
-  "submodule_path": "patches/wine/arknights-macos-runtime",
+  "submodule_path": "third-party/arknights-macos-runtime",
   "source": {
     "repository": "https://github.com/LuMiSxh/Arknights-MacOS-Runtime",
     "export_branch": "main"
@@ -105,5 +105,6 @@
       "patch": "mono/skip",
       "reason": "The workspace has the cross-architecture entitlement; use WINEDLLOVERRIDES=mscoree=d if needed."
     }
-  ]
+  ],
+  "patch_alias": "patches/wine/arknights-macos-runtime"
 }

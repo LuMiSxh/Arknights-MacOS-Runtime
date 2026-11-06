@@ -18,14 +18,16 @@ in this repository. The workspace receives a rebased copy and a Portfile entry.
 | Endfield      | commit `568afd1a32e25e40170eb7484f6790d1e1d370fd`                 |
 | Workspace branch | `arknights-arm64`                                              |
 | Submodule branch | `main`                                                        |
-| Submodule path | `patches/wine/arknights-macos-runtime`                           |
+| Submodule path | `third-party/arknights-macos-runtime`                             |
+| Patch alias    | `patches/wine/arknights-macos-runtime`                            |
 | Wine export   | `patches/wine-build-new/wine/`                                    |
 
 The workspace applies 72 Wine patches before the Arknights export. The export patches are
 rebased against that queue, not against this repository's WineCX 11.17 tree.
 
-The workspace mounts this repository at `patches/wine/arknights-macos-runtime`. Its Portfiles
-reference the export as `arknights-macos-runtime/patches/wine-build-new/wine/...`.
+The workspace mounts this repository at `third-party/arknights-macos-runtime`. A relative
+symlink at `patches/wine/arknights-macos-runtime` keeps the Portfile paths stable. The Portfile
+references the export as `arknights-macos-runtime/patches/wine-build-new/wine/...`.
 
 ## Export set
 

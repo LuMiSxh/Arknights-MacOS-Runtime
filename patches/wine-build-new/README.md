@@ -6,6 +6,8 @@ This directory is the Arknights patch export for the signed ARM64 runtime built 
 
 The workspace builds upstream Wine 11.18 with a 72-patch Hadron and Endfield queue. The
 patches here are rebased against that queue, not against this repository's WineCX 11.17 tree.
+The submodule lives at `third-party/arknights-macos-runtime`; the workspace exposes it at
+`patches/wine/arknights-macos-runtime` so the Portfile paths stay short.
 See [collaborator runtime](../../docs/arm/wine-build-new.md) for the mapping and the skip list.
 
 ## Layout
@@ -61,8 +63,9 @@ The general patches do not read `LMISXH_AKMOCL`. ACE is not separately gated.
 
 ## Workspace integration
 
-The workspace adds this repository at `patches/wine/arknights-macos-runtime`. Its Portfile
-sets `filespath` to `patches/wine` and lists the patches as:
+The workspace adds this repository at `third-party/arknights-macos-runtime`. A relative
+symlink at `patches/wine/arknights-macos-runtime` lets the Portfile keep `filespath` at
+`patches/wine` and list the patches as:
 
 ```text
 arknights-macos-runtime/patches/wine-build-new/wine/0001-... \
