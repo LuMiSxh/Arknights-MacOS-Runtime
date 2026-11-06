@@ -45,9 +45,10 @@ Terminal; the agent shell suppresses synchronous signals.
 The signed build in `wine-build-new` has the cross-architecture entitlement. The custom-x18
 entitlement is pending. It uses Hadron's W^X and JIT model, so it does not need the
 `address-space`, `wx-pages`, `id-registers`, `ec-code-bitmap`, or FEX `map-jit` patches. It
-needs the ACE context, ACE thread entry, AppContainer, Winsock, CEF, and CN window patches plus
-the FEX lookup-cache commit. See [collaborator runtime](wine-build-new.md) for the export and
-the skip list.
+needs the ACE context, ACE thread entry, AppContainer, Winsock, CEF, CN window, fullscreen,
+and cursor patches. The workspace FEX `local/0009` already commits the L1 lookup window, so
+it replaces the lookup-cache commit. See [collaborator runtime](wine-build-new.md) for the
+export and the skip list.
 
 ## Remaining
 
