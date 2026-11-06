@@ -2,7 +2,7 @@ diff --git a/dlls/ntdll/loader.c b/dlls/ntdll/loader.c
 index 22d2ef7e..4bd6e0f9 100644
 --- a/dlls/ntdll/loader.c
 +++ b/dlls/ntdll/loader.c
-@@ -2991,6 +2991,175 @@ static void apply_fuzzy_binary_patches( WINE_MODREF *wm )
+@@ -2991,6 +2991,174 @@ static void apply_fuzzy_binary_patches( WINE_MODREF *wm )
  #endif
  
  #if defined(__i386__) || defined(__x86_64__)
@@ -52,7 +52,7 @@ index 22d2ef7e..4bd6e0f9 100644
 +    return value;
 +}
 +
-++struct arknights_cef_patch
++struct arknights_cef_patch
 +{
 +    ULONG_PTR offset;
 +    const char *before;
@@ -74,8 +74,7 @@ index 22d2ef7e..4bd6e0f9 100644
 +{
 +    unsigned int i;
 +
-+    if (mode == ARKNIGHTS_CEF_COMPAT_DISABLED ||
-+        (mode == ARKNIGHTS_CEF_COMPAT_LEGACY_CN && descriptor->region != ARKNIGHTS_CEF_REGION_CN) ||
++    if (mode == LMISXH_CEF_COMPAT_DISABLED ||
 +        wcscmp( wm->ldr.BaseDllName.Buffer, descriptor->module_name ))
 +        return FALSE;
 +
