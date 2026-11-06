@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "kind": "arknights-patch-set",
+  "generated_for": "wine-build-new",
+  "submodule_path": "third-party/arknights-macos-runtime",
+  "source": {
+    "repository": "https://github.com/LuMiSxh/Arknights-MacOS-Runtime",
+    "export_branch": "main"
+  },
+  "base": {
+    "wine": "7b3fff76fa5178f6ce0141b2c776afa2a822f101",
+    "queue_before": 72
+  },
+  "master_env": "LMISXH_AKMOCL",
+  "modifiers": {
+    "LMISXH_AKMOCL_CEF": "Enable the Bilibili CEF 80.1.15 descriptor.",
+    "LMISXH_AKMOCL_CN": "Enable the Bilibili window behavior.",
+    "LMISXH_AKMOCL_FULLSCREEN": "Put fullscreen games in a native macOS Space.",
+    "LMISXH_AKMOCL_CURSOR": "Hide the two game software-cursor assets."
+  },
+  "wine": {
+    "portfile": "overlay/emulators/wine-arm64ec/Portfile",
+    "patches": [
+      {
+        "order": 73,
+        "path": "patches/wine-build-new/wine/0001-ntdll-carry-eflags-af-df.patch",
+        "sha256": "bdaa657858ca194535902385fb698943e86b8cfad57bc88c9b8ee0dab96207ce",
+        "modifier": null,
+        "default": "on"
+      },
+      {
+        "order": 74,
+        "path": "patches/wine-build-new/wine/0002-ntdll-hybrid-thread-entry.patch",
+        "sha256": "4ef0ddb8016ebd42d4df007b3fc038cdac31d31b5ef4aa5100e8276bc457f2d0",
+        "modifier": null,
+        "default": "on"
+      },
+      {
+        "order": 75,
+        "path": "patches/wine-build-new/wine/0003-ntoskrnl-arknights-ace-imports.patch",
+        "sha256": "63dafcff841eb083c96940a584902d48f4d7036ff6f917291cbcd2f25fcfdd1b",
+        "modifier": null,
+        "default": "on"
+      },
+      {
+        "order": 76,
+        "path": "patches/wine-build-new/wine/0004-userenv-appcontainer-apis.patch",
+        "sha256": "69df2d4e4d057ff19728a761ccd178e2f07371142692075c7ecc838fe669dfbe",
+        "modifier": null,
+        "default": "on"
+      },
+      {
+        "order": 77,
+        "path": "patches/wine-build-new/wine/0005-ws2_32-address-list-sort.patch",
+        "sha256": "d2861b0a0a1e84185137ee89a631d46c1b8c30e19c5f3fc9f4a553d5c2a261ff",
+        "modifier": null,
+        "default": "on"
+      },
+      {
+        "order": 78,
+        "path": "patches/wine-build-new/wine/0006-ntdll-bilibili-cef80-stack-base.patch",
+        "sha256": "22a35c0c5b13953653aaab409b5f9fe5362366889c0d2497e0159f1331e68cd2",
+        "modifier": "LMISXH_AKMOCL_CEF",
+        "default": "off"
+      },
+      {
+        "order": 79,
+        "path": "patches/wine-build-new/wine/0007-win32u-winemac-bilibili-layered-child.patch",
+        "sha256": "0c5553f8d0131bc3581729d566fda09b6476b65652127c921106dd49860bb0c5",
+        "modifier": "LMISXH_AKMOCL_CN",
+        "default": "off"
+      },
+      {
+        "order": 80,
+        "path": "patches/wine-build-new/wine/0008-winemac-bilibili-join-all-spaces.patch",
+        "sha256": "697cc61e8391b6a75bb01b429f4ac3830cc8062f74da257fd8f215e2cb0b2113",
+        "modifier": "LMISXH_AKMOCL_CN",
+        "default": "off",
+        "optional": true
+      },
+      {
+        "order": 81,
+        "path": "patches/wine-build-new/wine/0009-winemac-native-fullscreen-space.patch",
+        "sha256": "724b54a3b41d6e7a83c809ab4bbb58e6372e95e5aaa83d9161ff89f710382e2d",
+        "modifier": "LMISXH_AKMOCL_FULLSCREEN",
+        "default": "off",
+        "optional": true
+      },
+      {
+        "order": 82,
+        "path": "patches/wine-build-new/wine/0010-ntdll-hide-software-cursor-asset.patch",
+        "sha256": "f76d6feaa0f1274d930f3b7501f99cfa4cc9e514453b325ba417c45b0bcd43b1",
+        "modifier": "LMISXH_AKMOCL_CURSOR",
+        "default": "off",
+        "optional": true
+      }
+    ]
+  },
+  "excluded": [
+    {
+      "patch": "fex/lookup-cache-commit",
+      "reason": "FEX 2610 and Wine 11.18 pass x64/i386 FEX probes without it."
+    },
+    {
+      "patch": "mono/skip",
+      "reason": "The workspace has the cross-architecture entitlement; use WINEDLLOVERRIDES=mscoree=d if needed."
+    }
+  ],
+  "patch_alias": "patches/wine/arknights-macos-runtime"
+}

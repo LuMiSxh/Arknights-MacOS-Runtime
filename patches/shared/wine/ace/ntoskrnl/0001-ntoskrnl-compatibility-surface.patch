@@ -21,7 +21,7 @@ index ffa409a7..18ab5c93 100644
      NtQueryInformationProcess( handle, ProcessBasicInformation, &process->info, sizeof(process->info), NULL );
 -    NtQueryInformationProcess( handle, ProcessSessionInformation, &process->session_id, sizeof(process->session_id), NULL );
 -    NtQueryInformationProcess( handle, ProcessTimes, &process->times, sizeof(process->times), NULL );
-+    if (arknights_runtime_ace_compact_enabled())
++    if (lmisxh_akmocl_ace_enabled())
 +    {
 +        /* get full image name */
 +        len = 0;
@@ -76,7 +76,7 @@ index ffa409a7..18ab5c93 100644
 +{
 +    PEPROCESS process = obj;
 +
-+    if (arknights_runtime_ace_compact_enabled() && process->token)
++    if (lmisxh_akmocl_ace_enabled() && process->token)
 +        ObDereferenceObject(process->token);
 +
 +    process->token = NULL;
@@ -128,7 +128,7 @@ index ffa409a7..18ab5c93 100644
 + */
 +PACCESS_TOKEN WINAPI PsReferencePrimaryToken( PEPROCESS process )
 +{
-+    if (!arknights_runtime_ace_compact_enabled()) return NULL;
++    if (!lmisxh_akmocl_ace_enabled()) return NULL;
 +    TRACE("%p -> %p\n", process, process->token);
 +    if (process->token) ObReferenceObject(process->token);
 +    return process->token;
@@ -146,7 +146,7 @@ index ffa409a7..18ab5c93 100644
 + */
 +PEPROCESS WINAPI PsGetThreadProcess(PETHREAD thread)
 +{
-+    if (!arknights_runtime_ace_compact_enabled()) return NULL;
++    if (!lmisxh_akmocl_ace_enabled()) return NULL;
 +    TRACE("%p -> %p\n", thread, thread->kthread.process);
 +    return thread->kthread.process;
 +}
@@ -166,7 +166,7 @@ index ffa409a7..18ab5c93 100644
 +    NTSTATUS status;
 +    HANDLE handle, id;
 +
-+    if (!arknights_runtime_ace_compact_enabled()) return STATUS_NOT_IMPLEMENTED;
++    if (!lmisxh_akmocl_ace_enabled()) return STATUS_NOT_IMPLEMENTED;
 +
 +    id = PsGetThreadId(thread);
 +    if (!(handle = OpenThread(THREAD_ALL_ACCESS, FALSE, HandleToUlong(id))))
@@ -190,7 +190,7 @@ index ffa409a7..18ab5c93 100644
 +    static PHYSICAL_MEMORY_RANGE range;
 +    SYSTEM_BASIC_INFORMATION info = {0};
 +
-+    if (!arknights_runtime_ace_compact_enabled()) return NULL;
++    if (!lmisxh_akmocl_ace_enabled()) return NULL;
 +    TRACE("\n");
 +
 +    if (!InterlockedCompareExchange(&once, 1, 0))
@@ -212,7 +212,7 @@ index ffa409a7..18ab5c93 100644
 + */
 +void *WINAPI MmGetVirtualForPhysical(PHYSICAL_ADDRESS addr)
 +{
-+    if (!arknights_runtime_ace_compact_enabled()) return NULL;
++    if (!lmisxh_akmocl_ace_enabled()) return NULL;
 +    ULONG_PTR ret = addr.QuadPart;
 +    FIXME("(%p): semi-stub!\n", (void *)ret);
 +    return (void *)ret;
@@ -254,7 +254,7 @@ index ffa409a7..18ab5c93 100644
 +NTSTATUS WINAPI SeSetAuditParameter(void *audit_parameters, LONG type, ULONG index, void *data)
 +{
 +    FIXME("%p %ld %lu %p\n", audit_parameters, type, index, data);
-+    if (!arknights_runtime_ace_compact_enabled()) return STATUS_NOT_IMPLEMENTED;
++    if (!lmisxh_akmocl_ace_enabled()) return STATUS_NOT_IMPLEMENTED;
 +    return STATUS_SUCCESS;
 +}
 +
@@ -273,7 +273,7 @@ index ffa409a7..18ab5c93 100644
 +    TRACE("%p %p\n", process, image_name);
 +
 +    if (!image_name) return STATUS_INVALID_PARAMETER;
-+    if (!arknights_runtime_ace_compact_enabled())
++    if (!lmisxh_akmocl_ace_enabled())
 +    {
 +        *image_name = NULL;
 +        return STATUS_NOT_IMPLEMENTED;
@@ -420,13 +420,13 @@ diff --git a/dlls/ntoskrnl.exe/ntoskrnl_private.h b/dlls/ntoskrnl.exe/ntoskrnl_p
 index feb5f0ad..98365595 100644
 --- a/dlls/ntoskrnl.exe/ntoskrnl_private.h
 +++ b/dlls/ntoskrnl.exe/ntoskrnl_private.h
-@@ -39,6 +39,22 @@
+@@ -39,6 +39,23 @@
  #include "wine/list.h"
  #include "wine/rbtree.h"
  
-+/* The ACE compact compatibility surface is opt-in. Keep the default path byte-for-byte
-+ * equivalent to the unpatched Wine behavior when the control is disabled. */
-+static inline BOOL arknights_runtime_ace_compact_enabled(void)
++/* The ACE compatibility surface is opt-in. The Arknights master switch
++ * enables it. */
++static inline BOOL lmisxh_akmocl_ace_enabled(void)
 +{
 +    static LONG state = -1;
 +    LONG value = state;
@@ -434,7 +434,8 @@ index feb5f0ad..98365595 100644
 +
 +    if (value == -1)
 +    {
-+        value = GetEnvironmentVariableA("ARKNIGHTS_RUNTIME_ACE_COMPACT", flag, sizeof(flag)) == 1 && flag[0] == '1';
++        value = GetEnvironmentVariableA("LMISXH_AKMOCL", flag, sizeof(flag)) == 1 && flag[0] == '1';
++        /* ACE compatibility follows the Arknights master switch. */
 +        InterlockedCompareExchange(&state, value, -1);
 +    }
 +    return value;

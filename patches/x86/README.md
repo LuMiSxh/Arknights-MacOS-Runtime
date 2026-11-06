@@ -8,7 +8,7 @@ Shared patches are in `../shared/`, and ARM64-only patches are in `../arm/`.
 The x86_64 ACE routes are the [dispatcher spoof](wine/ace/dispatcher/0001-kernel32-ace-dispatcher-spoof.patch)
 and the [Rosetta workarounds](wine/ace/rosetta/0001-macos-rosetta-ace-workarounds.patch).
 Both belong to the [ACE family](../../shared/wine/ace/README.md) and use the same
-`ARKNIGHTS_RUNTIME_ACE_COMPACT=1` gate.
+`LMISXH_AKMOCL=1` master switch.
 The kernel and timing routes are shared.
 
 Apply the family in the order of the family README:

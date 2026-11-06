@@ -109,14 +109,14 @@
       "component": "wine",
       "family": "audio",
       "path": "patches/shared/wine/audio/0001-winecoreaudio-default-output.patch",
-      "sha256": "2676309df8bbcad45ae9d41848dde3e79c597189ccb2f6f899b3155b24e54a05"
+      "sha256": "a1a75239688f71258632f49032841ca7fb7dbb88f1e87e62da2e1acf9989086a"
     },
     {
       "id": "wine-hardware-cursor-suppression",
       "component": "wine",
       "family": "hardware-cursor",
       "path": "patches/shared/wine/hardware-cursor/0001-ntdll-hide-software-cursor-asset.patch",
-      "sha256": "ce4c5416840a23a1a526a8273abd1373fc36507e1a1d97b97fdade6bf9a1347d"
+      "sha256": "f76d6feaa0f1274d930f3b7501f99cfa4cc9e514453b325ba417c45b0bcd43b1"
     },
     {
       "id": "dxmt-skip-release-present-statistics",
@@ -130,7 +130,7 @@
       "component": "wine",
       "family": "ace",
       "path": "patches/shared/wine/ace/ntoskrnl/0001-ntoskrnl-compatibility-surface.patch",
-      "sha256": "e81a63be33e7a314758fdaa73f378d33d3fba5123333697c21b0e87ce64b2e44"
+      "sha256": "aee68d362a8d29125221aaa08998a88c2cf6c7f5010717e700d5f4a0b23a70f0"
     },
     {
       "id": "wine-ace-dispatcher-spoof",
@@ -140,7 +140,7 @@
         "rosetta-x86_64"
       ],
       "path": "patches/x86/wine/ace/dispatcher/0001-kernel32-ace-dispatcher-spoof.patch",
-      "sha256": "f60ccef64cf3fa154de7a85b96a5fbaabceb019ed92ea0af2f94dd61d90cb2be"
+      "sha256": "adfa7f97b7777f5162f28568dd8066bfc266395608e4bd89342520b193222918"
     },
     {
       "id": "wine-ace-rosetta-workarounds",
@@ -150,28 +150,28 @@
         "rosetta-x86_64"
       ],
       "path": "patches/x86/wine/ace/rosetta/0001-macos-rosetta-ace-workarounds.patch",
-      "sha256": "d6c259ef95d715fec0717882a656e2ef5dfc59b72af02969a38d05bd253e2f95"
+      "sha256": "8d126a5d2c21467a9e78e6fee22163713e4fdd5b0a8dfcee5a845b77faa7c306"
     },
     {
       "id": "wine-ace-relative-wait",
       "component": "wine",
       "family": "ace",
       "path": "patches/shared/wine/ace/timing/0001-ntdll-ace-qpc-relative-wait.patch",
-      "sha256": "5fe6395cf941d8da56f2a2525e005fe1abc109440287b03ec43a38c8a1dbd4c7"
+      "sha256": "e9044fa64ca4e0b8910c1c5dfcdb87fbf51584b87e5b28c7ead00b769e4d1a70"
     },
     {
       "id": "wine-cef-bilibili-stackbase",
       "component": "wine",
       "family": "cef",
       "path": "patches/shared/wine/cef/0001-ntdll-cef-compatibility.patch",
-      "sha256": "5e79f311c7386ab1dba8d16a264a790310388c7cce13a2e732305809cf4a6370"
+      "sha256": "c74032eecca6cc287a2014c75af5ae9d2a6a7903e6e0569b71c9242ba46bf274"
     },
     {
       "id": "wine-cn-bilibili-layered-child",
       "component": "wine",
       "family": "cn",
       "path": "patches/shared/wine/cn/windowing/0001-win32u-winemac-bilibili-layered-child.patch",
-      "sha256": "1c7b8dd32302cb409399035441cd378acfe260ca1515be4d96966556e326fa8d"
+      "sha256": "0e248235ea4a924d62ad6b966cdb8a90bece203279da44fa62de1e1bb36ecd5d"
     },
     {
       "id": "wine-cn-bilibili-join-all-spaces",
@@ -192,7 +192,7 @@
       "component": "wine",
       "family": "fullscreen",
       "path": "patches/shared/wine/fullscreen/0001-winemac-native-fullscreen-space.patch",
-      "sha256": "be5002957b5d7a5de5eae6ffe6d2a6df676efbce29152b6b34939bfa3869805f"
+      "sha256": "3b83dfd872782138ef2de91461f96ea099616ca1a78cd5f7f644fe2008898615"
     },
     {
       "id": "wine-winsock-address-list-sort",
@@ -253,7 +253,7 @@
       "component": "wine",
       "family": "mono",
       "path": "patches/arm/wine/mono/0001-mscoree-skip-mono-on-native-arm64.patch",
-      "sha256": "b7d811fe95c916c377b9d7f812e0cb7781df2de2d363b92bf65316ff367ed7ed",
+      "sha256": "ba3735ec6193864ad77118b565d85a0b4a41709bf066ef893ba125aeffed8bde",
       "targets": [
         "native-arm64"
       ]

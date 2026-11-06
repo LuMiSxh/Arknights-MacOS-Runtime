@@ -1,0 +1,64 @@
+diff --git a/dlls/ntoskrnl.exe/ntoskrnl.c b/dlls/ntoskrnl.exe/ntoskrnl.c
+index b23b530..51b11b2 100644
+--- a/dlls/ntoskrnl.exe/ntoskrnl.c
++++ b/dlls/ntoskrnl.exe/ntoskrnl.c
+@@ -3723,6 +3723,22 @@ HANDLE WINAPI PsGetCurrentProcessId(void)
+     return KeGetCurrentThread()->id.UniqueProcess;
+ }
+ 
++/***********************************************************************
++ *           PsGetCurrentThreadProcess   (NTOSKRNL.EXE.@)
++ */
++PEPROCESS WINAPI PsGetCurrentThreadProcess(void)
++{
++    return PsGetCurrentProcess();
++}
++
++/***********************************************************************
++ *           PsGetCurrentThreadProcessId   (NTOSKRNL.EXE.@)
++ */
++HANDLE WINAPI PsGetCurrentThreadProcessId(void)
++{
++    return PsGetCurrentProcessId();
++}
++
+ /***********************************************************************
+  *           PsGetCurrentProcessSessionId   (NTOSKRNL.EXE.@)
+  */
+@@ -5000,6 +5016,15 @@ BOOLEAN WINAPI SeSinglePrivilegeCheck(LUID privilege, KPROCESSOR_MODE mode)
+ /*********************************************************************
+  *           SePrivilegeCheck    (NTOSKRNL.@)
+  */
++/*********************************************************************
++ *           SeSetAuditParameter    (NTOSKRNL.@)
++ */
++NTSTATUS WINAPI SeSetAuditParameter(void *audit_parameters, LONG type, ULONG index, void *data)
++{
++    FIXME("%p %ld %lu %p\n", audit_parameters, type, index, data);
++    return STATUS_SUCCESS;
++}
++
+ BOOLEAN WINAPI SePrivilegeCheck(PRIVILEGE_SET *privileges, SECURITY_SUBJECT_CONTEXT *context, KPROCESSOR_MODE mode)
+ {
+     FIXME("stub: %p %p %u\n", privileges, context, mode);
+diff --git a/dlls/ntoskrnl.exe/ntoskrnl.exe.spec b/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
+index bee00e8..dc1e398 100644
+--- a/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
++++ b/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
+@@ -918,6 +918,8 @@
+ @ stdcall PsGetCurrentProcessSessionId()
+ @ stdcall PsGetCurrentThread() KeGetCurrentThread
+ @ stdcall PsGetCurrentThreadId()
++@ stdcall PsGetCurrentThreadProcess()
++@ stdcall PsGetCurrentThreadProcessId()
+ @ stub PsGetCurrentThreadPreviousMode
+ @ stub PsGetCurrentThreadStackBase
+ @ stub PsGetCurrentThreadStackLimit
+@@ -1376,6 +1378,7 @@
+ @ stub SeReleaseSecurityDescriptor
+ @ stub SeReleaseSubjectContext
+ @ stub SeSetAccessStateGenericMapping
++@ stdcall SeSetAuditParameter(ptr long long ptr)
+ @ stub SeSetSecurityDescriptorInfo
+ @ stub SeSetSecurityDescriptorInfoEx
+ @ stdcall SeSinglePrivilegeCheck(int64 long)

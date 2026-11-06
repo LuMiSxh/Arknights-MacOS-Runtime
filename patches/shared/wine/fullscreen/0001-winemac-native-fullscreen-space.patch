@@ -86,7 +86,7 @@ index 4d573c9..a57c6d1 100644
      NSRect nonFullscreenFrame;
      NSTimeInterval enteredFullScreenTime;
 
-+    /* Native fullscreen Space (ARKNIGHTS_RUNTIME_NATIVE_FULLSCREEN_SPACE) */
++    /* Native fullscreen Space (LMISXH_AKMOCL_FULLSCREEN) */
 +    BOOL nativeSpaceCandidate;
 +    BOOL nativeSpaceExempt;
 +    BOOL wineCloseButton;
@@ -520,7 +520,7 @@ index 05aaa57..a0f9468 100644
 
 +    /* Runtime gate: only the exact value "1" enables native fullscreen Spaces. */
 +    {
-+        const char *value = getenv("ARKNIGHTS_RUNTIME_NATIVE_FULLSCREEN_SPACE");
++        const char *value = getenv("LMISXH_AKMOCL_FULLSCREEN");
 +        native_fullscreen_space = value && value[0] == '1' && !value[1];
 +
 +        /* The client's platform notice helper inherits the variable. Its windows

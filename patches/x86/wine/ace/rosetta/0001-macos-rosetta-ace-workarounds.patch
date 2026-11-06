@@ -2,23 +2,26 @@ diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
 index 2b1338c5..5d5ddc6d 100644
 --- a/dlls/ntdll/unix/signal_x86_64.c
 +++ b/dlls/ntdll/unix/signal_x86_64.c
-@@ -1826,6 +1826,21 @@ NTSTATUS WINAPI NtCallbackReturn( void *ret_ptr, ULONG ret_len, NTSTATUS status
+@@ -1826,6 +1826,24 @@ NTSTATUS WINAPI NtCallbackReturn( void *ret_ptr, ULONG ret_len, NTSTATUS status
  }
  
  #ifdef __APPLE__
-+/* The additional Rosetta workarounds below are controlled ACE compact compatibility
++/* The additional Rosetta workarounds below are controlled ACE compatibility
 + * behavior. Existing CrossOver CET/XGETBV handling remains unchanged. */
-+static volatile LONG arknights_runtime_ace_compact;
++static volatile LONG lmisxh_akmocl_ace;
 +
-+static BOOL arknights_runtime_ace_compact_enabled(void)
++static BOOL lmisxh_akmocl_ace_enabled(void)
 +{
-+    return arknights_runtime_ace_compact != 0;
++    return lmisxh_akmocl_ace != 0;
 +}
 +
-+static void arknights_runtime_ace_compact_init(void)
++static void lmisxh_akmocl_ace_init(void)
 +{
-+    const char *flag = getenv("ARKNIGHTS_RUNTIME_ACE_COMPACT");
-+    InterlockedExchange(&arknights_runtime_ace_compact, flag && flag[0] == '1' && flag[1] == 0);
++    const char *master = getenv("LMISXH_AKMOCL");
++    const char *flag = master;
++    InterlockedExchange(&lmisxh_akmocl_ace,
++                        master && master[0] == '1' && master[1] == 0 &&
++                        flag && flag[0] == '1' && flag[1] == 0);
 +}
 +
  /***********************************************************************
@@ -36,7 +39,7 @@ index 2b1338c5..5d5ddc6d 100644
 +            BOOL has_sib = FALSE;
 +            BYTE modrm, sib;
 +
-+            if (!arknights_runtime_ace_compact_enabled() || p >= len) return FALSE;
++            if (!lmisxh_akmocl_ace_enabled() || p >= len) return FALSE;
 +            modrm = instr[p++];
 +            if (modrm & 0x38) return FALSE; /* /0 is the NOP encoding */
 +            mod = modrm >> 6;
@@ -66,7 +69,7 @@ index 2b1338c5..5d5ddc6d 100644
 +        /* Rosetta can report ACE's privileged CR3 read as an invalid opcode
 +         * rather than a general-protection fault. Preserve Wine's normal
 +         * classification unless the ACE compact compatibility route is enabled. */
-+        if (arknights_runtime_ace_compact_enabled() &&
++        if (lmisxh_akmocl_ace_enabled() &&
 +            (rec.ExceptionCode = is_privileged_instr( &context.c ))) break;
  #endif
          rec.ExceptionCode = EXCEPTION_ILLEGAL_INSTRUCTION;
@@ -75,7 +78,7 @@ index 2b1338c5..5d5ddc6d 100644
      signal_alloc_thread( teb );
  
  #ifdef __APPLE__
-+    arknights_runtime_ace_compact_init();
++    lmisxh_akmocl_ace_init();
      /* CW Hack 24256: We need the value of sysctl.proc_translated in signal
         handlers but sysctl[byname] is not signal-safe. */
      {
