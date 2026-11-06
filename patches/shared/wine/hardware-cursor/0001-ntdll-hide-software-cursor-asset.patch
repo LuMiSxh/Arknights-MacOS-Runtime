@@ -10,7 +10,7 @@ index cb9a0d98..cb359370 100644
  
  #include "ntstatus.h"
  /* Define WIN32_NO_STATUS so MSVC does not give us duplicate macro
-@@ -5085,6 +5086,92 @@ static void test_NtCreateFile(void)
+@@ -5085,6 +5086,97 @@ static void test_NtCreateFile(void)
      RemoveDirectoryW( path );
  }
  
@@ -28,13 +28,18 @@ index cb9a0d98..cb359370 100644
 +        "f7bcd64480c4566f25d65d642f5fba95.bin.extra",
 +        "other.bin"
 +    };
-+    char env[16], dir[MAX_PATH], path[MAX_PATH];
++    char env[32], dir[MAX_PATH], path[MAX_PATH];
 +    DWORD env_len;
 +    BOOL enabled;
 +    unsigned int i;
 +
-+    env_len = GetEnvironmentVariableA( "ARKNIGHTS_RUNTIME_HARDWARE_CURSOR", env, sizeof(env) );
++    env_len = GetEnvironmentVariableA( "LMISXH_AKMOCL", env, sizeof(env) );
 +    enabled = env_len == 1 && !strcmp( env, "1" );
++    if (enabled)
++    {
++        env_len = GetEnvironmentVariableA( "LMISXH_AKMOCL_CURSOR", env, sizeof(env) );
++        enabled = env_len == 1 && !strcmp( env, "1" );
++    }
 +
 +    GetTempPathA( MAX_PATH, dir );
 +    GetTempFileNameA( dir, "hcf", 0, path );
@@ -123,20 +128,21 @@ index 55a0ddac..30c0fa9a 100644
  #ifdef HAVE_SYS_STATVFS_H
  # include <sys/statvfs.h>
  #endif
-@@ -4385,6 +4386,22 @@ static void remove_trailing_backslash( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *
+@@ -4385,6 +4386,23 @@ static void remove_trailing_backslash( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *
      nt_name->Buffer[len - 1] = 0;
  }
  
-+static BOOL arknights_runtime_hardware_cursor_enabled(void)
++static BOOL lmisxh_akmocl_cursor_enabled(void)
 +{
 +    static LONG state = -1;
 +    LONG enabled = InterlockedCompareExchange( &state, -1, -1 );
 +
 +    if (enabled == -1)
 +    {
-+        const char *setting = getenv( "ARKNIGHTS_RUNTIME_HARDWARE_CURSOR" );
++        const char *master = getenv( "LMISXH_AKMOCL" );
++        const char *setting = getenv( "LMISXH_AKMOCL_CURSOR" );
 +
-+        enabled = setting && !strcmp( setting, "1" );
++        enabled = master && !strcmp( master, "1" ) && setting && !strcmp( setting, "1" );
 +        if (InterlockedCompareExchange( &state, enabled, -1 ) != -1)
 +            enabled = InterlockedCompareExchange( &state, -1, -1 );
 +    }
@@ -156,7 +162,7 @@ index 55a0ddac..30c0fa9a 100644
 +
 +        const char *name = basename ? basename + 1 : *unix_name_ret;
 +
-+        if (arknights_runtime_hardware_cursor_enabled() &&
++        if (lmisxh_akmocl_cursor_enabled() &&
 +            (!strcasecmp( name, "a9d41799f1af1868f2db495671227cd4.bin" ) ||
 +             !strcasecmp( name, "f7bcd64480c4566f25d65d642f5fba95.bin" )))
 +        {

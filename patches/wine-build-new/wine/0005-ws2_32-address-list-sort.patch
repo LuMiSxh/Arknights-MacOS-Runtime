@@ -1,0 +1,87 @@
+diff --git a/dlls/ws2_32/socket.c b/dlls/ws2_32/socket.c
+index b0335f4..b946e18 100644
+--- a/dlls/ws2_32/socket.c
++++ b/dlls/ws2_32/socket.c
+@@ -2767,6 +2767,70 @@ INT WINAPI WSAIoctl(SOCKET s, DWORD code, LPVOID in_buff, DWORD in_size, LPVOID
+         return ret ? -1 : 0;
+     }
+ 
++    case SIO_ADDRESS_LIST_SORT:
++    {
++        SOCKET_ADDRESS_LIST *in = in_buff, *out = out_buff;
++        DWORD list_size, total;
++        int i;
++
++        TRACE("-> SIO_ADDRESS_LIST_SORT request\n");
++
++        if (!in || in_size < FIELD_OFFSET(SOCKET_ADDRESS_LIST, Address[0]) ||
++            in->iAddressCount < 0)
++        {
++            *ret_size = 0;
++            SetLastError( WSAEINVAL );
++            return -1;
++        }
++        list_size = FIELD_OFFSET(SOCKET_ADDRESS_LIST, Address[in->iAddressCount]);
++        if (in_size < list_size)
++        {
++            *ret_size = list_size;
++            SetLastError( WSAEFAULT );
++            return -1;
++        }
++        if (!out || out_size < list_size)
++        {
++            *ret_size = list_size;
++            SetLastError( WSAEFAULT );
++            return -1;
++        }
++
++        /* Windows orders the list with the RFC 6724 destination algorithm, which needs
++         * the source addresses.  Callers such as Chromium's asynchronous DNS resolver
++         * only need a valid list, so keep the supplied order. */
++        if (out == in)
++        {
++            *ret_size = in_size;
++            return 0;
++        }
++
++        memcpy( out, in, list_size );
++        total = list_size;
++        for (i = 0; i < in->iAddressCount; i++)
++        {
++            SOCKET_ADDRESS *address = &out->Address[i];
++
++            if (!address->lpSockaddr || address->iSockaddrLength <= 0)
++            {
++                *ret_size = 0;
++                SetLastError( WSAEINVAL );
++                return -1;
++            }
++            if (total + address->iSockaddrLength > out_size)
++            {
++                *ret_size = total + address->iSockaddrLength;
++                SetLastError( WSAEFAULT );
++                return -1;
++            }
++            memmove( (char *)out + total, address->lpSockaddr, address->iSockaddrLength );
++            address->lpSockaddr = (SOCKADDR *)((char *)out + total);
++            total += address->iSockaddrLength;
++        }
++        *ret_size = total;
++        return 0;
++    }
++
+     case SIO_ADDRESS_LIST_CHANGE:
+     {
+         int force_async = !!overlapped;
+diff --git a/include/winsock2.h b/include/winsock2.h
+index 3165ea5..5fbffc9 100644
+--- a/include/winsock2.h
++++ b/include/winsock2.h
+@@ -426,6 +426,7 @@ extern "C" {
+ #define SIO_ADDRESS_LIST_QUERY     _WSAIOR(IOC_WS2,22)
+ #define SIO_ADDRESS_LIST_CHANGE    _WSAIO(IOC_WS2,23)
+ #define SIO_QUERY_TARGET_PNP_HANDLE _WSAIOR(IOC_WS2,24)
++#define SIO_ADDRESS_LIST_SORT      _WSAIORW(IOC_WS2,25)
+ #define SIO_GET_INTERFACE_LIST     _IOR ('t', 127, ULONG)
+ #endif /* USE_WS_PREFIX */
+ 

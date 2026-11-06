@@ -109,12 +109,13 @@ class ReleaseVerificationTests(unittest.TestCase):
             patch.parent.mkdir(parents=True, exist_ok=True)
             if family == "hardware-cursor":
                 content = (
-                    "+static BOOL arknights_runtime_hardware_cursor_enabled(void)\n"
+                    "+static BOOL lmisxh_akmocl_cursor_enabled(void)\n"
                     "+{\n"
-                    '+    const char *setting = getenv( "ARKNIGHTS_RUNTIME_HARDWARE_CURSOR" );\n'
-                    '+    return setting && !strcmp( setting, "1" );\n'
+                    '+    const char *master = getenv( "LMISXH_AKMOCL" );\n'
+                    '+    const char *setting = getenv( "LMISXH_AKMOCL_CURSOR" );\n'
+                    '+    return master && !strcmp( master, "1" ) && setting && !strcmp( setting, "1" );\n'
                     "+}\n"
-                    "+if (arknights_runtime_hardware_cursor_enabled() &&\n"
+                    "+if (lmisxh_akmocl_cursor_enabled() &&\n"
                     '+    (!strcasecmp( name, "a9d41799f1af1868f2db495671227cd4.bin" ) ||\n'
                     '+     !strcasecmp( name, "f7bcd64480c4566f25d65d642f5fba95.bin" )))\n'
                 )

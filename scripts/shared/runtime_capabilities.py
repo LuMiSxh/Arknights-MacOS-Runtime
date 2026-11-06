@@ -112,15 +112,16 @@ def validate_capability_contract(
             if line.startswith("+") and not line.startswith("+++")
         )
         gate = re.search(
-            r"static BOOL arknights_runtime_hardware_cursor_enabled\(void\)\s*\{(.*?)\n\}",
+            r"static BOOL lmisxh_akmocl_cursor_enabled\(void\)\s*\{(.*?)\n\}",
             added_source,
             re.DOTALL,
         )
         if (
             gate is None
-            or 'getenv( "ARKNIGHTS_RUNTIME_HARDWARE_CURSOR" )' not in gate.group(1)
+            or 'getenv( "LMISXH_AKMOCL" )' not in gate.group(1)
+            or 'getenv( "LMISXH_AKMOCL_CURSOR" )' not in gate.group(1)
             or '!strcmp( setting, "1" )' not in gate.group(1)
-            or "arknights_runtime_hardware_cursor_enabled()" not in added_source
+            or "lmisxh_akmocl_cursor_enabled()" not in added_source
             or "a9d41799f1af1868f2db495671227cd4.bin" not in added_source
             or "f7bcd64480c4566f25d65d642f5fba95.bin" not in added_source
         ):

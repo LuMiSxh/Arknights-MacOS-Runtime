@@ -1,0 +1,17 @@
+diff --git a/dlls/winemac.drv/cocoa_window.m b/dlls/winemac.drv/cocoa_window.m
+index 6ff007b..06b6df7 100644
+--- a/dlls/winemac.drv/cocoa_window.m
++++ b/dlls/winemac.drv/cocoa_window.m
+@@ -1079,6 +1079,12 @@ - (void) adjustFullScreenBehavior:(NSWindowCollectionBehavior)behavior
+                 [super toggleFullScreen:nil];
+         }
+ 
++        if (macdrv_is_bilibili_platform_process())
++        {
++            behavior &= ~NSWindowCollectionBehaviorFullScreenPrimary;
++            behavior |= NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary;
++        }
++
+         if (behavior != [self collectionBehavior])
+         {
+             [self setCollectionBehavior:behavior];

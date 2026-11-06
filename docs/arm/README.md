@@ -26,6 +26,7 @@ entitlement details.
 | ACE                             | Untested; the ARM patches are ported and the compact gate is active     |
 | Game                            | Opens; Global login works                                               |
 | Client ARM64 support            | Local app works; the game opens                                         |
+| Signed collaborator runtime     | Patch export prepared; build and ACE pending                            |
 | Dock and menu-bar name          | Baked into the loader as `Arknights`                                    |
 | Window chrome                   | Legacy; the custom x18 ABI entitlement should select the current design |
 
@@ -53,6 +54,7 @@ The x86_64 lane stays the default until the game passes the compatibility checks
 4. [Provenance](provenance.md): the reference runtime and its public sources.
 5. [Pipeline](pipeline.md): the second build target.
 6. [Client](client.md): the consumer changes and the local canary.
+7. [Collaborator runtime](wine-build-new.md): the signed ARM64 patch export.
 
 ## References
 

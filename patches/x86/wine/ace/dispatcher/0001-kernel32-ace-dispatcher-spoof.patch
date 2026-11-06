@@ -2,14 +2,14 @@ diff --git a/dlls/kernel32/module.c b/dlls/kernel32/module.c
 index ac880100..e19cb202 100644
 --- a/dlls/kernel32/module.c
 +++ b/dlls/kernel32/module.c
-@@ -261,6 +261,32 @@ BOOL WINAPI GetBinaryTypeA( LPCSTR lpApplicationName, LPDWORD lpBinaryType )
+@@ -261,6 +261,33 @@ BOOL WINAPI GetBinaryTypeA( LPCSTR lpApplicationName, LPDWORD lpBinaryType )
      return GetBinaryTypeW(NtCurrentTeb()->StaticUnicodeString.Buffer, lpBinaryType);
  }
  
 +#ifdef __x86_64__
-+/* Opt-in only: this dispatcher spoof is enabled by the ACE compact compatibility control.
-+ * Disabled and invalid control values preserve Wine's normal dispatcher path. */
-+static BOOL arknights_runtime_ace_compact_enabled(void)
++/* Opt-in only: this dispatcher spoof is enabled by the ACE compatibility control.
++ * Disabled and invalid values preserve Wine's normal dispatcher path. */
++static BOOL lmisxh_akmocl_ace_enabled(void)
 +{
 +    static LONG state = -1;
 +    LONG value = state;
@@ -17,7 +17,8 @@ index ac880100..e19cb202 100644
 +
 +    if (value == -1)
 +    {
-+        value = GetEnvironmentVariableA("ARKNIGHTS_RUNTIME_ACE_COMPACT", flag, sizeof(flag)) == 1 && flag[0] == '1';
++        value = GetEnvironmentVariableA("LMISXH_AKMOCL", flag, sizeof(flag)) == 1 && flag[0] == '1';
++        /* ACE compatibility follows the Arknights master switch. */
 +        InterlockedCompareExchange(&state, value, -1);
 +    }
 +    return value;
@@ -40,7 +41,7 @@ index ac880100..e19cb202 100644
          ANSI_STRING     str;
  
 +#ifdef __x86_64__
-+        if (arknights_runtime_ace_compact_enabled() &&
++        if (lmisxh_akmocl_ace_enabled() &&
 +            (strcmp( function, "KiUserApcDispatcher" ) == 0 || strcmp( function, "KiUserCallbackDispatcher" ) == 0))
 +        {
 +            FIXME( "HACK: returning int3 stub instead of %s\n", function );

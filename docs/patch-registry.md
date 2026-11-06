@@ -11,7 +11,7 @@ The ACE, CEF, and CN patches target WineCX <!-- pin:wine.commit|code -->`e0aa380
 - Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Wine draft MR 11370, commits `4d143f4c` and `65140f31`, Rhodri Richards
 - License: LGPL-2.1-or-later
-- Gate: `ARKNIGHTS_RUNTIME_AUDIO_FOLLOW_DEFAULT_OUTPUT=1`, parsed once per process
+- Gate: `LMISXH_AKMOCL=1` and `LMISXH_AKMOCL_AUDIO=1`, parsed once per process
 - Inactive behavior: Normal Wine endpoint enumeration and routing
 - Automated gate: Hash and clean `git apply --check`; patched Wine compile
 - Manual gate: Active shared render stream follows default device across switch/disconnect/reconnect
@@ -26,7 +26,7 @@ The MR is a draft. Capture and exclusive streams are unchanged.
 - Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Original runtime change; motivated by the [reported PC cursor stutter](https://www.reddit.com/r/arknights/comments/1vorlzp/pc_client_fix_for_the_annoying_mouse_stuttering/)
 - License: LGPL-2.1-or-later (Wine)
-- Gate: Exact `ARKNIGHTS_RUNTIME_HARDWARE_CURSOR=1`, checked during shared file-name resolution
+- Gate: `LMISXH_AKMOCL=1` and exact `LMISXH_AKMOCL_CURSOR=1`, checked during shared file-name resolution
 - Inactive behavior: Missing, `0`, or invalid values use Wine's normal path resolution
 - Automated gate: Hash, clean `git apply --check`, focused `ntdll.so` build, Wine test-object compilation for exact/case variants and attribute APIs
 - Manual gate: Compare the software sprite with the macOS pointer, using the exact asset
@@ -57,7 +57,7 @@ Both `Present` paths keep `UpdateStatistics` behind `DXMT_DEBUG`, which avoids i
 
 ## ACE
 
-All ACE patches use the exact gate `ARKNIGHTS_RUNTIME_ACE_COMPACT=1`. A missing, `0`, or other value keeps Wine's normal route. Every patch requires hash verification and clean application. All four are Endfield FineWine ports ([provenance](../patches/shared/wine/ace/provenance.md)).
+All ACE patches follow the `LMISXH_AKMOCL=1` master switch. A missing or other value keeps Wine's normal route. Every patch requires hash verification and clean application. All four are Endfield FineWine ports ([provenance](../patches/shared/wine/ace/provenance.md)).
 
 - [`wine-ace-ntoskrnl-surface`](../patches/shared/wine/ace/ntoskrnl/0001-ntoskrnl-compatibility-surface.patch)
     - What: Kernel exports and process metadata for the ACE client: current-thread process, image-name, exit-status, audit-parameter, and persistent-thread-state surfaces.
@@ -82,7 +82,7 @@ gate.
 
 ## CEF
 
-The CEF family uses the exact gate `ARKNIGHTS_RUNTIME_CEF_COMPAT=1`. An absent, `0`, or invalid value keeps Wine's normal route. If the CEF variable is absent, `ARKNIGHTS_RUNTIME_CN_COMPAT=1` keeps the legacy Bilibili behavior.
+The CEF family uses the master switch and exact `LMISXH_AKMOCL_CEF=1`. An absent, `0`, or invalid value keeps Wine's normal route.
 
 - [`wine-cef-bilibili-stackbase`](../patches/shared/wine/cef/0001-ntdll-cef-compatibility.patch)
     - What: Descriptor-driven CEF loader compatibility; proven Bilibili CEF 80.1.15 descriptor.
@@ -125,7 +125,7 @@ The patch also exports `CreateAppContainerToken` and `GetAppContainerNamedObject
 
 ## CN
 
-The CN family contains only the Bilibili windowing patches. They use the exact gate `ARKNIGHTS_RUNTIME_CN_COMPAT=1`. A missing, `0`, or other value keeps Wine's normal route.
+The CN family contains only the Bilibili windowing patches. They use the master switch and exact `LMISXH_AKMOCL_CN=1`. A missing, `0`, or other value keeps Wine's normal route.
 
 - [`wine-cn-bilibili-layered-child`](../patches/shared/wine/cn/windowing/0001-win32u-winemac-bilibili-layered-child.patch)
     - What: Keeps Chromium's layered proxies for login and payment drawable inside the root Wine window.
@@ -146,7 +146,7 @@ Remove a patch when the pinned WineCX supplies the behavior or the route is no l
 - Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Original runtime change, runtime maintainers
 - License: LGPL-2.1-or-later (Wine)
-- Gate: None. The patch is always active in the `combined` stage. It has no `ARKNIGHTS_RUNTIME_` variable, because the client needs the standard Command-Q key equivalent in every build.
+- Gate: None. The patch is always active in the `combined` stage. It has no `LMISXH_AKMOCL` variable, because the client needs the standard Command-Q key equivalent in every build.
 - Inactive behavior: None. No inactive route exists. Builds without the patch keep Wine's Option-Command-Q key equivalent for Quit.
 - Automated gate: Hash, clean `git apply --check` in lock order, `winemac.so` compile in the `combined` build
 - Manual gate: The app menu shows Command-Q for Quit. Option-Command-Q does not quit. Option-Command-H still hides other applications.
@@ -161,7 +161,7 @@ The patch changes one line in `dlls/winemac.drv/cocoa_app.m`. It sets the Quit i
 - Component/base: WineCX <!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Original runtime change, runtime maintainers
 - License: LGPL-2.1-or-later (Wine)
-- Gate: Exact `ARKNIGHTS_RUNTIME_NATIVE_FULLSCREEN_SPACE=1`, read once in `setup_options`
+- Gate: `LMISXH_AKMOCL=1` and exact `LMISXH_AKMOCL_FULLSCREEN=1`, read once in `setup_options`
 - Inactive behavior: Missing, `0`, or invalid values keep the screen-sized window at `NSStatusWindowLevel + 1`
 - Automated gate: Hash, clean `git apply --check` alone and after the `cn` family on both Wine branches, `cocoa_app.m` syntax check
 - Manual gate: A borderless fullscreen game window enters its own Space. Leaving the Space by the user stays left. A Wine resize below screen size leaves the Space. The cursor clip still holds after each change.
@@ -171,7 +171,7 @@ A window is a candidate only when the gate is on, it participates in the window 
 
 The patch enters the Space with a deferred `toggleFullScreen:` call. It never changes the window frame inside a Space. It reposts the actual frame to Wine at most twice for one requested rect. When the rect from Wine no longer covers the screen, the patch leaves the Space. A user exit blocks automatic re-entry until the rect changes or the window is ordered out. The patch logs decisions in the `macdrv` debug channel. In a Space the close button is enabled and sends the normal Win32 close.
 
-The patch turns the feature off for the whole process when the program is `PlatformProcess.exe` or `PlatformProcess.original.helper.exe`, because the notice helper inherits the gate. This check does not depend on `ARKNIGHTS_RUNTIME_CN_COMPAT`.
+The patch turns the feature off for the whole process when the program is `PlatformProcess.exe` or `PlatformProcess.original.helper.exe`, because the notice helper inherits the gate. This check does not depend on `LMISXH_AKMOCL_CN`.
 
 ## Address space
 

@@ -39,7 +39,7 @@ The client treats a missing key as `false`. Use `aceCompat` in the ACE warning a
 `nativeArm64` for diagnostics and to keep the Rosetta copy off the ARM lane. The DXMT and Metal
 capabilities keep their current meaning. The ARM64 archive keeps `aceCompat` false until the ACE
 test passes. ACE is untested on ARM; the compact patches are present and gated by
-`ARKNIGHTS_RUNTIME_ACE_COMPACT=1`.
+`LMISXH_AKMOCL=1`.
 
 ## Window chrome
 
