@@ -17,7 +17,7 @@ in this repository. The workspace receives a rebased copy and a Portfile entry.
 | Hadron        | commit `6f401bcfcf4c1cbf7fbd724974fc8d3562262b1c`                 |
 | Endfield      | commit `568afd1a32e25e40170eb7484f6790d1e1d370fd`                 |
 | Workspace branch | `arknights-arm64`                                              |
-| Submodule branch | `arm-gates`                                                    |
+| Submodule branch | `main`                                                        |
 | Submodule path | `patches/wine/arknights-macos-runtime`                           |
 | Wine export   | `patches/wine-build-new/wine/`                                    |
 
