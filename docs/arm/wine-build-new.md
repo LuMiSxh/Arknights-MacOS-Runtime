@@ -9,48 +9,74 @@ in this repository. The workspace receives a rebased copy and a Portfile entry.
 
 ## Workspace
 
-| Item          | Value                                                             |
-| ------------- | ----------------------------------------------------------------- |
-| Workspace     | `wine-build-new`                                                  |
-| Wine          | upstream 11.18, commit `7b3fff76fa5178f6ce0141b2c776afa2a822f101` |
-| FEX           | commit `14c92681f4d62cf84d901460e0358de09c8847a7`                 |
-| Hadron        | commit `6f401bcfcf4c1cbf7fbd724974fc8d3562262b1c`                 |
-| Endfield      | commit `568afd1a32e25e40170eb7484f6790d1e1d370fd`                 |
-| Workspace branch | `arknights-arm64`                                              |
-| Submodule branch | `main`                                                        |
-| Submodule path | `third-party/arknights-macos-runtime`                             |
-| Patch alias    | `patches/wine/arknights-macos-runtime`                            |
-| Wine export   | `patches/wine-build-new/wine/`                                    |
+| Item             | Value                                                                  |
+| ---------------- | ---------------------------------------------------------------------- |
+| Workspace        | `wine-build-new`                                                       |
+| Wine             | upstream 11.18, commit `7b3fff76fa5178f6ce0141b2c776afa2a822f101`      |
+| FEX              | commit `14c92681f4d62cf84d901460e0358de09c8847a7`                      |
+| Hadron           | commit `6f401bcfcf4c1cbf7fbd724974fc8d3562262b1c`                      |
+| Endfield         | commit `568afd1a32e25e40170eb7484f6790d1e1d370fd`                      |
+| Workspace branch | `arknights-arm64`                                                      |
+| Submodule branch | `main`                                                                 |
+| Submodule path   | `third-party/arknights-macos-runtime`                                  |
+| Patch alias      | `patches/wine/arknights-macos-runtime` -> `.../wine-build-new/patches` |
+| Wine export      | `wine-build-new/patches/`                                              |
 
 The workspace applies 72 Wine patches before the Arknights export. The export patches are
 rebased against that queue, not against this repository's WineCX 11.17 tree.
 
 The workspace mounts this repository at `third-party/arknights-macos-runtime`. A relative
-symlink at `patches/wine/arknights-macos-runtime` keeps the Portfile paths stable. The Portfile
-references the export as `arknights-macos-runtime/patches/wine-build-new/wine/...`.
+symlink at `patches/wine/arknights-macos-runtime` points at the export's `patches`
+directory, so the workspace patches folder contains only the ten patch files. The Portfile
+references them as `arknights-macos-runtime/0001-...` through `0010-...`.
 
 ## Export set
 
-| Export                                             | Source in this repository                     | Gate             |
-| -------------------------------------------------- | --------------------------------------------- | ---------------- |
-| `0001-ntdll-carry-eflags-af-df.patch`              | `patches/arm/wine/ace-context/`               | none (general)   |
-| `0002-ntdll-hybrid-thread-entry.patch`             | `patches/arm/wine/ace-thread-entry/`          | none (general)   |
-| `0003-ntoskrnl-arknights-ace-imports.patch`        | `patches/shared/wine/ace/ntoskrnl/` (reduced) | none (general)   |
-| `0004-userenv-appcontainer-apis.patch`             | `patches/shared/wine/appcontainer/`           | none (general)   |
-| `0005-ws2_32-address-list-sort.patch`              | `patches/shared/wine/winsock/`                | none (general)   |
-| `0006-ntdll-bilibili-cef80-stack-base.patch`       | `patches/shared/wine/cef/` (rebased)          | master + `_CEF`  |
-| `0007-win32u-winemac-bilibili-layered-child.patch` | `patches/shared/wine/cn/windowing/` (rebased) | master + `_CN`   |
-| `0008-winemac-bilibili-join-all-spaces.patch`      | `patches/shared/wine/cn/windowing/`           | master + `_CN` (optional) |
-| `0009-winemac-native-fullscreen-space.patch`       | `patches/shared/wine/fullscreen/` (rebased)   | master + `_FULLSCREEN` (optional) |
-| `0010-ntdll-hide-software-cursor-asset.patch`      | `patches/shared/wine/hardware-cursor/`        | master + `_CURSOR` (optional) |
+| Export                                             | Source in this repository                     | Runtime gate                      | Need                  |
+| -------------------------------------------------- | --------------------------------------------- | --------------------------------- | --------------------- |
+| `0001-ntdll-carry-eflags-af-df.patch`              | `patches/arm/wine/ace-context/`               | none (general)                    | keep until ACE run    |
+| `0002-ntdll-hybrid-thread-entry.patch`             | `patches/arm/wine/ace-thread-entry/`          | none (general)                    | keep until ACE run    |
+| `0003-ntoskrnl-arknights-ace-imports.patch`        | `patches/shared/wine/ace/ntoskrnl/` (reduced) | none (general)                    | keep until ACE run    |
+| `0004-userenv-appcontainer-apis.patch`             | `patches/shared/wine/appcontainer/`           | none (general)                    | required for CEF      |
+| `0005-ws2_32-address-list-sort.patch`              | `patches/shared/wine/winsock/`                | none (general)                    | required for CEF      |
+| `0006-ntdll-bilibili-cef80-stack-base.patch`       | `patches/shared/wine/cef/` (rebased)          | master + `_CEF`                   | required for Bilibili |
+| `0007-win32u-winemac-bilibili-layered-child.patch` | `patches/shared/wine/cn/windowing/` (rebased) | master + `_CN`                    | required for Bilibili |
+| `0008-winemac-bilibili-join-all-spaces.patch`      | `patches/shared/wine/cn/windowing/`           | master + `_CN` (optional)         | required for Bilibili |
+| `0009-winemac-native-fullscreen-space.patch`       | `patches/shared/wine/fullscreen/` (rebased)   | master + `_FULLSCREEN` (optional) | ours, user-visible    |
+| `0010-ntdll-hide-software-cursor-asset.patch`      | `patches/shared/wine/hardware-cursor/`        | master + `_CURSOR` (optional)     | ours, user-visible    |
 
-`0003` is reduced. The workspace already has `PsGetProcessImageFileName`,
+The workspace applies all ten patches at build time. The gates select behavior at runtime;
+they do not select patches. `0008` uses the process check that `0007` adds, so the two are
+always applied together.
+
+`0003` is reduced. Wine 11.18 already has `PsGetProcessImageFileName`,
 `PsReferencePrimaryToken`, `PsGetProcessExitStatus`, `ObRegisterCallbacks`,
-`SeLocateProcessImageName`, and the process and thread notify routines. The export adds only
-`PsGetCurrentThreadProcess`, `PsGetCurrentThreadProcessId`, and `SeSetAuditParameter`.
+`SeLocateProcessImageName`, and the process and thread notify routines. The Endfield queue
+adds other ACE imports. The export adds only `PsGetCurrentThreadProcess`,
+`PsGetCurrentThreadProcessId`, and `SeSetAuditParameter`.
 
 `0006`, `0007`, and `0008` do not apply to the Wine 11.18 tree unchanged. They were ported
 to its loader and winemac code. The behavior is the same.
+
+## Audit
+
+The export was audited against the workspace queue and the pinned upstream trees.
+
+| Question                                      | Result                                                                                                                                                                                                                            |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FEX lookup-cache eager commit                 | Not needed. `patches/fex/local/0009` adds `LookupCache::CommitL1Window()` and calls it in the constructor, after a cache clear, and when the dynamic L1 window grows. Our patch rewrites the same constructor and does not apply. |
+| Mono skip                                     | Not needed. The workspace ships no Wine Mono, the entitlement removes the low-4 GB constraint, and `WINEDLLOVERRIDES=mscoree=d` covers a fresh prefix. Arknights does not use .NET.                                               |
+| ACE imports (`0003`)                          | Kept until an ACE run. Wine 11.18 lacks the exports, but no Arknights ACE import dump was available.                                                                                                                              |
+| Hybrid thread entry (`0002`)                  | Kept until an ACE run. The reference fix is an EA overlay case, not ACE.                                                                                                                                                          |
+| AF/DF context (`0001`)                        | Kept until an ACE run. FEX rebuilds emulated flags, but native ARM64EC context handling still drops them.                                                                                                                         |
+| AppContainer (`0004`)                         | Kept. It replaces a per-game `userenv.dll` shim and covers all clients.                                                                                                                                                           |
+| AsyncDns (`0005`)                             | Kept. It replaces a per-game `--disable-features=AsyncDns` workaround.                                                                                                                                                            |
+| Bilibili CEF and windowing (`0006` to `0008`) | Kept. There is no client-side equivalent for the CEF descriptor or layered surfaces. `0008` is a six-line Space fix that the old client bridge also performed.                                                                    |
+| Fullscreen (`0009`)                           | Kept. A Windows DLL cannot change the `NSWindow` collection behavior or the fullscreen handshake.                                                                                                                                 |
+| Hardware cursor (`0010`)                      | Kept. A proxy DLL only covers wrapped APIs. Deleting the assets is undone by Repair.                                                                                                                                              |
+
+ACE remains unverified. Drop `0001` to `0003` only after an ACE run on the signed runtime
+shows they are unnecessary. The China update must complete first.
 
 ## Work the workspace already has
 
@@ -59,7 +85,7 @@ the same behavior.
 
 | Work                                                                       | Provided by                                                                               |
 | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| 4 GB `__PAGEZERO`, top-down allocations, cross-architecture loader         | Hadron wine `0001`, `0008`, `0040`; `local/0003`                                         |
+| 4 GB `__PAGEZERO`, top-down allocations, cross-architecture loader         | Hadron wine `0001`, `0008`, `0040`; `local/0003`                                          |
 | Executable and writable host-page flips                                    | Hadron wine `0002`, `0006`, `0034`, `0035`, `0036`                                        |
 | ARM64 ID registers                                                         | Hadron wine `0020`                                                                        |
 | ARM64EC code bitmap, `RtlIsEcCode` bounds                                  | Hadron wine `0011`, `0041`                                                                |
@@ -78,10 +104,10 @@ The Arknights `address-space`, `wx-pages`, `id-registers`, `ec-code-bitmap`,
   `MEM_EXTENDED_PARAMETER_WINE_UNIX_JIT`.
 - The same allocation path sets `MEM_EXTENDED_PARAMETER_EC_CODE`. Wine 11.18 marks the code
   bitmap itself, so `ec-code-marking` is unnecessary.
-- FEX 2610 and Wine 11.18 pass the workspace's x64/i386 FEX probes with the reserved lookup
-  cache. The eager commit is not needed there.
-- Mono remains an optional-component limitation in the workspace. Arknights does not use
-  .NET. The launcher can set `WINEDLLOVERRIDES=mscoree=d` instead of carrying a patch.
+- The workspace FEX `local/0009` replaces `lookup-cache-commit` and is narrower: it commits
+  the active L1 window instead of the whole cache.
+- Mono remains an optional-component limitation in the workspace. The workspace ships no
+  Wine Mono. Set `WINEDLLOVERRIDES=mscoree=d` if a download dialog appears.
 
 ## Entitlements
 
@@ -100,8 +126,8 @@ opts one behavior in. An absent or invalid modifier leaves that behavior off.
 
 ```sh
 LMISXH_AKMOCL=1
-LMISXH_AKMOCL_CEF=1       # Bilibili CEF 80.1.15 descriptor
-LMISXH_AKMOCL_CN=1        # CN window behavior
+LMISXH_AKMOCL_CEF=1         # Bilibili CEF 80.1.15 descriptor
+LMISXH_AKMOCL_CN=1          # CN window behavior
 LMISXH_AKMOCL_FULLSCREEN=1  # Native fullscreen Space
 LMISXH_AKMOCL_CURSOR=1      # Hide the software cursor asset
 ```
@@ -119,13 +145,13 @@ Yaagl has no generic patch-gate layer. It selects a Wine distribution per game a
 environment variables in each client's `program-launch-game.ts`. It already uses this for
 `WINEDLLOVERRIDES`, `WINEMSYNC`, `WINEESYNC`, and `WINE_ENABLE_TIMEOUT_FIX`.
 
-Upstream Yaagl has no Arknights client. An Arknights client must set the master switch and the
-modifiers it needs. General patches must not depend on that client.
+Upstream Yaagl has no Arknights client, so this change adds nothing to Yaagl. A future
+Arknights client sets `LMISXH_AKMOCL=1` and the modifiers it needs. General patches must
+not depend on that client.
 
 ## Validation
 
 - All 82 Wine patches apply to a pristine Wine 11.18 tree with `patch -p1 -F0`.
-- The resulting tree is byte-identical to the branch the export was generated from.
 - No Wine build, prefix creation, game launch, or ACE run was performed for the export.
 - ACE remains untested. Complete the China update before judging an ACE result.
 
@@ -134,5 +160,5 @@ modifiers it needs. General patches must not depend on that client.
 1. Change the canonical patch in `patches/arm` or `patches/shared`.
 2. Rebase it onto the workspace queue in a Wine 11.18 checkout.
 3. Run the full queue. Every patch must apply with `-F0`.
-4. Replace the file under `patches/wine-build-new/` in this repository.
+4. Replace the file under `wine-build-new/patches/` in this repository.
 5. Update the gate or provenance here when the contract changes.
