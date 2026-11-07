@@ -9,26 +9,26 @@ in this repository. The workspace receives a rebased copy and a Portfile entry.
 
 ## Workspace
 
-| Item             | Value                                                                  |
-| ---------------- | ---------------------------------------------------------------------- |
-| Workspace        | `wine-build-new`                                                       |
-| Wine             | upstream 11.18, commit `7b3fff76fa5178f6ce0141b2c776afa2a822f101`      |
-| FEX              | commit `14c92681f4d62cf84d901460e0358de09c8847a7`                      |
-| Hadron           | commit `6f401bcfcf4c1cbf7fbd724974fc8d3562262b1c`                      |
-| Endfield         | commit `568afd1a32e25e40170eb7484f6790d1e1d370fd`                      |
-| Workspace branch | `arknights-arm64`                                                      |
-| Submodule branch | `main`                                                                 |
-| Submodule path   | `third-party/arknights-macos-runtime`                                  |
-| Patch alias      | `patches/wine/arknights-macos-runtime` -> `.../wine-build-new/patches` |
-| Wine export      | `wine-build-new/patches/`                                              |
+| Item             | Value                                                              |
+| ---------------- | ------------------------------------------------------------------ |
+| Workspace        | `wine-build-new`                                                   |
+| Wine             | upstream 11.18, commit `7b3fff76fa5178f6ce0141b2c776afa2a822f101`  |
+| FEX              | commit `14c92681f4d62cf84d901460e0358de09c8847a7`                  |
+| Hadron           | commit `6f401bcfcf4c1cbf7fbd724974fc8d3562262b1c`                  |
+| Endfield         | commit `568afd1a32e25e40170eb7484f6790d1e1d370fd`                  |
+| Workspace branch | `arknights-arm64`                                                  |
+| Submodule branch | `main`                                                             |
+| Submodule path   | `third-party/arknights-macos-runtime`                              |
+| Patch alias      | `patches/wine/arknights-macos-runtime/` with one symlink per patch |
+| Wine export      | `wine-build-new/patches/`                                          |
 
 The workspace applies 72 Wine patches before the Arknights export. The export patches are
 rebased against that queue, not against this repository's WineCX 11.17 tree.
 
-The workspace mounts this repository at `third-party/arknights-macos-runtime`. A relative
-symlink at `patches/wine/arknights-macos-runtime` points at the export's `patches`
-directory, so the workspace patches folder contains only the ten patch files. The Portfile
-references them as `arknights-macos-runtime/0001-...` through `0010-...`.
+The workspace mounts this repository at `third-party/arknights-macos-runtime` and links
+each patch file individually into `patches/wine/arknights-macos-runtime/`. The workspace
+patches folder contains only the ten patch files. The Portfile references them as
+`arknights-macos-runtime/0001-...` through `0010-...`.
 
 ## Export set
 
