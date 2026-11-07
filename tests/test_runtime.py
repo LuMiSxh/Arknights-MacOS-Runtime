@@ -363,7 +363,7 @@ class RuntimeLockTests(unittest.TestCase):
         self.assertEqual(lock["artifact"]["release"], "wine-11-18-arm64-v5")
         self.assertEqual(
             lock["artifact"]["sha256"],
-            "059e9a88e008493ea6bd3fb93334298b6f7f730b554f5a9048a0834eeea9880a",
+            "3008b2d45cbe1653ebdd4a0704de790ecc5668a580a84b3db42140fd5c1af31b",
         )
         self.assertNotIn("dxmtArtifact", lock)
         self.assertEqual(

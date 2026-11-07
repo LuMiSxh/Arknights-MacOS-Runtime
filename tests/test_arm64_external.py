@@ -11,7 +11,13 @@ import pytest
 
 from scripts.arm64 import fetch_external
 from scripts.arm64.assemble import AssemblyError, assemble
-from scripts.arm64.fetch_external import FetchError, _extract_archive, fetch_release
+from scripts.arm64.fetch_external import (
+    FetchError,
+    _extract_archive,
+    fetch_release,
+    fetch_selected_release,
+    select_release,
+)
 from scripts.arm64.provenance import write_provenance
 from scripts.build_common import CLEARED_DOS_STUB
 
@@ -36,6 +42,109 @@ def _release(archive: bytes, *, arch: str = "arm64", size: int | None = None) ->
     if size is not None:
         release["size"] = size
     return release
+
+
+def test_selects_the_newest_arm64_release():
+    releases = [
+        {
+            "id": "wine-11-18-arm64-v4",
+            "arch": "arm64",
+            "published_at": "2026-11-06T06:35:15Z",
+        },
+        {
+            "id": "wine-11-18-arm64-v5",
+            "arch": "arm64",
+            "published_at": "2026-11-07T12:14:35Z",
+        },
+        {
+            "id": "wine-11-18-x86_64-v9",
+            "arch": "x86_64",
+            "published_at": "2026-11-08T00:00:00Z",
+        },
+    ]
+
+    assert select_release(releases, "")["id"] == "wine-11-18-arm64-v5"
+
+
+def test_uses_the_highest_build_when_publish_dates_match():
+    releases = [
+        {
+            "id": "wine-11-18-arm64-v4",
+            "arch": "arm64",
+            "published_at": "2026-11-07T12:14:35Z",
+        },
+        {
+            "id": "wine-11-18-arm64-v6",
+            "arch": "arm64",
+            "published_at": "2026-11-07T12:14:35Z",
+        },
+    ]
+
+    assert select_release(releases, "")["id"] == "wine-11-18-arm64-v6"
+
+
+def test_rejects_a_catalog_without_arm64_releases():
+    with pytest.raises(FetchError, match="arm64"):
+        select_release([{"id": "wine-11-18-x86_64-v1", "arch": "x86_64"}], "")
+
+
+def test_explicit_release_id_wins_over_the_newest():
+    releases = [
+        {
+            "id": "wine-11-18-arm64-v5",
+            "arch": "arm64",
+            "published_at": "2026-11-07T12:14:35Z",
+        },
+        {
+            "id": "wine-11-18-arm64-v4",
+            "arch": "arm64",
+            "published_at": "2026-11-06T06:35:15Z",
+        },
+    ]
+
+    assert (
+        select_release(releases, "wine-11-18-arm64-v4")["id"] == "wine-11-18-arm64-v4"
+    )
+
+
+def test_fetch_uses_the_newest_arm64_release_by_default(tmp_path, monkeypatch):
+    newest = b"newest archive"
+    older = b"older archive"
+    catalog_url = "https://catalog.example/catalog.json"
+    newest_url = "https://download.example/newest.tar.xz"
+    older_url = "https://download.example/older.tar.xz"
+    catalog = json.dumps(
+        {
+            "releases": [
+                {
+                    "id": "wine-11-18-arm64-v4",
+                    "arch": "arm64",
+                    "published_at": "2026-11-06T06:35:15Z",
+                    "sha256": _sha256(older),
+                    "url": older_url,
+                },
+                {
+                    "id": "wine-11-18-arm64-v5",
+                    "arch": "arm64",
+                    "published_at": "2026-11-07T12:14:35Z",
+                    "sha256": _sha256(newest),
+                    "url": newest_url,
+                },
+            ]
+        }
+    ).encode()
+    monkeypatch.setenv("ARM64_RUNTIME_CATALOG_URL", catalog_url)
+    responses = {catalog_url: catalog, newest_url: newest, older_url: older}
+
+    release, path = fetch_selected_release(
+        "ARM64_RUNTIME_CATALOG_URL",
+        "",
+        tmp_path / "wine.tar.xz",
+        fetch=responses.__getitem__,
+    )
+
+    assert release["id"] == "wine-11-18-arm64-v5"
+    assert path.read_bytes() == newest
 
 
 def _single_member_tar(name: str, *, linkname: str | None = None) -> bytes:
@@ -216,18 +325,27 @@ def test_extract_rejects_unsafe_archive_members(tmp_path, name, linkname):
 def test_fetch_target_requests_only_the_wine_archive(tmp_path, monkeypatch):
     calls = []
 
-    def fake_fetch(env_name, release_id, expected_sha256, output):
-        calls.append((env_name, release_id, expected_sha256))
+    def fake_fetch(env_name, release_id, output):
+        calls.append((env_name, release_id))
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_bytes(b"archive")
-        return output
+        return (
+            {
+                "id": RELEASE_ID,
+                "arch": "arm64",
+                "sha256": "0" * 64,
+                "size": 7,
+            },
+            output,
+        )
 
     def fake_extract(archive, destination):
         (destination / "wine").mkdir()
 
-    monkeypatch.setattr(fetch_external, "fetch_release", fake_fetch)
+    monkeypatch.setattr(fetch_external, "fetch_selected_release", fake_fetch)
     monkeypatch.setattr(fetch_external, "_extract_archive", fake_extract)
 
+    output = tmp_path / "incoming"
     fetch_external._fetch_target(
         {
             "artifact": {
@@ -236,10 +354,14 @@ def test_fetch_target_requests_only_the_wine_archive(tmp_path, monkeypatch):
                 "sha256": "0" * 64,
             }
         },
-        tmp_path / "incoming",
+        output,
+        "wine-11-18-arm64-v4",
     )
 
-    assert calls == [("ARM64_RUNTIME_CATALOG_URL", RELEASE_ID, "0" * 64)]
+    assert calls == [("ARM64_RUNTIME_CATALOG_URL", "wine-11-18-arm64-v4")]
+    metadata = json.loads((output / "external.json").read_text())
+    assert metadata["id"] == RELEASE_ID
+    assert metadata["sha256"] == "0" * 64
 
 
 def test_fetch_target_rejects_a_non_wine_catalog(tmp_path):
@@ -253,6 +375,7 @@ def test_fetch_target_rejects_a_non_wine_catalog(tmp_path):
                 }
             },
             tmp_path / "incoming",
+            "",
         )
 
 
@@ -341,3 +464,46 @@ def test_provenance_records_the_external_build_without_urls(tmp_path):
     raw = (tmp_path / "provenance.json").read_text()
     assert "catalog" not in raw
     assert "pull/4" not in raw
+
+
+def test_provenance_records_the_selected_catalog_artifact(tmp_path):
+    runtime_archive = tmp_path / "Arknights-MacOS-Runtime-v0.9.0+arm.tar.gz"
+    runtime_archive.write_bytes(b"runtime payload")
+    source_archive = tmp_path / "Arknights-MacOS-Runtime-v0.9.0+arm-source.tar.gz"
+    source_archive.write_bytes(b"source payload")
+    external = tmp_path / "external.json"
+    external.write_text(
+        json.dumps(
+            {
+                "id": RELEASE_ID,
+                "arch": "arm64",
+                "sha256": "a" * 64,
+                "size": 7,
+            }
+        ),
+        encoding="utf-8",
+    )
+    lock = {
+        "buildMode": "external",
+        "target": "native-arm64",
+        "deploymentTarget": "26.0",
+        "interface": {"minimumMacOS": "26.0"},
+        "features": {},
+        "sources": {"wine": {"commit": "7b3fff76fa5178f6ce0141b2c776afa2a822f101"}},
+    }
+
+    write_provenance(
+        lock,
+        "v0.9.0+arm",
+        runtime_archive,
+        source_archive,
+        tmp_path / "provenance.json",
+        external_artifact=external,
+    )
+
+    data = json.loads((tmp_path / "provenance.json").read_text())
+    assert data["externalArtifact"] == {
+        "id": RELEASE_ID,
+        "sha256": "a" * 64,
+        "size": 7,
+    }

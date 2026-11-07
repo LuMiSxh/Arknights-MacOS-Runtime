@@ -7,6 +7,10 @@ on:
                 description: SemVer version; the workflow appends +arm
                 required: true
                 type: string
+            release_id:
+                description: Catalog release id; leave empty for the newest ARM64 release
+                required: false
+                type: string
 
 permissions: {}
 
@@ -56,9 +60,11 @@ jobs:
             - name: Fetch the external Wine artifact
               env:
                   ARM64_RUNTIME_CATALOG_URL: ${{ secrets.ARM64_RUNTIME_CATALOG_URL }}
+                  RELEASE_ID: ${{ inputs.release_id }}
               run: |
                   uv run --locked --no-dev scripts/arm64/fetch_external.py \
                     --target native-arm64 \
+                    --release-id "$RELEASE_ID" \
                     --output .build/arm64/incoming
 
             - name: Install llvm-mingw
@@ -137,6 +143,7 @@ jobs:
                     --tag "$tag" \
                     --runtime-archive ".build/arm64/release/Arknights-MacOS-Runtime-$tag.tar.gz" \
                     --source-archive ".build/arm64/release/Arknights-MacOS-Runtime-$tag-source.tar.gz" \
+                    --external-artifact .build/arm64/incoming/external.json \
                     --output .build/arm64/release/provenance.json
 
             - name: Copy the notices
@@ -144,8 +151,13 @@ jobs:
 
             - name: Write release notes
               run: |
-                  cat > .build/arm64/release/RELEASE-NOTES.md <<'EOF'
+                  set -euo pipefail
+                  artifact="$(uv run --locked --no-dev python -c \
+                    'import json; print(json.load(open(".build/arm64/incoming/external.json"))["id"])')"
+                  cat > .build/arm64/release/RELEASE-NOTES.md <<EOF
                   Huge thanks to @riverfog7 for providing this runtime. Built in the [wine-build-new](https://github.com/riverfog7/wine-build-new) repository.
+
+                  External Wine artifact: $artifact.
                   EOF
 
             - uses: actions/upload-artifact@v7.0.1

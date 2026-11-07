@@ -6,7 +6,7 @@ The ARM64 lane runs a native ARM64 Wine runtime on macOS 26.0 or newer. The x86_
 
 The ARM64 Wine runtime is built outside this repository in the [wine-build-new](https://github.com/riverfog7/wine-build-new) workspace. That workspace has the Developer ID signature and provisioning profile that this repository cannot obtain.
 
-This repository pins the released Wine artifact `wine-11-18-arm64-v5` in [`runtime.lock.json`](../../runtime.lock.json). The **Draft ARM64 Release** workflow fetches that artifact, builds DXMT for ARM64EC, repacks the client contract, validates the tree, and creates a draft release.
+The **Draft ARM64 Release** workflow uses the newest ARM64 release in the external catalog by default. Pass a catalog release id to select a specific release. It builds DXMT for ARM64EC, repacks the client contract, validates the tree, and creates a draft release. [`runtime.lock.json`](../../runtime.lock.json) keeps the last verified baseline (`wine-11-18-arm64-v5`).
 
 `native-arm64` is an external target. `scripts/runtime.py prepare --target native-arm64` refuses it. The lane receives no patches from this repository. The ARM64 patch export is in [`wine-build-new/`](../../wine-build-new/).
 
@@ -15,7 +15,7 @@ This repository pins the released Wine artifact `wine-11-18-arm64-v5` in [`runti
 | Item                 | State                                                 |
 | -------------------- | ----------------------------------------------------- |
 | ARM64 release target | External; macOS 26.0 or newer                         |
-| Wine payload         | `wine-11-18-arm64-v5` from `wine-build-new`           |
+| Wine payload         | Newest ARM64 catalog release; baseline `wine-11-18-arm64-v5` |
 | DXMT                 | Built from `sources.dxmt` for ARM64EC in the workflow |
 | Client ARM64 support | Implemented; the manual canary is pending             |
 | ACE                  | Untested on the ARM64 lane                            |

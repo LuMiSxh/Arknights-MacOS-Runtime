@@ -25,7 +25,7 @@
 
 ## Conventions
 
-- `runtime.lock.json` is the sole source of pins, patch order, archive paths, and deployment target.
+- `runtime.lock.json` is the sole source of source pins, patch order, archive paths, and deployment target. The native ARM64 artifact comes from the external catalog; the workflow verifies its SHA-256 and records the selection in provenance.
 - Use full commits and SHA-256 hashes; reject floating refs and unverified downloads.
 - Keep generated sources, downloads, reports, and artifacts under `.build/`; never commit binaries.
 - Run Python through the root `pyproject.toml` and `uv.lock` with `uv run --locked`; keep runtime orchestration standard-library-only.
