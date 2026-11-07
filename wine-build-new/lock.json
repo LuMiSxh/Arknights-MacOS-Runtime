@@ -66,7 +66,7 @@
       {
         "order": 79,
         "path": "wine-build-new/patches/0007-win32u-winemac-bilibili-layered-child.patch",
-        "sha256": "0c5553f8d0131bc3581729d566fda09b6476b65652127c921106dd49860bb0c5",
+        "sha256": "ee371a152ad4fbffbca18d319422f56a6779a184bcdc3665ae154a0af4354ee0",
         "modifier": "LMISXH_AKMOCL_CN",
         "default": "off"
       },

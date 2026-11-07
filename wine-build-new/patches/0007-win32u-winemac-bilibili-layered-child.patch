@@ -176,10 +176,11 @@ diff --git a/dlls/winemac.drv/cocoa_window.m b/dlls/winemac.drv/cocoa_window.m
 index efd9964..6ff007b 100644
 --- a/dlls/winemac.drv/cocoa_window.m
 +++ b/dlls/winemac.drv/cocoa_window.m
-@@ -252,6 +252,7 @@ @interface WineContentView : WineBaseView <NSTextInputClient, NSViewLayerContent
+@@ -252,6 +252,8 @@ @interface WineContentView : WineBaseView <NSTextInputClient, NSViewLayerContent
  
      WineMetalView *_metalView;
      NSMutableDictionary<NSNumber*, CALayerHost*>* _caLayerHosts;
++    @public
 +    BOOL windowSurfaceView;
  }
  
@@ -725,7 +726,7 @@ index dd1aca0..3dfe197 100644
  
      thread_data = macdrv_thread_data();
  
-@@ -1713,6 +1932,11 @@ void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT
+@@ -1713,4 +1932,9 @@ void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT
  
  done:
      release_win_data(data);
@@ -735,5 +736,3 @@ index dd1aca0..3dfe197 100644
 +        macdrv_release_view(layered_view);
 +    }
  }
- 
- 
