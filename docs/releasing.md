@@ -27,12 +27,12 @@ The client pins the release archive URL and SHA-256 in its `runtime.json`. There
 
 ## ARM64 release
 
-The ARM64 lane ships the external `wine-11-18-arm64-v5` Wine tree and builds DXMT in the workflow. The catalog URL is the only secret. Keep it in the `release-arm64` environment as `ARM64_RUNTIME_CATALOG_URL`. Restrict the environment to `main`, `release/*`, and `version-*`. Do not create repository-level secrets.
+The ARM64 lane ships an external Wine tree and builds DXMT in the workflow. The catalog URL is the only secret. Store it as the repository secret `ARM64_RUNTIME_CATALOG_URL`. The `release-arm64` environment scopes the release job; restrict it to `main`, `release/*`, and `version-*`.
 
 The repository variables `LLVM_MINGW_URL` and `LLVM_MINGW_SHA256` pin the llvm-mingw release. They are public build inputs, not secrets.
 
-1. Dispatch **Draft ARM64 Release** with a version such as `0.9.0`. The workflow appends `+arm`.
-2. The workflow reads the pinned Wine release ID and SHA-256 from `runtime.lock.json`, fetches the artifact, verifies it, and extracts it. The catalog and archive URLs never appear in output, assets, or provenance.
+1. Dispatch **Draft ARM64 Release** with a version such as `0.9.0`. The workflow appends `+arm`. Optionally enter a catalog release id; leave it empty to use the newest ARM64 release.
+2. The workflow selects the release id and takes the SHA-256 from the catalog, fetches the artifact, verifies it, and extracts it. The lock pin is the last verified baseline. The catalog and archive URLs never appear in output, assets, or provenance.
 3. `scripts/arm64/build_dxmt.py` builds DXMT from `sources.dxmt` for ARM64EC with `MACOSX_DEPLOYMENT_TARGET=26.0`. It also builds a minimal Wine tree for the import libraries. That Wine build is a build dependency and is never shipped.
 4. `scripts/arm64/assemble.py` repacks the client tree as `Libraries/Wine`, `Libraries/DXMT`, `Licenses/`, and `NOTICE.md`. The signed `wine.app` keeps its Developer ID signature.
 5. `scripts/validate_runtime.py --target native-arm64` validates the tree. The workflow also rejects a Mach-O whose `minos` is above 26.0.
@@ -40,7 +40,7 @@ The repository variables `LLVM_MINGW_URL` and `LLVM_MINGW_SHA256` pin the llvm-m
 7. The release assets are the runtime archive, its checksum, the corresponding source archive, its checksum, `provenance.json`, and `NOTICE.md`. The source archive contains `wine-build-new`, `runtime.lock.json`, and `docs/arm/provenance.md`.
 8. Inspect and test those exact assets. Publish the unchanged draft only after the source, notice, and manual compatibility review.
 
-The release notes and `provenance.json` credit `https://github.com/riverfog7/wine-build-new`. The ARM runtime archive and corresponding source archive form one immutable versioned contract. The client pins the archive URL and SHA-256.
+The release notes and `provenance.json` credit `https://github.com/riverfog7/wine-build-new`. The release notes name the selected catalog release. `provenance.json` records its id and SHA-256 under `externalArtifact`. The ARM runtime archive and corresponding source archive form one immutable versioned contract. The client pins the archive URL and SHA-256.
 
 ## Verify build provenance
 

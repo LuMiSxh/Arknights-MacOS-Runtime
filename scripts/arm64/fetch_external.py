@@ -3,8 +3,9 @@
 
 """Fetch and verify the external native-arm64 Wine artifact.
 
-The catalog URL lives only in the `release-arm64` environment. This script reads it
-from an environment variable and never writes a URL to output, logs, or error messages.
+The catalog URL lives only in the GitHub Actions secret `ARM64_RUNTIME_CATALOG_URL`.
+This script reads it from an environment variable and never writes a URL to output, logs,
+or error messages.
 DXMT is built locally by `build_dxmt.py`, not downloaded.
 """
 
@@ -19,6 +20,7 @@ import sys
 import tarfile
 import urllib.request
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -38,6 +40,8 @@ ARM64_TARGET = "native-arm64"
 WINE_CATALOG_ENV = "ARM64_RUNTIME_CATALOG_URL"
 
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:")
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_BUILD_NUMBER = re.compile(r"-v(\d+)$")
 
 
 class FetchError(RuntimeError):
@@ -93,6 +97,46 @@ def _require_arm64(release: dict[str, Any]) -> None:
         raise FetchError("catalog release architecture is not arm64")
 
 
+def _releases(catalog: dict[str, Any]) -> list[Any]:
+    releases = catalog.get("releases")
+    if not isinstance(releases, list):
+        raise FetchError("catalog must name a releases array")
+    return releases
+
+
+def _published_at(release: dict[str, Any]) -> datetime:
+    value = release.get("published_at")
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value)
+            return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+        except ValueError:
+            pass
+    return datetime.min.replace(tzinfo=UTC)
+
+
+def _build_number(release: dict[str, Any]) -> int:
+    match = _BUILD_NUMBER.search(str(release.get("id", "")))
+    return int(match.group(1)) if match else 0
+
+
+def select_release(releases: list[Any], release_id: str) -> dict[str, Any]:
+    """Return the named release, or the newest ARM64 release when no id is given."""
+
+    if release_id:
+        return _select_release(releases, release_id)
+    arm64 = [
+        release
+        for release in releases
+        if isinstance(release, dict) and release.get("arch") == "arm64"
+    ]
+    if not arm64:
+        raise FetchError("catalog has no arm64 release")
+    return max(
+        arm64, key=lambda release: (_published_at(release), _build_number(release))
+    )
+
+
 def _download_archive(
     url: str, partial: Path, fetch: Callable[[str], bytes] | None
 ) -> None:
@@ -107,24 +151,23 @@ def _download_archive(
             output.write(chunk)
 
 
-def fetch_release(
+def fetch_selected_release(
     env_name: str,
     release_id: str,
-    expected_sha256: str,
     output: Path,
+    expected_sha256: str | None = None,
     fetch: Callable[[str], bytes] | None = None,
-) -> Path:
-    """Download one pinned release after its catalog fields and bytes are verified."""
+) -> tuple[dict[str, Any], Path]:
+    """Download the selected release after its catalog fields and bytes are verified."""
 
     catalog = download_catalog(env_name, fetch)
-    releases = catalog.get("releases")
-    if not isinstance(releases, list):
-        raise FetchError("catalog must name a releases array")
-    release = _select_release(releases, release_id)
+    release = select_release(_releases(catalog), release_id)
     _require_arm64(release)
 
     declared = release.get("sha256")
-    if declared != expected_sha256:
+    if not isinstance(declared, str) or _SHA256.fullmatch(declared) is None:
+        raise FetchError("catalog release has no valid SHA-256")
+    if expected_sha256 is not None and declared != expected_sha256:
         raise FetchError("catalog SHA-256 does not match the locked SHA-256")
 
     archive_url = release.get("url")
@@ -145,10 +188,25 @@ def fetch_release(
             raise FetchError("archive size does not match the catalog size")
 
     actual = _sha256_file(partial)
-    if actual != expected_sha256:
-        raise FetchError("archive SHA-256 does not match the locked SHA-256")
+    if actual != declared:
+        raise FetchError("archive SHA-256 does not match the catalog SHA-256")
     partial.replace(output)
-    return output
+    return release, output
+
+
+def fetch_release(
+    env_name: str,
+    release_id: str,
+    expected_sha256: str,
+    output: Path,
+    fetch: Callable[[str], bytes] | None = None,
+) -> Path:
+    """Download one pinned release after its catalog fields and bytes are verified."""
+
+    _, path = fetch_selected_release(
+        env_name, release_id, output, expected_sha256, fetch
+    )
+    return path
 
 
 def _validate_member(member: tarfile.TarInfo) -> None:
@@ -180,17 +238,25 @@ def _extract_archive(archive: Path, destination: Path) -> None:
             raise FetchError("archive member escapes the destination") from problem
 
 
-def _fetch_target(lock: dict[str, Any], output: Path) -> None:
+def _fetch_target(lock: dict[str, Any], output: Path, release_id: str) -> None:
     output.mkdir(parents=True, exist_ok=True)
     artifact = lock["artifact"]
     if artifact["catalog"] != "wine":
         raise FetchError("the external target must pin the wine catalog")
-    archive = fetch_release(
-        WINE_CATALOG_ENV,
-        artifact["release"],
-        artifact["sha256"],
-        output / "wine.tar.xz",
+    release, archive = fetch_selected_release(
+        WINE_CATALOG_ENV, release_id, output / "wine.tar.xz"
     )
+    if release["id"] == artifact["release"] and release["sha256"] != artifact["sha256"]:
+        raise FetchError("catalog SHA-256 does not match the lock pin for that release")
+    metadata = {
+        key: release[key]
+        for key in ("id", "arch", "sha256", "size", "published_at")
+        if key in release
+    }
+    (output / "external.json").write_text(
+        json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
+    )
+    info(f"Selected catalog release {release['id']}")
     info("Verifying the wine archive")
     _extract_archive(archive, output)
     if not (output / "wine").is_dir():
@@ -201,6 +267,11 @@ def _fetch_target(lock: dict[str, Any], output: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target", default=ARM64_TARGET)
+    parser.add_argument(
+        "--release-id",
+        default="",
+        help="catalog release id; defaults to the newest ARM64 release",
+    )
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
     try:
@@ -208,7 +279,7 @@ def main() -> int:
         if lock["buildMode"] != "external":
             error(f"the {lock['target']} target is not an external target")
             return 1
-        _fetch_target(lock, arguments.output)
+        _fetch_target(lock, arguments.output, arguments.release_id.strip())
     except (FetchError, LockError, KeyError, OSError) as caught_error:
         error(str(caught_error))
         return 1

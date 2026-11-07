@@ -3,8 +3,9 @@
 
 """Write the external native-arm64 release provenance.
 
-The provenance records the pinned Wine revision and the SHA-256 of the two release
-archives. It never records the secret-backed catalog URL or the external artifact URL.
+The provenance records the selected catalog artifact, the pinned Wine revision, and the
+SHA-256 of the two release archives. It never records the secret-backed catalog URL or the
+external artifact URL.
 """
 
 from __future__ import annotations
@@ -48,6 +49,7 @@ def write_provenance(
     runtime_archive: Path,
     source_archive: Path,
     output: Path,
+    external_artifact: Path | None = None,
 ) -> dict[str, Any]:
     """Write `provenance.json` for the external target and return its contents."""
 
@@ -77,6 +79,18 @@ def write_provenance(
             "sha256": _sha256(source_archive),
         },
     }
+    if external_artifact is not None:
+        try:
+            artifact = json.loads(external_artifact.read_text(encoding="utf-8"))
+            provenance["externalArtifact"] = {
+                "id": artifact["id"],
+                "sha256": artifact["sha256"],
+                "size": artifact.get("size"),
+            }
+        except (OSError, json.JSONDecodeError, KeyError, TypeError) as problem:
+            raise ProvenanceError(
+                "external artifact metadata is incomplete"
+            ) from problem
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
     return provenance
@@ -88,6 +102,7 @@ def main() -> int:
     parser.add_argument("--tag", required=True)
     parser.add_argument("--runtime-archive", type=Path, required=True)
     parser.add_argument("--source-archive", type=Path, required=True)
+    parser.add_argument("--external-artifact", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
     try:
@@ -98,6 +113,7 @@ def main() -> int:
             arguments.runtime_archive,
             arguments.source_archive,
             arguments.output,
+            external_artifact=arguments.external_artifact,
         )
     except (ProvenanceError, LockError, OSError) as caught_error:
         error(str(caught_error))

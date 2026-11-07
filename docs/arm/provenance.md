@@ -5,13 +5,15 @@ established the component set.
 
 ## Shipped Wine artifact
 
-The ARM64 release uses the external Wine artifact that [`runtime.lock.json`](../../runtime.lock.json)
-pins.
+The ARM64 release uses an external Wine artifact from the catalog. The workflow uses the
+newest ARM64 release by default, or the release id passed to the manual dispatch. It records
+the selected id and SHA-256 in `provenance.json`; [`runtime.lock.json`](../../runtime.lock.json)
+keeps the last verified baseline.
 
 | Field         | Value                                                                  |
 | ------------- | ---------------------------------------------------------------------- |
 | Release       | `wine-11-18-arm64-v5`                                                  |
-| SHA-256       | `059e9a88e008493ea6bd3fb93334298b6f7f730b554f5a9048a0834eeea9880a`     |
+| SHA-256       | `3008b2d45cbe1653ebdd4a0704de790ecc5668a580a84b3db42140fd5c1af31b`     |
 | Wine source   | Upstream Wine 11.18, commit `7b3fff76fa5178f6ce0141b2c776afa2a822f101` |
 | Minimum macOS | 26.0                                                                   |
 | Builder       | [wine-build-new](https://github.com/riverfog7/wine-build-new)          |
@@ -27,6 +29,8 @@ wine/                       # lowercase
   lib/wine/i386-windows/
   share/licenses/           # Wine ARM64EC, FEX, Mesa
 ```
+
+`provenance.json` records the selected catalog id, SHA-256, and size under `externalArtifact`.
 
 The archive has no DXMT, no `winemetal.so`, no `wine64`, no `Arknights` link, and no
 `WINEPRELOADERAPPNAME`. `scripts/arm64/assemble.py` adds `Wine/bin/wine64`, `Wine/bin/Arknights`,
@@ -143,7 +147,7 @@ nm -gU wine/lib/wine/aarch64-unix/libarm64ecfex.so
 | ---------------------------------- | ------------------------------------------------------------------- |
 | No public signed loader            | This repository cannot reproduce or redistribute the reference app. |
 | The installed reference is patched | The reference tree is not a clean build.                            |
-| The signed loader is external      | This repository pins the released artifact and never re-signs it.   |
+| The signed loader is external      | The workflow verifies the selected artifact and never re-signs it.  |
 
 ## Licenses
 
