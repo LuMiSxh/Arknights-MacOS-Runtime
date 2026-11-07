@@ -2,38 +2,24 @@ diff --git a/dlls/win32u/window.c b/dlls/win32u/window.c
 index 9a57c00..0eef6fb 100644
 --- a/dlls/win32u/window.c
 +++ b/dlls/win32u/window.c
-@@ -24,6 +24,7 @@
+@@ -24,6 +24,8 @@
  #endif
  
  #include <assert.h>
++#include <stdlib.h>
 +#include "winternl.h"
  
  #include "ntstatus.h"
  #include "ntgdi_private.h"
-@@ -57,6 +58,121 @@ static void *client_objects[MAX_USER_HANDLES];
+@@ -57,6 +58,106 @@ static void *client_objects[MAX_USER_HANDLES];
  static volatile unsigned int startup_info_flags;
  static unsigned int startup_show_window;
  
 +static BOOL lmisxh_akmocl_flag( const char *name )
 +{
-+    WCHAR nameW[32];
-+    WCHAR valueW[2];
-+    UNICODE_STRING nameU, valueU;
-+    unsigned int i;
++    const char *value = getenv( name );
 +
-+    for (i = 0; name[i] && i < sizeof(nameW) / sizeof(nameW[0]) - 1; i++)
-+        nameW[i] = (unsigned char)name[i];
-+    nameW[i] = 0;
-+
-+    nameU.Length = i * sizeof(WCHAR);
-+    nameU.MaximumLength = (i + 1) * sizeof(WCHAR);
-+    nameU.Buffer = nameW;
-+    valueU.Length = 0;
-+    valueU.MaximumLength = sizeof(valueW);
-+    valueU.Buffer = valueW;
-+
-+    return RtlQueryEnvironmentVariable_U( NULL, &nameU, &valueU ) == STATUS_SUCCESS &&
-+           valueU.Length == sizeof(WCHAR) && valueW[0] == '1';
++    return value && value[0] == '1' && !value[1];
 +}
 +
 +static BOOL arknights_runtime_cn_compat_enabled(void)
@@ -480,7 +466,7 @@ index dd1aca0..3dfe197 100644
  
  /***********************************************************************
   *              sync_window_min_max_info
-@@ -789,6 +797,201 @@ void activate_on_following_focus(void)
+@@ -789,6 +797,202 @@ void activate_on_following_focus(void)
  }
  
  
@@ -618,7 +604,8 @@ index dd1aca0..3dfe197 100644
 +    points[0].y = rect.top;
 +    points[1].x = rect.right;
 +    points[1].y = rect.bottom;
-+    if (NtUserMapWindowPoints(NULL, toplevel, points, 2, dpi)) return FALSE;
++    /* The return value is a coordinate offset, not a success flag. */
++    NtUserMapWindowPoints(NULL, toplevel, points, 2, dpi);
 +
 +    frame->left = points[0].x;
 +    frame->top = points[0].y;

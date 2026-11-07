@@ -2,7 +2,7 @@ diff --git a/dlls/ntdll/loader.c b/dlls/ntdll/loader.c
 index b0b2392..15dc475 100644
 --- a/dlls/ntdll/loader.c
 +++ b/dlls/ntdll/loader.c
-@@ -2264,6 +2264,164 @@ done:
+@@ -2264,6 +2264,166 @@ done:
   *
   * Build the module data for a mapped dll.
   */
@@ -14,6 +14,7 @@ index b0b2392..15dc475 100644
 +    WCHAR nameW[32];
 +    WCHAR valueW[2];
 +    UNICODE_STRING nameU, valueU;
++    NTSTATUS status;
 +    unsigned int i;
 +
 +    for (i = 0; name[i] && i < sizeof(nameW) / sizeof(nameW[0]) - 1; i++)
@@ -27,8 +28,9 @@ index b0b2392..15dc475 100644
 +    valueU.MaximumLength = sizeof(valueW);
 +    valueU.Buffer = valueW;
 +
-+    return RtlQueryEnvironmentVariable_U( NULL, &nameU, &valueU ) == STATUS_SUCCESS &&
-+           valueU.Length == sizeof(WCHAR) && valueW[0] == '1';
++    status = RtlQueryEnvironmentVariable_U( NULL, &nameU, &valueU );
++    return status == STATUS_VARIABLE_NOT_FOUND ||
++           (status == STATUS_SUCCESS && valueU.Length == sizeof(WCHAR) && valueW[0] == '1');
 +}
 +
 +static BOOL arknights_runtime_cef_compat_enabled(void)

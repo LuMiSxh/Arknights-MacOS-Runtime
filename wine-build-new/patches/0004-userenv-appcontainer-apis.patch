@@ -78,7 +78,7 @@ index 54f713e..00a0080 100644
  #include "sddl.h"
  #include "objbase.h"
  #include "userenv.h"
-@@ -687,12 +689,139 @@ BOOL WINAPI USERENV_138( int csidl, LPCSTR lnk_dir, LPCSTR lnk_filename,
+@@ -687,12 +689,141 @@ BOOL WINAPI USERENV_138( int csidl, LPCSTR lnk_dir, LPCSTR lnk_filename,
      return FALSE;
  }
 
@@ -87,6 +87,7 @@ index 54f713e..00a0080 100644
 +    WCHAR nameW[32];
 +    WCHAR valueW[2];
 +    UNICODE_STRING nameU, valueU;
++    NTSTATUS status;
 +    unsigned int i;
 +
 +    for (i = 0; name[i] && i < sizeof(nameW) / sizeof(nameW[0]) - 1; i++)
@@ -100,8 +101,9 @@ index 54f713e..00a0080 100644
 +    valueU.MaximumLength = sizeof(valueW);
 +    valueU.Buffer = valueW;
 +
-+    return RtlQueryEnvironmentVariable_U( NULL, &nameU, &valueU ) == STATUS_SUCCESS &&
-+           valueU.Length == sizeof(WCHAR) && valueW[0] == '1';
++    status = RtlQueryEnvironmentVariable_U( NULL, &nameU, &valueU );
++    return status == STATUS_VARIABLE_NOT_FOUND ||
++           (status == STATUS_SUCCESS && valueU.Length == sizeof(WCHAR) && valueW[0] == '1');
 +}
 +
 +static BOOL lmisxh_akmocl_appcontainer_enabled(void)
