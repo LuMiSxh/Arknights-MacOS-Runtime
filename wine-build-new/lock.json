@@ -24,7 +24,7 @@
       {
         "order": 73,
         "path": "wine-build-new/patches/0001-ntdll-carry-eflags-af-df.patch",
-        "sha256": "e301b36233fa27a49194f65a0b536e80b6aa881b7f9d6b12195a248345518933",
+        "sha256": "dfee2bea4068c74bf9959b190354a8021e098db98f0d8a408161ce94b9898009",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_EFLAGS"
       },
