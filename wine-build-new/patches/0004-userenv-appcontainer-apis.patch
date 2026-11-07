@@ -68,19 +68,35 @@ diff --git a/dlls/userenv/userenv_main.c b/dlls/userenv/userenv_main.c
 index 54f713e..00a0080 100644
 --- a/dlls/userenv/userenv_main.c
 +++ b/dlls/userenv/userenv_main.c
-@@ -26,6 +26,8 @@
+@@ -26,6 +26,9 @@
  #include "winreg.h"
  #include "winternl.h"
  #include "winnls.h"
 +#include <wchar.h>
 +#include <wincrypt.h>
++#include <stdlib.h>
  #include "sddl.h"
  #include "objbase.h"
  #include "userenv.h"
-@@ -687,12 +689,100 @@ BOOL WINAPI USERENV_138( int csidl, LPCSTR lnk_dir, LPCSTR lnk_filename,
+@@ -687,12 +689,119 @@ BOOL WINAPI USERENV_138( int csidl, LPCSTR lnk_dir, LPCSTR lnk_filename,
      return FALSE;
  }
- 
+
++static BOOL lmisxh_akmocl_appcontainer_enabled(void)
++{
++    static LONG state = -1;
++    LONG value = state;
++
++    if (value == -1)
++    {
++        const char *flag = getenv( "LMISXH_AKMOCL_APPCONTAINER" );
++
++        value = !flag || (flag[0] == '1' && !flag[1]);
++        InterlockedCompareExchange( &state, value, -1 );
++    }
++    return value;
++}
++
 +static HRESULT result_from_last_error(void)
 +{
 +    DWORD error = GetLastError();
@@ -105,6 +121,7 @@ index 54f713e..00a0080 100644
 +
 +    if (!app_container_sid) return E_POINTER;
 +    *app_container_sid = NULL;
++    if (!lmisxh_akmocl_appcontainer_enabled()) return E_NOTIMPL;
 +    if (!app_container_name || !app_container_name[0]) return E_INVALIDARG;
 +
 +    name_length = wcslen(app_container_name);
@@ -154,13 +171,14 @@ index 54f713e..00a0080 100644
 -    FIXME("(%s, %s, %s, %p, %ld, %p): stub\n", debugstr_w(container_name), debugstr_w(display_name),
 +    TRACE("(%s, %s, %s, %p, %ld, %p)\n", debugstr_w(container_name), debugstr_w(display_name),
            debugstr_w(description), capabilities, capability_count, container_sid);
- 
+
 +    return DeriveAppContainerSidFromAppContainerName(container_name, (PSID *)container_sid);
 +}
 +
 +HRESULT WINAPI DeleteAppContainerProfile(PCWSTR container_name)
 +{
 +    TRACE("(%s)\n", debugstr_w(container_name));
++    if (!lmisxh_akmocl_appcontainer_enabled()) return E_NOTIMPL;
 +    return S_OK;
 +}
 +
@@ -169,6 +187,7 @@ index 54f713e..00a0080 100644
 +    TRACE("(%lx, %p)\n", desired_access, app_container_key);
 +    if (!app_container_key) return E_POINTER;
 +    *app_container_key = NULL;
++    if (!lmisxh_akmocl_appcontainer_enabled()) return E_NOTIMPL;
 +    return E_NOTIMPL;
 +}
 +
@@ -177,5 +196,6 @@ index 54f713e..00a0080 100644
 +    TRACE("(%s, %p)\n", debugstr_w(app_container_sid), folder_path);
 +    if (!folder_path) return E_POINTER;
 +    *folder_path = NULL;
++    if (!lmisxh_akmocl_appcontainer_enabled()) return E_NOTIMPL;
      return E_NOTIMPL;
  }

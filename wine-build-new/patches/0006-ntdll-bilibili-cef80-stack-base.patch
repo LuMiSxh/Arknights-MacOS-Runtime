@@ -2,55 +2,24 @@ diff --git a/dlls/ntdll/loader.c b/dlls/ntdll/loader.c
 index b0b2392..15dc475 100644
 --- a/dlls/ntdll/loader.c
 +++ b/dlls/ntdll/loader.c
-@@ -2264,6 +2264,177 @@ done:
+@@ -2264,6 +2264,144 @@ done:
   *
   * Build the module data for a mapped dll.
   */
 +#ifdef __x86_64__
-+/* CEF compatibility is opt-in and descriptor-driven. The master switch and
-+ * LMISXH_AKMOCL_CEF=1 enable every regional descriptor. The CN modifier
-+ * remains a fallback for the proven Bilibili descriptor. */
-+enum arknights_cef_compat_mode
-+{
-+    ARKNIGHTS_CEF_COMPAT_DISABLED,
-+    ARKNIGHTS_CEF_COMPAT_GENERIC
-+};
-+
-+enum arknights_cef_descriptor_region
-+{
-+    ARKNIGHTS_CEF_REGION_CN
-+};
-+
-+static const WCHAR arknights_runtime_master_nameW[] =
-+    {'L','M','I','S','X','H','_','A','K','M','O','C','L',0};
-+static const WCHAR arknights_runtime_cef_compat_nameW[] =
-+    {'L','M','I','S','X','H','_','A','K','M','O','C','L','_','C','E','F',0};
-+
-+static BOOL arknights_runtime_query_flag( const WCHAR *name, USHORT name_length, BOOL *present )
-+{
-+    WCHAR flag[2] = {0};
-+    UNICODE_STRING nameW = {name_length, name_length + sizeof(WCHAR), (WCHAR *)name};
-+    UNICODE_STRING valueW = {0, sizeof(flag), flag};
-+    NTSTATUS status = RtlQueryEnvironmentVariable_U( NULL, &nameW, &valueW );
-+
-+    *present = status != STATUS_VARIABLE_NOT_FOUND;
-+    return status == STATUS_SUCCESS && valueW.Length == sizeof(WCHAR) && flag[0] == '1';
-+}
-+
-+static enum arknights_cef_compat_mode arknights_runtime_cef_compat_mode(void)
++/* CEF compatibility is descriptor-driven. Each descriptor preflights the
++ * exact module name, RVAs, and bytes before it writes anything. */
++static BOOL arknights_runtime_cef_compat_enabled(void)
 +{
 +    static LONG state = -1;
 +    LONG value = state;
-+    BOOL present;
 +
 +    if (value == -1)
 +    {
-+        value = (arknights_runtime_query_flag( arknights_runtime_master_nameW,
-+                                               sizeof(arknights_runtime_master_nameW) - sizeof(WCHAR), &present ) &&
-+                 arknights_runtime_query_flag( arknights_runtime_cef_compat_nameW,
-+                                               sizeof(arknights_runtime_cef_compat_nameW) - sizeof(WCHAR), &present ))
-+            ? ARKNIGHTS_CEF_COMPAT_GENERIC : ARKNIGHTS_CEF_COMPAT_DISABLED;
-+        InterlockedCompareExchange(&state, value, -1);
++        const char *flag = getenv( "LMISXH_AKMOCL_CEF" );
++
++        value = !flag || (flag[0] == '1' && !flag[1]);
++        InterlockedCompareExchange( &state, value, -1 );
 +    }
 +    return value;
 +}
@@ -68,17 +37,14 @@ index b0b2392..15dc475 100644
 +    const WCHAR *module_name;
 +    const struct arknights_cef_patch *patches;
 +    unsigned int patch_count;
-+    enum arknights_cef_descriptor_region region;
 +};
 +
 +static BOOL arknights_apply_cef_descriptor( WINE_MODREF *wm,
-+                                            const struct arknights_cef_descriptor *descriptor,
-+                                            enum arknights_cef_compat_mode mode )
++                                            const struct arknights_cef_descriptor *descriptor )
 +{
 +    unsigned int i;
 +
-+    if (mode == ARKNIGHTS_CEF_COMPAT_DISABLED ||
-+        wcscmp( wm->ldr.BaseDllName.Buffer, descriptor->module_name ))
++    if (wcscmp( wm->ldr.BaseDllName.Buffer, descriptor->module_name ))
 +        return FALSE;
 +
 +    /* Preflight all expected bytes before writing any patch bytes. */
@@ -171,9 +137,10 @@ index b0b2392..15dc475 100644
 +        { 0x24c425f, before_stackbase_check, after_stackbase_check, sizeof(before_stackbase_check) }
 +    };
 +    static const struct arknights_cef_descriptor descriptor =
-+        {cef_name, patches, ARRAY_SIZE(patches), ARKNIGHTS_CEF_REGION_CN};
++        {cef_name, patches, ARRAY_SIZE(patches)};
 +
-+    arknights_apply_cef_descriptor( wm, &descriptor, arknights_runtime_cef_compat_mode() );
++    if (!arknights_runtime_cef_compat_enabled()) return;
++    arknights_apply_cef_descriptor( wm, &descriptor );
 +}
 +#endif
 +
@@ -183,7 +150,7 @@ index b0b2392..15dc475 100644
 @@ -2340,6 +2519,10 @@ static NTSTATUS build_module( LPCWSTR load_path, const UNICODE_STRING *nt_name,
      TRACE_(loaddll)( "Loaded %s at %p: %s\n", debugstr_w(wm->ldr.FullDllName.Buffer), *module,
                       is_builtin ? "builtin" : "native" );
- 
+
 +#ifdef __x86_64__
 +    apply_bilibili_cef80_stackbase_patch( wm );
 +#endif

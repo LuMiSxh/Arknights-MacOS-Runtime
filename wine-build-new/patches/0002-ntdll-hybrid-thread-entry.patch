@@ -2,10 +2,26 @@ diff --git a/dlls/ntdll/signal_arm64ec.c b/dlls/ntdll/signal_arm64ec.c
 index 9f3a0c4..3252a83 100644
 --- a/dlls/ntdll/signal_arm64ec.c
 +++ b/dlls/ntdll/signal_arm64ec.c
-@@ -2118,6 +2118,88 @@ void __attribute__((naked)) RtlUserThreadStart( PRTL_THREAD_START_ROUTINE entry,
+@@ -2118,6 +2118,105 @@ void __attribute__((naked)) RtlUserThreadStart( PRTL_THREAD_START_ROUTINE entry,
  }
- 
- 
+
+
++static BOOL lmisxh_akmocl_hybrid_thread_enabled(void)
++{
++    static LONG state = -1;
++    LONG value = state;
++
++    if (value == -1)
++    {
++        const char *flag = getenv( "LMISXH_AKMOCL_HYBRID_THREAD" );
++
++        value = !flag || (flag[0] == '1' && !flag[1]);
++        InterlockedCompareExchange( &state, value, -1 );
++    }
++    return value;
++}
++
++
 +/***********************************************************************
 + *           fixup_native_thread_entry
 + *
@@ -33,6 +49,7 @@ index 9f3a0c4..3252a83 100644
 +    ULONG size, rva, i;
 +    ANSI_STRING name;
 +
++    if (!lmisxh_akmocl_hybrid_thread_enabled()) return entry;
 +    if (!entry || RtlIsEcCode( entry )) return entry;
 +    if (LdrFindEntryForAddress( (void *)entry, &mod )) return entry;
 +    if (!(cfg = RtlImageDirectoryEntryToData( mod->DllBase, TRUE, IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG, &size )) ||
@@ -92,7 +109,7 @@ index 9f3a0c4..3252a83 100644
   *		LdrInitializeThunk (NTDLL.@)
   */
 @@ -2136,6 +2218,7 @@ void WINAPI LdrInitializeThunk( CONTEXT *arm_context, ULONG_PTR unk2, ULONG_PTR
- 
+
      context_arm_to_x64( &context, (ARM64_NT_CONTEXT *)arm_context );
      loader_init( &context.AMD64_Context, (void **)&context.X0 );
 +    context.X0 = fixup_native_thread_entry( context.X0 );

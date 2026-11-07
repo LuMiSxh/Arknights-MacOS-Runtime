@@ -2,15 +2,38 @@ diff --git a/dlls/ntoskrnl.exe/ntoskrnl.c b/dlls/ntoskrnl.exe/ntoskrnl.c
 index b23b530..51b11b2 100644
 --- a/dlls/ntoskrnl.exe/ntoskrnl.c
 +++ b/dlls/ntoskrnl.exe/ntoskrnl.c
-@@ -3723,6 +3723,22 @@ HANDLE WINAPI PsGetCurrentProcessId(void)
+@@ -23,5 +23,6 @@
+  */
+
+ #include <assert.h>
++#include <stdlib.h>
+
+ #include "ntoskrnl_private.h"
+@@ -3723,6 +3724,39 @@ HANDLE WINAPI PsGetCurrentProcessId(void)
      return KeGetCurrentThread()->id.UniqueProcess;
  }
- 
+
++static BOOL lmisxh_akmocl_ace_imports_enabled(void)
++{
++    static LONG state = -1;
++    LONG value = state;
++
++    if (value == -1)
++    {
++        const char *flag = getenv( "LMISXH_AKMOCL_ACE_IMPORTS" );
++
++        value = !flag || (flag[0] == '1' && !flag[1]);
++        InterlockedCompareExchange( &state, value, -1 );
++    }
++    return value;
++}
++
 +/***********************************************************************
 + *           PsGetCurrentThreadProcess   (NTOSKRNL.EXE.@)
 + */
 +PEPROCESS WINAPI PsGetCurrentThreadProcess(void)
 +{
++    if (!lmisxh_akmocl_ace_imports_enabled()) return NULL;
 +    return PsGetCurrentProcess();
 +}
 +
@@ -19,13 +42,14 @@ index b23b530..51b11b2 100644
 + */
 +HANDLE WINAPI PsGetCurrentThreadProcessId(void)
 +{
++    if (!lmisxh_akmocl_ace_imports_enabled()) return 0;
 +    return PsGetCurrentProcessId();
 +}
 +
  /***********************************************************************
   *           PsGetCurrentProcessSessionId   (NTOSKRNL.EXE.@)
   */
-@@ -5000,6 +5016,15 @@ BOOLEAN WINAPI SeSinglePrivilegeCheck(LUID privilege, KPROCESSOR_MODE mode)
+@@ -5000,6 +5016,16 @@ BOOLEAN WINAPI SeSinglePrivilegeCheck(LUID privilege, KPROCESSOR_MODE mode)
  /*********************************************************************
   *           SePrivilegeCheck    (NTOSKRNL.@)
   */
@@ -34,6 +58,7 @@ index b23b530..51b11b2 100644
 + */
 +NTSTATUS WINAPI SeSetAuditParameter(void *audit_parameters, LONG type, ULONG index, void *data)
 +{
++    if (!lmisxh_akmocl_ace_imports_enabled()) return STATUS_NOT_IMPLEMENTED;
 +    FIXME("%p %ld %lu %p\n", audit_parameters, type, index, data);
 +    return STATUS_SUCCESS;
 +}
