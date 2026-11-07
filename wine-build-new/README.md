@@ -6,8 +6,8 @@ This directory is the Arknights patch export for the signed ARM64 runtime built 
 
 The workspace builds upstream Wine 11.18 with a 72-patch Hadron and Endfield queue. The
 patches here are rebased against that queue, not against this repository's WineCX 11.17
-tree. The workspace links each patch individually from `wine-build-new/patches/` into
-`patches/wine/arknights-macos-runtime/`, matching its other third-party patch families.
+tree. The workspace references `wine-build-new/patches/` directly from the Wine Portfile;
+no entry is added under `patches/wine/`.
 See [collaborator runtime](../docs/arm/wine-build-new.md) for the mapping and the audit.
 
 ## Layout
@@ -121,13 +121,15 @@ ACE is not separately gated.
 
 ## Workspace integration
 
-The workspace adds this repository at `third-party/arknights-macos-runtime`. Each patch
-file is linked individually into `patches/wine/arknights-macos-runtime/`, so the Portfile
-keeps `filespath` at `patches/wine` and lists the patches as:
+The workspace adds this repository at `third-party/arknights-macos-runtime`. The Portfile
+references each patch directly from the submodule with a path relative to its existing
+`filespath` at `patches/wine`:
 
 ```text
-arknights-macos-runtime/0001-... \
+../../third-party/arknights-macos-runtime/wine-build-new/patches/0001-... \
 ```
+
+No Arknights entry is added under `patches/wine/`.
 
 The FEX port no longer needs an entry.
 
