@@ -31,7 +31,7 @@
       {
         "order": 74,
         "path": "wine-build-new/patches/0002-ntdll-hybrid-thread-entry.patch",
-        "sha256": "e7f786930346b872a47eccc32a59304149404ca065c0635238aa7d4d442296de",
+        "sha256": "c716a7c2df2fc51e283083bd2fb88c6dcaaf6a6ed72f30a90a827cf3d7039ab2",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_HYBRID_THREAD"
       },
@@ -66,7 +66,7 @@
       {
         "order": 79,
         "path": "wine-build-new/patches/0007-win32u-winemac-bilibili-layered-child.patch",
-        "sha256": "9d015986bba393a55d9d1281ce7fc392d3cdf0f85a8aa0c1a2b8c028bf77a63c",
+        "sha256": "01f355f5776ff94614f999a987e60c2cfc9b35baa46ef0f8ec271699138c1ece",
         "modifier": "LMISXH_AKMOCL_CN",
         "default": "off"
       },
