@@ -192,7 +192,7 @@
       "component": "wine",
       "family": "fullscreen",
       "path": "patches/shared/wine/fullscreen/0001-winemac-native-fullscreen-space.patch",
-      "sha256": "3b83dfd872782138ef2de91461f96ea099616ca1a78cd5f7f644fe2008898615"
+      "sha256": "9a14900ff0aab882a34f5b45f4f14232a03636ede6178cac085ee6595ff3820c"
     },
     {
       "id": "wine-winsock-address-list-sort",
