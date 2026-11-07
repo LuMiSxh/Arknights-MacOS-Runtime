@@ -1,9 +1,8 @@
 diff --git a/dlls/ntdll/unwind.h b/dlls/ntdll/unwind.h
-index 1852708..a57a081 100644
+index 18527088d0a..94111b972a9 100644
 --- a/dlls/ntdll/unwind.h
 +++ b/dlls/ntdll/unwind.h
-@@ -24,7 +24,8 @@
- #include <stdarg.h>
+@@ -25,6 +25,7 @@
  #include "windef.h"
  #include "winbase.h"
  #include "winnt.h"
@@ -11,7 +10,7 @@ index 1852708..a57a081 100644
 
  #if defined(__aarch64__) || defined(__arm64ec__)
 
-@@ -52,6 +53,43 @@ static inline ULONG ctx_flags_arm_to_x64( ULONG flags )
+@@ -53,6 +54,51 @@ static inline ULONG ctx_flags_arm_to_x64( ULONG flags )
      return ret;
  }
 
@@ -46,6 +45,14 @@ index 1852708..a57a081 100644
 +
 +    if (value == -1)
 +    {
++        PEB *peb = NtCurrentTeb()->Peb;
++
++        /* The environment and its lock are not initialized during the early
++           thread-context conversion path. Use the default until they are, so
++           the lookup never takes the PEB lock before it exists. */
++        if (!peb || !peb->ProcessParameters)
++            return TRUE;
++
 +        value = lmisxh_akmocl_flag( "LMISXH_AKMOCL_EFLAGS" );
 +        InterlockedCompareExchange( &state, value, -1 );
 +    }
@@ -55,7 +62,7 @@ index 1852708..a57a081 100644
  static inline UINT eflags_to_cpsr( UINT eflags )
  {
      UINT ret = 0;
-@@ -62,6 +77,13 @@ static inline UINT eflags_to_cpsr( UINT eflags )
+@@ -62,6 +108,13 @@ static inline UINT eflags_to_cpsr( UINT eflags )
      if (eflags & 0x0080) ret |= 0x80000000;  /* negative */
      if (eflags & 0x0100) ret |= 0x00200000;  /* trap */
      if (eflags & 0x0800) ret |= 0x10000000;  /* overflow */
@@ -69,7 +76,7 @@ index 1852708..a57a081 100644
      return ret;
  }
 
-@@ -74,5 +94,11 @@ static inline UINT cpsr_to_eflags( UINT cpsr )
+@@ -74,5 +127,11 @@ static inline UINT cpsr_to_eflags( UINT cpsr )
      if (cpsr & 0x20000000) ret |= 0x0001;  /* carry */
      if (cpsr & 0x40000000) ret |= 0x0040;  /* zero */
      if (cpsr & 0x80000000) ret |= 0x0080;  /* negative */
