@@ -24,7 +24,7 @@
       {
         "order": 73,
         "path": "wine-build-new/patches/0001-ntdll-carry-eflags-af-df.patch",
-        "sha256": "b81c28c0f7614caac063468714fe085c7172deec1c4ab345a7195b511734fb4b",
+        "sha256": "e301b36233fa27a49194f65a0b536e80b6aa881b7f9d6b12195a248345518933",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_EFLAGS"
       },
@@ -38,35 +38,35 @@
       {
         "order": 75,
         "path": "wine-build-new/patches/0003-ntoskrnl-arknights-ace-imports.patch",
-        "sha256": "2dcc7e2beb5b07ae8182fe56abb0aae9a021c252cd63352774da79ffd8605b9d",
+        "sha256": "729737a1f8f3dfcc803d768db6d354d73f89061bcd5b7edb830c01882e4476a0",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_ACE_IMPORTS"
       },
       {
         "order": 76,
         "path": "wine-build-new/patches/0004-userenv-appcontainer-apis.patch",
-        "sha256": "868b3a6fd0701d38ea0283b988b3d5aabd63444c340aca51755288b10e553e23",
+        "sha256": "fe56b85ccc68fa09d5ca31e41bf587f6a49b3a1ec0ae843cebf7150360f656cf",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_APPCONTAINER"
       },
       {
         "order": 77,
         "path": "wine-build-new/patches/0005-ws2_32-address-list-sort.patch",
-        "sha256": "90cedbcdc39de368384ca90307063c56f2e9290f00690e5bff9e56025697580e",
+        "sha256": "5870f9c2da9cc65075abefe3037cdb52d22b756b079829b6c278f0d26202663c",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_WINSOCK"
       },
       {
         "order": 78,
         "path": "wine-build-new/patches/0006-ntdll-bilibili-cef80-stack-base.patch",
-        "sha256": "841f778f3ef2f5f69092474c08661dc659c2eb71d0db58c21081ac8415810e7f",
+        "sha256": "68370330f0c190fc9c9549db2a8f9fc5da1e7c5611375e544e40647169cd0dcc",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_CEF"
       },
       {
         "order": 79,
         "path": "wine-build-new/patches/0007-win32u-winemac-bilibili-layered-child.patch",
-        "sha256": "01f355f5776ff94614f999a987e60c2cfc9b35baa46ef0f8ec271699138c1ece",
+        "sha256": "d670eb2a2ee616e8b42a6d6c75c9b9db63228265020733b78bbb075de6bf65e5",
         "modifier": "LMISXH_AKMOCL_CN",
         "default": "off"
       },
@@ -107,7 +107,7 @@
     }
   ],
   "opt_outs": {
-    "LMISXH_AKMOCL_EFLAGS": "Carry AF and DF across ARM64EC context switches.",
+    "LMISXH_AKMOCL_EFLAGS": "Carry PF, AF and DF across ARM64EC context switches with the paired FEX patch.",
     "LMISXH_AKMOCL_HYBRID_THREAD": "Start a hybrid-module thread on its x64 export.",
     "LMISXH_AKMOCL_ACE_IMPORTS": "Export the three ACE kernel imports.",
     "LMISXH_AKMOCL_APPCONTAINER": "Implement the AppContainer names Chromium resolves.",
@@ -119,5 +119,15 @@
   "patch_alias": "patches/wine/arknights-macos-runtime",
   "patch_alias_target": "third-party/arknights-macos-runtime/wine-build-new/patches",
   "patch_alias_mode": "per-file",
-  "portfile_prefix": "arknights-macos-runtime/"
+  "portfile_prefix": "arknights-macos-runtime/",
+  "fex": {
+    "base": "14c92681f4d62cf84d901460e0358de09c8847a7",
+    "application": "Apply after the wine-build-new FEX patch queue and deploy with Wine patch 0001.",
+    "patches": [
+      {
+        "path": "wine-build-new/fex/0001-arm64ec-restore-carried-eflags.patch",
+        "sha256": "6f4ebc271f043deac6a6938a1980fbe77bb34f09160a1079dabd40982b03d89b"
+      }
+    ]
+  }
 }

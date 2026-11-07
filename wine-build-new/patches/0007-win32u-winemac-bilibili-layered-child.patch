@@ -466,7 +466,7 @@ index dd1aca0..3dfe197 100644
  
  /***********************************************************************
   *              sync_window_min_max_info
-@@ -789,6 +797,201 @@ void activate_on_following_focus(void)
+@@ -789,6 +797,202 @@ void activate_on_following_focus(void)
  }
  
  
@@ -604,7 +604,8 @@ index dd1aca0..3dfe197 100644
 +    points[0].y = rect.top;
 +    points[1].x = rect.right;
 +    points[1].y = rect.bottom;
-+    if (NtUserMapWindowPoints(NULL, toplevel, points, 2, dpi)) return FALSE;
++    /* The return value is a coordinate offset, not a success flag. */
++    NtUserMapWindowPoints(NULL, toplevel, points, 2, dpi);
 +
 +    frame->left = points[0].x;
 +    frame->top = points[0].y;

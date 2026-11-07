@@ -24,7 +24,7 @@ behavior at runtime; they do not select patches at build time.
 
 | Patch                                              | Runtime gate             | Need                  | Purpose                                                  |
 | -------------------------------------------------- | ------------------------ | --------------------- | -------------------------------------------------------- |
-| `0001-ntdll-carry-eflags-af-df.patch`              | opt-out `_EFLAGS`        | keep until ACE run    | Keeps AF and DF across ARM64EC context switches.         |
+| `0001-ntdll-carry-eflags-af-df.patch`              | opt-out `_EFLAGS`        | keep until ACE run    | Keeps PF, AF and DF across ARM64EC context switches.         |
 | `0002-ntdll-hybrid-thread-entry.patch`             | opt-out `_HYBRID_THREAD` | keep until ACE run    | Starts a hybrid-module thread on its x64 export.         |
 | `0003-ntoskrnl-arknights-ace-imports.patch`        | opt-out `_ACE_IMPORTS`   | keep until ACE run    | Adds three kernel imports that ACE resolves.             |
 | `0004-userenv-appcontainer-apis.patch`             | opt-out `_APPCONTAINER`  | required for CEF      | Adds the AppContainer names Chromium resolves.           |
@@ -66,6 +66,23 @@ filter could be approximated by a proxy DLL, but that only covers wrapped APIs a
 less durable than the shared NT name resolver. `0009` is on by default with an opt-out;
 `0010` stays opt-in.
 
+## Paired FEX context patch
+
+Apply `fex/0001-arm64ec-restore-carried-eflags.patch` after the FEX patch queue in
+`wine-build-new`. Its source pin and checksum are in `lock.json` under `fex`.
+Build and deploy it with Wine patch `0001`. Do not deploy the FEX patch with an
+older Wine runtime that drops these context bits.
+
+Wine and FEX use CPSR packet bits 26, 27 and 19 for PF, AF and DF. Wine converts
+these bits in saved contexts. FEX accepts the restored flags when it resumes x64
+execution. Both sides use `LMISXH_AKMOCL_EFLAGS`: unset or `1` enables this path;
+other values retain the previous merge behavior.
+
+The address-list patch preserves input order as a compatibility fallback. It does
+not implement Windows destination-address ranking. It validates the count and
+copy sizes before writing output and uses Wine's existing asynchronous completion
+path for both separate and in-place buffers.
+
 ## What is not in the export
 
 - **FEX lookup-cache eager commit.** The workspace patch
@@ -88,7 +105,7 @@ less durable than the shared NT name resolver. `0009` is on by default with an o
 variable or `1` keeps the behavior; any other value turns it off.
 
 ```sh
-LMISXH_AKMOCL_EFLAGS=0          # Do not carry AF and DF
+LMISXH_AKMOCL_EFLAGS=0          # Do not carry PF, AF and DF
 LMISXH_AKMOCL_HYBRID_THREAD=0   # Do not fix up hybrid-module thread entries
 LMISXH_AKMOCL_ACE_IMPORTS=0     # Do not export the ACE kernel imports
 LMISXH_AKMOCL_APPCONTAINER=0    # Do not implement the AppContainer names
