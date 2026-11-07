@@ -2,10 +2,32 @@ diff --git a/dlls/ntdll/signal_arm64ec.c b/dlls/ntdll/signal_arm64ec.c
 index 9f3a0c4..3252a83 100644
 --- a/dlls/ntdll/signal_arm64ec.c
 +++ b/dlls/ntdll/signal_arm64ec.c
-@@ -2118,6 +2118,105 @@ void __attribute__((naked)) RtlUserThreadStart( PRTL_THREAD_START_ROUTINE entry,
+@@ -2118,6 +2118,125 @@ void __attribute__((naked)) RtlUserThreadStart( PRTL_THREAD_START_ROUTINE entry,
  }
 
 
++static BOOL lmisxh_akmocl_flag( const char *name )
++{
++    WCHAR nameW[32];
++    WCHAR valueW[2];
++    UNICODE_STRING nameU, valueU;
++    unsigned int i;
++
++    for (i = 0; name[i] && i < sizeof(nameW) / sizeof(nameW[0]) - 1; i++)
++        nameW[i] = (unsigned char)name[i];
++    nameW[i] = 0;
++
++    nameU.Length = i * sizeof(WCHAR);
++    nameU.MaximumLength = (i + 1) * sizeof(WCHAR);
++    nameU.Buffer = nameW;
++    valueU.Length = 0;
++    valueU.MaximumLength = sizeof(valueW);
++    valueU.Buffer = valueW;
++
++    return RtlQueryEnvironmentVariable_U( NULL, &nameU, &valueU ) == STATUS_SUCCESS &&
++           valueU.Length == sizeof(WCHAR) && valueW[0] == '1';
++}
++
 +static BOOL lmisxh_akmocl_hybrid_thread_enabled(void)
 +{
 +    static LONG state = -1;
@@ -13,9 +35,7 @@ index 9f3a0c4..3252a83 100644
 +
 +    if (value == -1)
 +    {
-+        const char *flag = getenv( "LMISXH_AKMOCL_HYBRID_THREAD" );
-+
-+        value = !flag || (flag[0] == '1' && !flag[1]);
++        value = lmisxh_akmocl_flag( "LMISXH_AKMOCL_HYBRID_THREAD" );
 +        InterlockedCompareExchange( &state, value, -1 );
 +    }
 +    return value;

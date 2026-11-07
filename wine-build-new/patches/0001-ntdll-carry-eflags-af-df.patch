@@ -7,14 +7,36 @@ index 1852708..a57a081 100644
  #include "windef.h"
  #include "winbase.h"
  #include "winnt.h"
-+#include <stdlib.h>
++#include "winternl.h"
 
  #if defined(__aarch64__) || defined(__arm64ec__)
 
-@@ -52,6 +53,21 @@ static inline ULONG ctx_flags_arm_to_x64( ULONG flags )
+@@ -52,6 +53,41 @@ static inline ULONG ctx_flags_arm_to_x64( ULONG flags )
      return ret;
  }
 
++static inline BOOL lmisxh_akmocl_flag( const char *name )
++{
++    WCHAR nameW[32];
++    WCHAR valueW[2];
++    UNICODE_STRING nameU, valueU;
++    unsigned int i;
++
++    for (i = 0; name[i] && i < sizeof(nameW) / sizeof(nameW[0]) - 1; i++)
++        nameW[i] = (unsigned char)name[i];
++    nameW[i] = 0;
++
++    nameU.Length = i * sizeof(WCHAR);
++    nameU.MaximumLength = (i + 1) * sizeof(WCHAR);
++    nameU.Buffer = nameW;
++    valueU.Length = 0;
++    valueU.MaximumLength = sizeof(valueW);
++    valueU.Buffer = valueW;
++
++    return RtlQueryEnvironmentVariable_U( NULL, &nameU, &valueU ) == STATUS_SUCCESS &&
++           valueU.Length == sizeof(WCHAR) && valueW[0] == '1';
++}
++
 +static inline BOOL lmisxh_akmocl_eflags_enabled(void)
 +{
 +    static LONG state = -1;
@@ -22,9 +44,7 @@ index 1852708..a57a081 100644
 +
 +    if (value == -1)
 +    {
-+        const char *flag = getenv( "LMISXH_AKMOCL_EFLAGS" );
-+
-+        value = !flag || (flag[0] == '1' && !flag[1]);
++        value = lmisxh_akmocl_flag( "LMISXH_AKMOCL_EFLAGS" );
 +        InterlockedCompareExchange( &state, value, -1 );
 +    }
 +    return value;

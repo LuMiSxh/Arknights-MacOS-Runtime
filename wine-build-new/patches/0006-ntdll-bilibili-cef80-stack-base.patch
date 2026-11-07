@@ -2,13 +2,35 @@ diff --git a/dlls/ntdll/loader.c b/dlls/ntdll/loader.c
 index b0b2392..15dc475 100644
 --- a/dlls/ntdll/loader.c
 +++ b/dlls/ntdll/loader.c
-@@ -2264,6 +2264,144 @@ done:
+@@ -2264,6 +2264,164 @@ done:
   *
   * Build the module data for a mapped dll.
   */
 +#ifdef __x86_64__
 +/* CEF compatibility is descriptor-driven. Each descriptor preflights the
 + * exact module name, RVAs, and bytes before it writes anything. */
++static BOOL lmisxh_akmocl_flag( const char *name )
++{
++    WCHAR nameW[32];
++    WCHAR valueW[2];
++    UNICODE_STRING nameU, valueU;
++    unsigned int i;
++
++    for (i = 0; name[i] && i < sizeof(nameW) / sizeof(nameW[0]) - 1; i++)
++        nameW[i] = (unsigned char)name[i];
++    nameW[i] = 0;
++
++    nameU.Length = i * sizeof(WCHAR);
++    nameU.MaximumLength = (i + 1) * sizeof(WCHAR);
++    nameU.Buffer = nameW;
++    valueU.Length = 0;
++    valueU.MaximumLength = sizeof(valueW);
++    valueU.Buffer = valueW;
++
++    return RtlQueryEnvironmentVariable_U( NULL, &nameU, &valueU ) == STATUS_SUCCESS &&
++           valueU.Length == sizeof(WCHAR) && valueW[0] == '1';
++}
++
 +static BOOL arknights_runtime_cef_compat_enabled(void)
 +{
 +    static LONG state = -1;
@@ -16,9 +38,7 @@ index b0b2392..15dc475 100644
 +
 +    if (value == -1)
 +    {
-+        const char *flag = getenv( "LMISXH_AKMOCL_CEF" );
-+
-+        value = !flag || (flag[0] == '1' && !flag[1]);
++        value = lmisxh_akmocl_flag( "LMISXH_AKMOCL_CEF" );
 +        InterlockedCompareExchange( &state, value, -1 );
 +    }
 +    return value;
