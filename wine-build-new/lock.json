@@ -24,49 +24,49 @@
       {
         "order": 73,
         "path": "wine-build-new/patches/0001-ntdll-carry-eflags-af-df.patch",
-        "sha256": "9024e6af97ffb39095e8b31a2dda05f1da78e8b913ee6fe090ec2dd60db32c35",
+        "sha256": "b81c28c0f7614caac063468714fe085c7172deec1c4ab345a7195b511734fb4b",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_EFLAGS"
       },
       {
         "order": 74,
         "path": "wine-build-new/patches/0002-ntdll-hybrid-thread-entry.patch",
-        "sha256": "ced9e5b472a5984eb54731f4cd97b386b8ec6505c5c49c7aff2821afdd86b75d",
+        "sha256": "e7f786930346b872a47eccc32a59304149404ca065c0635238aa7d4d442296de",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_HYBRID_THREAD"
       },
       {
         "order": 75,
         "path": "wine-build-new/patches/0003-ntoskrnl-arknights-ace-imports.patch",
-        "sha256": "c7fcdb068e04774cf8a6ebce7f6d53fa2fc1d72b5efe854ad9ebd9f5817c3de0",
+        "sha256": "2dcc7e2beb5b07ae8182fe56abb0aae9a021c252cd63352774da79ffd8605b9d",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_ACE_IMPORTS"
       },
       {
         "order": 76,
         "path": "wine-build-new/patches/0004-userenv-appcontainer-apis.patch",
-        "sha256": "3f505d90b410a1d511f750f86d2b7cda5db090458ae678e3e45a8c836a6fa251",
+        "sha256": "868b3a6fd0701d38ea0283b988b3d5aabd63444c340aca51755288b10e553e23",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_APPCONTAINER"
       },
       {
         "order": 77,
         "path": "wine-build-new/patches/0005-ws2_32-address-list-sort.patch",
-        "sha256": "501b5e4c727c0d6a176febf13b3ad658754fbb53dedba814fdf9d6ca936fe2c5",
+        "sha256": "90cedbcdc39de368384ca90307063c56f2e9290f00690e5bff9e56025697580e",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_WINSOCK"
       },
       {
         "order": 78,
         "path": "wine-build-new/patches/0006-ntdll-bilibili-cef80-stack-base.patch",
-        "sha256": "80d2af0090935dd3cd03723b15d6026cf6f91de523aaf3388f001c4179db18ab",
+        "sha256": "841f778f3ef2f5f69092474c08661dc659c2eb71d0db58c21081ac8415810e7f",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_CEF"
       },
       {
         "order": 79,
         "path": "wine-build-new/patches/0007-win32u-winemac-bilibili-layered-child.patch",
-        "sha256": "ee371a152ad4fbffbca18d319422f56a6779a184bcdc3665ae154a0af4354ee0",
+        "sha256": "9d015986bba393a55d9d1281ce7fc392d3cdf0f85a8aa0c1a2b8c028bf77a63c",
         "modifier": "LMISXH_AKMOCL_CN",
         "default": "off"
       },

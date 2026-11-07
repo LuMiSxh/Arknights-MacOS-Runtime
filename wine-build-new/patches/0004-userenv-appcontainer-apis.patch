@@ -78,10 +78,32 @@ index 54f713e..00a0080 100644
  #include "sddl.h"
  #include "objbase.h"
  #include "userenv.h"
-@@ -687,12 +689,119 @@ BOOL WINAPI USERENV_138( int csidl, LPCSTR lnk_dir, LPCSTR lnk_filename,
+@@ -687,12 +689,139 @@ BOOL WINAPI USERENV_138( int csidl, LPCSTR lnk_dir, LPCSTR lnk_filename,
      return FALSE;
  }
 
++static BOOL lmisxh_akmocl_flag( const char *name )
++{
++    WCHAR nameW[32];
++    WCHAR valueW[2];
++    UNICODE_STRING nameU, valueU;
++    unsigned int i;
++
++    for (i = 0; name[i] && i < sizeof(nameW) / sizeof(nameW[0]) - 1; i++)
++        nameW[i] = (unsigned char)name[i];
++    nameW[i] = 0;
++
++    nameU.Length = i * sizeof(WCHAR);
++    nameU.MaximumLength = (i + 1) * sizeof(WCHAR);
++    nameU.Buffer = nameW;
++    valueU.Length = 0;
++    valueU.MaximumLength = sizeof(valueW);
++    valueU.Buffer = valueW;
++
++    return RtlQueryEnvironmentVariable_U( NULL, &nameU, &valueU ) == STATUS_SUCCESS &&
++           valueU.Length == sizeof(WCHAR) && valueW[0] == '1';
++}
++
 +static BOOL lmisxh_akmocl_appcontainer_enabled(void)
 +{
 +    static LONG state = -1;
@@ -89,9 +111,7 @@ index 54f713e..00a0080 100644
 +
 +    if (value == -1)
 +    {
-+        const char *flag = getenv( "LMISXH_AKMOCL_APPCONTAINER" );
-+
-+        value = !flag || (flag[0] == '1' && !flag[1]);
++        value = lmisxh_akmocl_flag( "LMISXH_AKMOCL_APPCONTAINER" );
 +        InterlockedCompareExchange( &state, value, -1 );
 +    }
 +    return value;
