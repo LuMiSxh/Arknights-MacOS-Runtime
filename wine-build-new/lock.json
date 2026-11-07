@@ -118,5 +118,6 @@
     "LMISXH_AKMOCL_CEF": "Apply the Bilibili CEF 80.1.15 descriptor.",
     "LMISXH_AKMOCL_FULLSCREEN": "Put fullscreen games in a native macOS Space."
   },
-  "opt_out_semantics": "Unset or 1 enables the behavior; any other value disables it."
+  "opt_out_semantics": "Unset or 1 enables the behavior; any other value disables it.",
+  "patch_alias_mode": "per-file"
 }
