@@ -1,16 +1,18 @@
-# Collaborator runtime (wine-build-new)
+# Patch export (wine-build-new)
 
-The signed ARM64 runtime is built in a separate MacPorts workspace. That workspace pins
-upstream Wine 11.18, FEX 2610, Hadron, and the Endfield ACE baseline. It is being prepared
-with the Apple entitlements that this repository cannot get.
+The signed ARM64 runtime is built in the
+[wine-build-new](https://github.com/riverfog7/wine-build-new) workspace. That workspace pins
+upstream Wine 11.18, FEX 2610, Hadron, and the Endfield ACE baseline. The Arknights patch export is
+in the same repository.
 
-This page records the patch export for that workspace. The canonical Arknights patches stay
-in this repository. The workspace receives a rebased copy and a Portfile entry.
+This page records the export. The canonical Arknights patches stay in this repository. The
+workspace receives a rebased copy and a Portfile entry.
 
 ## Workspace
 
 | Item             | Value                                                              |
 | ---------------- | ------------------------------------------------------------------ |
+| Repository       | [wine-build-new](https://github.com/riverfog7/wine-build-new)      |
 | Workspace        | `wine-build-new`                                                   |
 | Wine             | upstream 11.18, commit `7b3fff76fa5178f6ce0141b2c776afa2a822f101`  |
 | FEX              | commit `14c92681f4d62cf84d901460e0358de09c8847a7`                  |
@@ -31,18 +33,18 @@ references them as `arknights-macos-runtime/0001-...` through `0010-...`.
 
 ## Export set
 
-| Export                                             | Source in this repository                     | Runtime gate                  | Need                  |
-| -------------------------------------------------- | --------------------------------------------- | ----------------------------- | --------------------- |
-| `0001-ntdll-carry-eflags-af-df.patch`              | `patches/arm/wine/ace-context/`               | opt-out `_EFLAGS`             | keep until ACE run    |
-| `0002-ntdll-hybrid-thread-entry.patch`             | `patches/arm/wine/ace-thread-entry/`          | opt-out `_HYBRID_THREAD`      | keep until ACE run    |
-| `0003-ntoskrnl-arknights-ace-imports.patch`        | `patches/shared/wine/ace/ntoskrnl/` (reduced) | opt-out `_ACE_IMPORTS`        | keep until ACE run    |
-| `0004-userenv-appcontainer-apis.patch`             | `patches/shared/wine/appcontainer/`           | opt-out `_APPCONTAINER`       | required for CEF      |
-| `0005-ws2_32-address-list-sort.patch`              | `patches/shared/wine/winsock/`                | opt-out `_WINSOCK`            | required for CEF      |
-| `0006-ntdll-bilibili-cef80-stack-base.patch`       | `patches/shared/wine/cef/` (rebased)          | opt-out `_CEF`                | required for Bilibili |
-| `0007-win32u-winemac-bilibili-layered-child.patch` | `patches/shared/wine/cn/windowing/` (rebased) | master + `_CN`                | required for Bilibili |
-| `0008-winemac-bilibili-join-all-spaces.patch`      | `patches/shared/wine/cn/windowing/`           | master + `_CN` (optional)     | required for Bilibili |
-| `0009-winemac-native-fullscreen-space.patch`       | `patches/shared/wine/fullscreen/` (rebased)   | opt-out `_FULLSCREEN`         | ours, user-visible    |
-| `0010-ntdll-hide-software-cursor-asset.patch`      | `patches/shared/wine/hardware-cursor/`        | master + `_CURSOR` (optional) | ours, user-visible    |
+| Export                                             | Source in this repository              | Runtime gate                  | Need                  |
+| -------------------------------------------------- | -------------------------------------- | ----------------------------- | --------------------- |
+| `0001-ntdll-carry-eflags-af-df.patch`              | `wine-build-new/patches/`              | opt-out `_EFLAGS`             | keep until ACE run    |
+| `0002-ntdll-hybrid-thread-entry.patch`             | `wine-build-new/patches/`              | opt-out `_HYBRID_THREAD`      | keep until ACE run    |
+| `0003-ntoskrnl-arknights-ace-imports.patch`        | `patches/wine/ace/ntoskrnl/` (reduced) | opt-out `_ACE_IMPORTS`        | keep until ACE run    |
+| `0004-userenv-appcontainer-apis.patch`             | `patches/wine/appcontainer/`           | opt-out `_APPCONTAINER`       | required for CEF      |
+| `0005-ws2_32-address-list-sort.patch`              | `patches/wine/winsock/`                | opt-out `_WINSOCK`            | required for CEF      |
+| `0006-ntdll-bilibili-cef80-stack-base.patch`       | `patches/wine/cef/` (rebased)          | opt-out `_CEF`                | required for Bilibili |
+| `0007-win32u-winemac-bilibili-layered-child.patch` | `patches/wine/cn/windowing/` (rebased) | master + `_CN`                | required for Bilibili |
+| `0008-winemac-bilibili-join-all-spaces.patch`      | `patches/wine/cn/windowing/`           | master + `_CN` (optional)     | required for Bilibili |
+| `0009-winemac-native-fullscreen-space.patch`       | `patches/wine/fullscreen/` (rebased)   | opt-out `_FULLSCREEN`         | ours, user-visible    |
+| `0010-ntdll-hide-software-cursor-asset.patch`      | `patches/wine/hardware-cursor/`        | master + `_CURSOR` (optional) | ours, user-visible    |
 
 The workspace applies all ten patches at build time. The variables select behavior at
 runtime; they do not select patches. `0001` to `0006` and `0009` are on by default and each
@@ -113,12 +115,8 @@ The Arknights `address-space`, `wx-pages`, `id-registers`, `ec-code-bitmap`,
 ## Entitlements
 
 The workspace profile currently grants `com.apple.developer.cross-architecture-support`.
-It does not yet grant `com.apple.private.custom-x18-abi`. The collaborator is obtaining the
-second entitlement.
-
-The cross-architecture entitlement removes the shared-user-data relocation and the mixed-page
-workaround. The custom-x18 entitlement removes the SDK-12 loader relink. Confirm both in the
-final profile before judging the window chrome. See [entitlements](entitlements.md).
+It does not yet grant `com.apple.private.custom-x18-abi`. Confirm the final profile before judging
+the window chrome. See [entitlements](entitlements.md).
 
 ## Gates and opt-outs
 
@@ -158,13 +156,13 @@ Arknights client sets the opt-outs it needs; the CN and cursor patches still nee
 
 ## Validation
 
-- All 82 Wine patches apply to a pristine Wine 11.18 tree with `patch -p1 -F0`.
+- All patches apply to a pristine Wine 11.18 tree with `patch -p1 -F0` after the workspace queue.
 - No Wine build, prefix creation, game launch, or ACE run was performed for the export.
 - ACE remains untested. Complete the China update before judging an ACE result.
 
 ## Updating the export
 
-1. Change the canonical patch in `patches/arm` or `patches/shared`.
+1. Change the canonical patch in `patches/`.
 2. Rebase it onto the workspace queue in a Wine 11.18 checkout.
 3. Run the full queue. Every patch must apply with `-F0`.
 4. Replace the file under `wine-build-new/patches/` in this repository.

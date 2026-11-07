@@ -36,7 +36,9 @@ The opt-in Hardware Cursor Wine patch filters the exact region-specific cursor a
 
 ## License files in the archive
 
-The file `LICENSES/index.json` lists every component with its version, SPDX identifier, source, license files, optional notice, and status. The status is `verified` or `unverified`. A component can also name the targets that ship it. The script `scripts/shared/release/licenses.py` validates the index against `runtime.lock.json`, the build script, and the generated inventory. The clean build puts `Licenses/` (with `index.json`) and `NOTICE.md` at the root of the runtime archive. The native-arm64 canary build writes the same payload for its target, so it lists Wine, DXMT, FEX, and the Nix closure but not MoltenVK. The release check fails when the payload is missing.
+The file `LICENSES/index.json` lists every component with its version, SPDX identifier, source, license files, optional notice, and status. The status is `verified` or `unverified`. A component can also name the targets that ship it. The script `scripts/release/licenses.py` validates the index against `runtime.lock.json`, the build script, and the generated inventory. The clean build puts `Licenses/` (with `index.json`) and `NOTICE.md` at the root of the runtime archive. The native-arm64 canary build writes the same payload for its target, so it lists Wine, DXMT, FEX, and the Nix closure but not MoltenVK. The release check fails when the payload is missing.
+
+The external ARM64 archive keeps its upstream `share/licenses` directory. The runtime release adds Wine, DXMT, FEX, and MoltenVK notices. The generated Nix closure inventory is not part of the external lane.
 
 The corresponding-source offer for the Nix libraries is not yet in place.
 

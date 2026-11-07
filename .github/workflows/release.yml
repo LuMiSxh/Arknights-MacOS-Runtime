@@ -43,7 +43,7 @@ jobs:
               run: |
                   set -euo pipefail
                   release_tag="$(uv run --locked --no-dev python -c \
-                    'import sys; from scripts.shared.release.verify import normalize_version; print(normalize_version(sys.argv[1]))' \
+                    'import sys; from scripts.release.verify import normalize_version; print(normalize_version(sys.argv[1]))' \
                     "$RELEASE_VERSION_INPUT")"
                   architecture="${release_tag##*+}"
                   if [[ "$architecture" == "$release_tag" ]]; then
@@ -142,7 +142,7 @@ jobs:
                   tar -czf "$source_archive" --exclude='.git' --exclude='__pycache__' \
                     -C "$source_root" wine-combined dxmt-combined \
                     -C "$stage_directory" runtime-component-inventory.tsv \
-                    -C "$GITHUB_WORKSPACE" patches runtime.lock.json runtime-capabilities.json docs/patch-registry.md \
+                    -C "$GITHUB_WORKSPACE" patches runtime.lock.json docs/patch-registry.md \
                     docs/legal LICENSE LICENSES scripts Justfile pyproject.toml uv.lock
                   (
                     cd "$RELEASE_DIRECTORY"
@@ -152,7 +152,7 @@ jobs:
 
             - name: Verify release checksum, provenance, and notices
               run: |
-                  uv run --locked --no-dev scripts/shared/release/verify.py \
+                  uv run --locked --no-dev scripts/release/verify.py \
                     --tag "$RELEASE_TAG" \
                     --commit "$BUILD_COMMIT" \
                     --archive "$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG.tar.gz" \

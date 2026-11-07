@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.shared.release.licenses import (
+from scripts.release.licenses import (
     ARCHIVE_LICENSES_DIRECTORY,
     ARCHIVE_NOTICE,
     BUILD_SCRIPT,

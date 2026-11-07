@@ -7,8 +7,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from scripts.shared import build as build_helpers
-from scripts.shared.build import (
+from scripts import build_common as build_helpers
+from scripts.build_common import (
     CLEARED_DOS_STUB,
     Builder,
     is_macho,

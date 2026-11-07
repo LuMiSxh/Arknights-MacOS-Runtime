@@ -10,38 +10,29 @@ check:
     {{ uv_dev }} pytest
     {{ uv_dev }} ruff check scripts tests
     {{ uv_dev }} ruff format --check scripts tests
-    {{ uv }} scripts/shared/runtime.py validate-lock
-    {{ uv }} scripts/shared/release/licenses.py generate --check
-    {{ uv }} scripts/shared/release/pins.py check
+    {{ uv }} scripts/runtime.py validate-lock
+    {{ uv }} scripts/release/licenses.py generate --check
+    {{ uv }} scripts/release/pins.py check
     {{ uv_dev }} actionlint
     git diff --check
 
 validate:
-    {{ uv }} scripts/shared/runtime.py validate-lock
+    {{ uv }} scripts/runtime.py validate-lock
 
 update-pins *args:
-    {{ uv }} scripts/shared/release/pins.py update {{ args }}
+    {{ uv }} scripts/release/pins.py update {{ args }}
 
 monitor:
-    {{ uv }} scripts/shared/monitor.py --output .build/reports/source-monitor.json
+    {{ uv }} scripts/monitor.py --output .build/reports/source-monitor.json
 
 frametime-record case seconds:
-    {{ uv }} scripts/shared/frametime.py record "{{ case }}" --seconds "{{ seconds }}"
-
-prepare-arm64:
-    {{ uv }} scripts/shared/runtime.py prepare combined --target native-arm64 --all-sources --destination-root .build/stages/arm64/sources
-
-build-arm64 *args:
-    {{ uv }} scripts/build.py arm64 {{ args }}
-
-verify-arm64:
-    {{ uv }} scripts/shared/validate_runtime.py ".build/stages/arm64/candidate/Libraries" --target native-arm64
+    {{ uv }} scripts/frametime.py record "{{ case }}" --seconds "{{ seconds }}"
 
 prepare stage="combined":
-    {{ uv }} scripts/shared/runtime.py prepare "{{ stage }}"
+    {{ uv }} scripts/runtime.py prepare "{{ stage }}"
 
 fetch-base:
-    {{ uv }} scripts/shared/runtime.py fetch-base
+    {{ uv }} scripts/runtime.py fetch-base
 
 build stage="combined":
     {{ uv }} scripts/build.py canary "{{ stage }}"
@@ -50,4 +41,19 @@ build-release:
     {{ uv }} scripts/build.py release
 
 verify path=".build/stages/combined/candidate/Libraries":
-    {{ uv }} scripts/shared/validate_runtime.py "{{ path }}"
+    {{ uv }} scripts/validate_runtime.py "{{ path }}"
+
+arm64-fetch:
+    {{ uv }} scripts/arm64/fetch_external.py --target native-arm64 --output .build/arm64/incoming
+
+arm64-dxmt:
+    {{ uv }} scripts/arm64/build_dxmt.py --target native-arm64 --root .build/arm64
+
+arm64-assemble:
+    {{ uv }} scripts/arm64/assemble.py --wine .build/arm64/incoming/wine --dxmt .build/arm64/dxmt --output .build/arm64/Libraries
+
+arm64-provenance tag:
+    {{ uv }} scripts/arm64/provenance.py --target native-arm64 --tag "{{ tag }}" --runtime-archive ".build/arm64/release/Arknights-MacOS-Runtime-{{ tag }}.tar.gz" --source-archive ".build/arm64/release/Arknights-MacOS-Runtime-{{ tag }}-source.tar.gz" --output .build/arm64/release/provenance.json
+
+arm64-verify:
+    {{ uv }} scripts/validate_runtime.py .build/arm64/Libraries --target native-arm64

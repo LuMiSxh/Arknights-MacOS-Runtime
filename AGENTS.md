@@ -30,7 +30,7 @@
 - Keep generated sources, downloads, reports, and artifacts under `.build/`; never commit binaries.
 - Run Python through the root `pyproject.toml` and `uv.lock` with `uv run --locked`; keep runtime orchestration standard-library-only.
 - Preserve upstream patch authorship, source links, trailers, and licenses in `docs/patch-registry.md`.
-- Gate each patch family with one documented `ARKNIGHTS_RUNTIME_` variable; absent or invalid input
+- Gate each patch family with one documented `LMISXH_AKMOCL_` variable; absent or invalid input
   preserves the documented default.
 - Never infer patched behavior from a process name or path.
 - Workflows use minimum permissions and pin actions to explicit `v` version tags.

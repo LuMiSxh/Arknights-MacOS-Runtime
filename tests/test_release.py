@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.shared.release.verify import (
+from scripts.release.verify import (
     ReleaseValidationError,
     normalize_version,
     verify_release,
@@ -24,9 +24,7 @@ class ReleaseVerificationTests(unittest.TestCase):
         self.root = Path(self.temporary_directory.name)
         self._write_repository()
         self.archive = self.root / "runtime.tar.gz"
-        self._write_runtime_archive(
-            (self.root / "runtime-capabilities.json").read_bytes()
-        )
+        self._write_runtime_archive()
         self.checksum = self.root / "runtime.tar.gz.sha256"
         self._write_checksum(self.archive, self.checksum)
         self.source_root = self.root / "sources"
@@ -66,7 +64,6 @@ class ReleaseVerificationTests(unittest.TestCase):
         self,
         *,
         omit: tuple[str, ...] = (),
-        aliases: tuple[str, ...] = (),
     ) -> None:
         for name in ("scripts", "Justfile", "pyproject.toml", "uv.lock"):
             path = self.root / name
@@ -79,7 +76,6 @@ class ReleaseVerificationTests(unittest.TestCase):
             "wine-combined": self.source_root / "wine-combined",
             "dxmt-combined": self.source_root / "dxmt-combined",
             "runtime-component-inventory.tsv": self.component_inventory,
-            "runtime-capabilities.json": self.root / "runtime-capabilities.json",
             "scripts": self.root / "scripts",
             "Justfile": self.root / "Justfile",
             "pyproject.toml": self.root / "pyproject.toml",
@@ -89,10 +85,6 @@ class ReleaseVerificationTests(unittest.TestCase):
             for arcname, path in members.items():
                 if arcname not in omit:
                     archive.add(path, arcname=arcname)
-            for alias in aliases:
-                member = tarfile.TarInfo(alias)
-                member.type = tarfile.DIRTYPE
-                archive.addfile(member)
 
     def _write_repository(self) -> None:
         patch_definitions = (
@@ -135,7 +127,7 @@ class ReleaseVerificationTests(unittest.TestCase):
             "schemaVersion": 3,
             "archiveSchemaVersion": 2,
             "defaultTarget": "rosetta-x86_64",
-            "targets": {"rosetta-x86_64": {}},
+            "targets": {"rosetta-x86_64": {"buildMode": "build"}},
             "deploymentTarget": "15.0",
             "sources": {
                 "wine": {
@@ -171,22 +163,15 @@ class ReleaseVerificationTests(unittest.TestCase):
                     "commit": "2" * 40,
                 }
             },
-            "interface": {"runtimeCapabilities": "runtime-capabilities.json"},
+            "interface": {},
+            "features": {
+                "hardwareCursor": True,
+                "metalFXSpatialUpscaling": True,
+                "nativeFullscreenSpace": True,
+            },
             "patches": patches,
         }
         (self.root / "runtime.lock.json").write_text(json.dumps(lock), encoding="utf-8")
-        (self.root / "runtime-capabilities.json").write_text(
-            json.dumps(
-                {
-                    "schemaVersion": 2,
-                    "capabilities": {
-                        "hardwareCursor": True,
-                        "metalFXSpatialUpscaling": False,
-                    },
-                }
-            ),
-            encoding="utf-8",
-        )
         for relative, content in {
             "LICENSE": "project license\n",
             "LICENSES/Wine-LGPL-2.1.txt": "wine license\n",
@@ -204,29 +189,11 @@ class ReleaseVerificationTests(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
 
-    def _write_runtime_archive(
-        self,
-        manifest: bytes | None,
-        *,
-        include_manifest: bool = True,
-        aliases: tuple[tuple[str, bytes | None], ...] = (),
-    ) -> None:
+    def _write_runtime_archive(self) -> None:
         with tarfile.open(self.archive, "w:gz") as archive:
             root = tarfile.TarInfo("Libraries")
             root.type = tarfile.DIRTYPE
             archive.addfile(root)
-            if include_manifest:
-                member = tarfile.TarInfo("Libraries/runtime-capabilities.json")
-                member.size = len(manifest or b"")
-                archive.addfile(member, io.BytesIO(manifest or b""))
-            for name, contents in aliases:
-                member = tarfile.TarInfo(name)
-                if contents is None:
-                    member.type = tarfile.DIRTYPE
-                    archive.addfile(member)
-                else:
-                    member.size = len(contents)
-                    archive.addfile(member, io.BytesIO(contents))
 
     @staticmethod
     def _write_checksum(artifact: Path, checksum: Path) -> None:
@@ -320,43 +287,6 @@ class ReleaseVerificationTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ReleaseValidationError, "names"):
             self._verify()
-
-    def test_rejects_release_archives_with_missing_or_mismatched_capability_manifest(
-        self,
-    ) -> None:
-        source_manifest = (self.root / "runtime-capabilities.json").read_bytes()
-        for contents, include_manifest in ((source_manifest, False), (b"{}", True)):
-            with self.subTest(include_manifest=include_manifest):
-                self._write_runtime_archive(contents, include_manifest=include_manifest)
-                self._write_checksum(self.archive, self.checksum)
-
-                with self.assertRaisesRegex(
-                    ReleaseValidationError, "capability manifest"
-                ):
-                    self._verify()
-
-    def test_rejects_runtime_and_source_manifest_archive_aliases(self) -> None:
-        expected = (self.root / "runtime-capabilities.json").read_bytes()
-        mutations = (
-            ("runtime", "Libraries/./runtime-capabilities.json", b"{}"),
-            ("runtime", "Libraries/.", None),
-            ("source", "runtime-capabilities.json/.", None),
-        )
-        for artifact, alias, contents in mutations:
-            with self.subTest(artifact=artifact, alias=alias):
-                if artifact == "runtime":
-                    self._write_runtime_archive(
-                        expected,
-                        aliases=((alias, contents),),
-                    )
-                    self._write_checksum(self.archive, self.checksum)
-                else:
-                    self._write_source_archive(aliases=(alias,))
-                    self._write_checksum(self.source_archive, self.source_checksum)
-                with self.assertRaisesRegex(
-                    ReleaseValidationError, "capability manifest"
-                ):
-                    self._verify()
 
     def test_rejects_a_missing_or_symlinked_source_checkout(self) -> None:
         (self.source_root / "wine-combined" / "source.c").unlink()
@@ -500,6 +430,210 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
                 for version in re.findall(r"uses: [^\s]+@(v[^\s]+)", workflow)
             )
         )
+
+
+def _write_external_fixture(root: Path) -> None:
+    lock = {
+        "schemaVersion": 3,
+        "archiveSchemaVersion": 2,
+        "defaultTarget": "rosetta-x86_64",
+        "deploymentTarget": "15.0",
+        "sources": {
+            "wine": {
+                "repository": "https://github.com/example/wine.git",
+                "commit": "a" * 40,
+            },
+            "dxmt": {
+                "repository": "https://github.com/example/dxmt.git",
+                "commit": "b" * 40,
+            },
+        },
+        "baseArtifact": {
+            "url": "https://github.com/example/runtime/releases/download/v1/Libraries.tar.gz",
+            "sha256": "c" * 64,
+            "recipe": {
+                "repository": "https://github.com/example/recipe.git",
+                "commit": "d" * 40,
+            },
+        },
+        "baseProvenance": {
+            "moltenvk": {
+                "repository": "https://github.com/example/moltenvk.git",
+                "commit": "e" * 40,
+            },
+            "wineGecko": {
+                "repository": "https://gitlab.winehq.org/wine/wine-gecko.git",
+                "commit": "f" * 40,
+            },
+        },
+        "build": {
+            "nixpkgs": {
+                "repository": "https://github.com/NixOS/nixpkgs.git",
+                "commit": "1" * 40,
+            }
+        },
+        "interface": {},
+        "features": {
+            "hardwareCursor": True,
+            "metalFXSpatialUpscaling": True,
+            "nativeFullscreenSpace": True,
+        },
+        "targets": {
+            "rosetta-x86_64": {"buildMode": "build"},
+            "native-arm64": {
+                "buildMode": "external",
+                "deploymentTarget": "26.0",
+                "sources": {
+                    "wine": {
+                        "repository": "https://gitlab.winehq.org/wine/wine.git",
+                        "commit": "2" * 40,
+                        "version": "11.18",
+                    },
+                    "fex": {
+                        "repository": "https://github.com/FEX-Emu/FEX.git",
+                        "commit": "3" * 40,
+                        "version": "2610",
+                    },
+                    "dxmt": {
+                        "repository": "https://github.com/3Shain/dxmt.git",
+                        "commit": "4" * 40,
+                        "version": "0.80",
+                    },
+                },
+                "artifact": {
+                    "catalog": "wine",
+                    "release": "wine-11-18-arm64-v5",
+                    "sha256": "5" * 64,
+                },
+                "baseArtifact": None,
+                "interface": {
+                    "wineDirectory": "Wine",
+                    "dxmtDirectory": "DXMT",
+                    "minimumMacOS": "26.0",
+                    "executables": [
+                        "Wine/bin/Arknights",
+                        "Wine/bin/wine64",
+                        "Wine/bin/wineserver",
+                    ],
+                    "requiredFiles": ["Wine/lib/wine/aarch64-unix/winemac.so"],
+                },
+                "features": {
+                    "hardwareCursor": True,
+                    "metalFXSpatialUpscaling": True,
+                    "nativeFullscreenSpace": True,
+                },
+            },
+        },
+        "patches": [],
+    }
+    (root / "runtime.lock.json").write_text(json.dumps(lock), encoding="utf-8")
+    (root / "wine-build-new").mkdir(parents=True)
+    (root / "wine-build-new" / "source.c").write_text("source\n", encoding="utf-8")
+    for relative, content in {
+        "LICENSE": "project license\n",
+        "LICENSES/Wine-LGPL-2.1.txt": "wine license\n",
+        "LICENSES/DXMT-LGPL-2.1.txt": "dxmt license\n",
+        "LICENSES/runtime/Apache-2.0.txt": "apache license\n",
+        "LICENSES/runtime/GPL-2.0.txt": "gpl2 license\n",
+        "LICENSES/runtime/GPL-3.0.txt": "gpl3 license\n",
+        "LICENSES/runtime/LGPL-2.1.txt": "lgpl21 license\n",
+        "LICENSES/runtime/LGPL-3.0.txt": "lgpl3 license\n",
+        "LICENSES/runtime/MIT-DXMT.txt": "mit license\n",
+        "LICENSES/runtime/MIT.txt": "mit license\n",
+        "docs/patch-registry.md": "patch registry\n",
+        "docs/legal/redistribution.md": "redistribution inventory\n",
+    }.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+
+
+def _write_external_archives(root: Path) -> None:
+    def add_file(tar: tarfile.TarFile, name: str, data: bytes) -> None:
+        member = tarfile.TarInfo(name)
+        member.size = len(data)
+        tar.addfile(member, io.BytesIO(data))
+
+    def add_dir(tar: tarfile.TarFile, name: str) -> None:
+        member = tarfile.TarInfo(name)
+        member.type = tarfile.DIRTYPE
+        tar.addfile(member)
+
+    runtime_archive = root / "runtime.tar.gz"
+    with tarfile.open(runtime_archive, "w:gz") as tar:
+        add_dir(tar, "Libraries")
+        add_dir(tar, "Licenses")
+        add_dir(tar, "Licenses/runtime")
+        for name in (
+            "Wine-LGPL-2.1.txt",
+            "DXMT-LGPL-2.1.txt",
+            "runtime/MIT.txt",
+            "runtime/Apache-2.0.txt",
+        ):
+            add_file(tar, f"Licenses/{name}", b"license\n")
+        add_file(tar, "NOTICE.md", b"# Third-party notices\n")
+
+    source_archive = root / "sources.tar.gz"
+    with tarfile.open(source_archive, "w:gz") as tar:
+        add_dir(tar, "wine-build-new")
+        add_file(tar, "wine-build-new/source.c", b"source\n")
+        add_file(tar, "runtime.lock.json", (root / "runtime.lock.json").read_bytes())
+        add_dir(tar, "docs")
+        add_dir(tar, "docs/arm")
+        add_file(tar, "docs/arm/provenance.md", b"provenance\n")
+
+    for artifact in (runtime_archive, source_archive):
+        digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        (root / f"{artifact.name}.sha256").write_text(
+            f"{digest}  {artifact.name}\n", encoding="utf-8"
+        )
+
+
+def test_external_target_accepts_the_minimal_notice_set(tmp_path):
+    root = tmp_path / "external"
+    root.mkdir()
+    _write_external_fixture(root)
+    _write_external_archives(root)
+    (root / "validation.json").write_text(
+        json.dumps(
+            {
+                "runtime": "/private/build/external/Libraries",
+                "deploymentTarget": "26.0",
+                "inheritedMachOAboveTarget": 0,
+                "releaseEligible": True,
+                "status": "valid",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    outputs = verify_release(
+        repository_root=root,
+        tag="v0.9.0+arm",
+        commit="7" * 40,
+        archive=root / "runtime.tar.gz",
+        checksum=root / "runtime.tar.gz.sha256",
+        source_root=root,
+        source_archive=root / "sources.tar.gz",
+        source_checksum=root / "sources.tar.gz.sha256",
+        validation_report=root / "validation.json",
+        output_directory=root / "release",
+        target="native-arm64",
+    )
+
+    provenance = json.loads(outputs["provenance"].read_text(encoding="utf-8"))
+    assert provenance["validation"]["releaseEligible"] is False
+    assert provenance["validation"]["builtExternally"] is True
+
+    with tarfile.open(root / "runtime.tar.gz", "r:gz") as archive:
+        names = {member.name for member in archive.getmembers() if member.isfile()}
+    assert {
+        "NOTICE.md",
+        "Licenses/Wine-LGPL-2.1.txt",
+        "Licenses/DXMT-LGPL-2.1.txt",
+        "Licenses/runtime/MIT.txt",
+        "Licenses/runtime/Apache-2.0.txt",
+    } <= names
 
 
 if __name__ == "__main__":

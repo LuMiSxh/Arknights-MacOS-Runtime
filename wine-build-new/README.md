@@ -1,20 +1,21 @@
 # wine-build-new export
 
 This directory is the Arknights patch export for the signed ARM64 runtime built in
-`wine-build-new`. That workspace consumes this repository as a submodule at
-`third-party/arknights-macos-runtime`.
+[wine-build-new](https://github.com/riverfog7/wine-build-new). That workspace consumes this
+repository as a submodule at `third-party/arknights-macos-runtime`.
 
 The workspace builds upstream Wine 11.18 with a 72-patch Hadron and Endfield queue. The
 patches here are rebased against that queue, not against this repository's WineCX 11.17
 tree. The workspace links each patch individually from `wine-build-new/patches/` into
 `patches/wine/arknights-macos-runtime/`, matching its other third-party patch families.
-See [collaborator runtime](../docs/arm/wine-build-new.md) for the mapping and the audit.
+See [the patch export](../docs/arm/wine-build-new.md) for the mapping and the audit.
 
 ## Layout
 
 | Path        | Content                                                   |
 | ----------- | --------------------------------------------------------- |
 | `patches/`  | Ten Wine patches, applied after the 72-patch queue        |
+| `fex/`      | The paired FEX context patch for Wine patch `0001`        |
 | `lock.json` | Machine-readable list of paths, hashes, and runtime gates |
 
 ## What is in the export
@@ -24,7 +25,7 @@ behavior at runtime; they do not select patches at build time.
 
 | Patch                                              | Runtime gate             | Need                  | Purpose                                                  |
 | -------------------------------------------------- | ------------------------ | --------------------- | -------------------------------------------------------- |
-| `0001-ntdll-carry-eflags-af-df.patch`              | opt-out `_EFLAGS`        | keep until ACE run    | Keeps PF, AF and DF across ARM64EC context switches.         |
+| `0001-ntdll-carry-eflags-af-df.patch`              | opt-out `_EFLAGS`        | keep until ACE run    | Keeps PF, AF and DF across ARM64EC context switches.     |
 | `0002-ntdll-hybrid-thread-entry.patch`             | opt-out `_HYBRID_THREAD` | keep until ACE run    | Starts a hybrid-module thread on its x64 export.         |
 | `0003-ntoskrnl-arknights-ace-imports.patch`        | opt-out `_ACE_IMPORTS`   | keep until ACE run    | Adds three kernel imports that ACE resolves.             |
 | `0004-userenv-appcontainer-apis.patch`             | opt-out `_APPCONTAINER`  | required for CEF      | Adds the AppContainer names Chromium resolves.           |

@@ -1,0 +1,110 @@
+#!/usr/bin/env -S uv run --locked --no-dev
+# SPDX-License-Identifier: MPL-2.0
+
+"""Write the external native-arm64 release provenance.
+
+The provenance records the pinned Wine revision and the SHA-256 of the two release
+archives. It never records the secret-backed catalog URL or the external artifact URL.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+if __package__:
+    from ..lib.console import error, success
+    from ..runtime import LockError, load_lock
+else:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from scripts.lib.console import error, success
+    from scripts.runtime import LockError, load_lock
+
+
+ARM64_TARGET = "native-arm64"
+
+WINE_BUILD_NEW_REPOSITORY = "https://github.com/riverfog7/wine-build-new"
+
+
+class ProvenanceError(RuntimeError):
+    """Provenance cannot be produced."""
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        while chunk := source.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def write_provenance(
+    lock: dict[str, Any],
+    tag: str,
+    runtime_archive: Path,
+    source_archive: Path,
+    output: Path,
+) -> dict[str, Any]:
+    """Write `provenance.json` for the external target and return its contents."""
+
+    if lock.get("buildMode") != "external":
+        raise ProvenanceError("provenance requires an external target")
+
+    interface = lock.get("interface") or {}
+    minimum_macos = interface.get("minimumMacOS") or lock.get("deploymentTarget")
+    revision = lock["sources"]["wine"]["commit"]
+
+    provenance = {
+        "schemaVersion": 1,
+        "releaseTag": tag,
+        "target": lock["target"],
+        "minimumMacOS": minimum_macos,
+        "features": lock["features"],
+        "externalBuild": {
+            "repository": WINE_BUILD_NEW_REPOSITORY,
+            "revision": revision,
+        },
+        "runtimeArchive": {
+            "name": runtime_archive.name,
+            "sha256": _sha256(runtime_archive),
+        },
+        "correspondingSourceArchive": {
+            "name": source_archive.name,
+            "sha256": _sha256(source_archive),
+        },
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
+    return provenance
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--target", default=ARM64_TARGET)
+    parser.add_argument("--tag", required=True)
+    parser.add_argument("--runtime-archive", type=Path, required=True)
+    parser.add_argument("--source-archive", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    arguments = parser.parse_args()
+    try:
+        lock = load_lock(target=arguments.target)
+        write_provenance(
+            lock,
+            arguments.tag,
+            arguments.runtime_archive,
+            arguments.source_archive,
+            arguments.output,
+        )
+    except (ProvenanceError, LockError, OSError) as caught_error:
+        error(str(caught_error))
+        return 1
+    success(f"wrote {arguments.output}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

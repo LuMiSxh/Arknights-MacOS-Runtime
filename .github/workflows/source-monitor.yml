@@ -30,7 +30,7 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
-                  uv run --locked --no-dev scripts/shared/monitor.py \
+                  uv run --locked --no-dev scripts/monitor.py \
                     --output .build/reports/source-monitor.json \
                     --summary "$GITHUB_STEP_SUMMARY"
 

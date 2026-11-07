@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from scripts.shared.release.toolchain import UNAVAILABLE, collect_toolchain
+from scripts.release.toolchain import UNAVAILABLE, collect_toolchain
 
 
 class ToolchainReportTests(unittest.TestCase):

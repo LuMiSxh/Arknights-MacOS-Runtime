@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.shared.runtime import (
+from scripts.runtime import (
     LockError,
     _sha256_file,
     load_lock,
@@ -64,16 +64,21 @@ class RuntimeLockTests(unittest.TestCase):
                 }
             },
             "interface": {
-                "runtimeCapabilities": "runtime-capabilities.json",
                 "executables": ["Wine/bin/wine64"],
                 "requiredFiles": ["Wine/lib/wine/x86_64-unix/winemac.so"],
             },
-            "targets": {"rosetta-x86_64": {}},
+            "features": {
+                "hardwareCursor": True,
+                "metalFXSpatialUpscaling": True,
+                "nativeFullscreenSpace": True,
+            },
+            "targets": {"rosetta-x86_64": {"buildMode": "build"}},
             "patches": [
                 {
                     "id": "wine-audio-default-output",
                     "component": "wine",
                     "family": "audio",
+                    "targets": ["rosetta-x86_64"],
                     "path": "patches/wine/audio/0001.patch",
                     "sha256": hashlib.sha256(b"example patch\n").hexdigest(),
                 }
@@ -90,6 +95,8 @@ class RuntimeLockTests(unittest.TestCase):
 
     def add_arm64_target(self) -> None:
         self.lock["targets"]["native-arm64"] = {
+            "buildMode": "external",
+            "deploymentTarget": "26.0",
             "sources": {
                 "wine": {
                     "repository": "https://github.com/dappermint/winecx.git",
@@ -104,9 +111,13 @@ class RuntimeLockTests(unittest.TestCase):
                     "commit": "e" * 40,
                 },
             },
+            "artifact": {
+                "catalog": "wine",
+                "release": "wine-arm64",
+                "sha256": "a" * 64,
+            },
             "baseArtifact": None,
             "interface": {
-                "runtimeCapabilities": "runtime-capabilities.json",
                 "executables": ["Wine/bin/wine64"],
             },
         }
@@ -263,6 +274,21 @@ class RuntimeLockTests(unittest.TestCase):
         with self.assertRaisesRegex(LockError, "defaultTarget"):
             load_lock(self.write_lock(), repository_root=self.root)
 
+    def test_rejects_an_unknown_external_target_key(self) -> None:
+        self.add_arm64_target()
+        self.lock["targets"]["native-arm64"]["dxmtArtifact"] = {
+            "catalog": "dxmt",
+            "release": "dxmt-arm64",
+            "sha256": "b" * 64,
+        }
+
+        with self.assertRaisesRegex(LockError, "unknown keys"):
+            load_lock(
+                self.write_lock(),
+                repository_root=self.root,
+                target="native-arm64",
+            )
+
     def test_rejects_a_patch_naming_an_undeclared_target(self) -> None:
         self.lock["patches"][0]["targets"] = ["native-arm64"]
 
@@ -325,6 +351,30 @@ class RuntimeLockTests(unittest.TestCase):
             "wine-ace-rosetta-workarounds",
             [patch["id"] for patch in lock["patches"]],
         )
+
+    def test_native_arm64_is_an_external_target(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        lock = load_lock(
+            root / "runtime.lock.json", repository_root=root, target="native-arm64"
+        )
+
+        self.assertEqual(lock["buildMode"], "external")
+        self.assertEqual(lock["deploymentTarget"], "26.0")
+        self.assertEqual(lock["artifact"]["release"], "wine-11-18-arm64-v5")
+        self.assertEqual(
+            lock["artifact"]["sha256"],
+            "059e9a88e008493ea6bd3fb93334298b6f7f730b554f5a9048a0834eeea9880a",
+        )
+        self.assertNotIn("dxmtArtifact", lock)
+        self.assertEqual(
+            lock["sources"]["dxmt"]["commit"],
+            "647b0020ba5764e5593b12407afd76964fa11e20",
+        )
+        self.assertEqual(lock["patches"], [])
+
+    def test_prepare_refuses_an_external_target(self) -> None:
+        with self.assertRaisesRegex(LockError, "external"):
+            prepare("combined", target="native-arm64")
 
 
 if __name__ == "__main__":

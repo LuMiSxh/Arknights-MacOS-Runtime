@@ -8,7 +8,7 @@ runtime.lock.json -> verified source checkouts -> ordered patch families
                  -> structural report -> canary artifact
 ```
 
-The release artifact contains all seven patch families. Release validation requires a clean build of every component. Both lanes keep archive schema 2: top-level `Wine/` and `DXMT/`, the Wine loader and server, the macOS driver, the WineMetal bridge, and the x64 DXMT payload.
+The release artifact contains the patched x86_64 components. Release validation requires a clean build of every component. Both lanes keep archive schema 2: top-level `Wine/` and `DXMT/`, the Wine loader and server, the macOS driver, the WineMetal bridge, and the DXMT payload.
 
 ## 64-bit-only clean build
 
@@ -36,4 +36,4 @@ The launcher selects the remaining flags from the profile of the active client. 
 
 ## Native ARM64 target
 
-`runtime.lock.json` declares a second target, `native-arm64`. It runs WineCX on ARM64 without Rosetta, with FEX for x86_64 programs and DXMT ARM64EC for Direct3D 10 and 11. The project has no distributable signing identity, so the target must not use the cross-architecture entitlement. `rosetta-x86_64` stays the default until the ARM64 canary passes. The plan is in [the ARM64 documentation](arm/README.md).
+`runtime.lock.json` declares a second target, `native-arm64`. It runs a native ARM64 Wine runtime without Rosetta, with FEX for x86_64 programs and DXMT ARM64EC for Direct3D 10 and 11. The target is external: the Wine payload is built in [wine-build-new](https://github.com/riverfog7/wine-build-new), and this repository builds DXMT, repacks the tree, and validates it. The lane requires macOS 26.0 or newer. `rosetta-x86_64` stays the default. See [the ARM64 documentation](arm/README.md).
