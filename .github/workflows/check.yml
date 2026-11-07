@@ -32,9 +32,10 @@ jobs:
                   uv run --locked pytest
                   uv run --locked ruff check scripts tests
                   uv run --locked ruff format --check scripts tests
-                  uv run --locked --no-dev scripts/shared/runtime.py validate-lock
-                  uv run --locked --no-dev scripts/shared/release/licenses.py generate --check
-                  uv run --locked --no-dev scripts/shared/release/pins.py check
+                  uv run --locked --no-dev scripts/runtime.py validate-lock
+                  uv run --locked --no-dev scripts/release/licenses.py generate --check
+                  uv run --locked --no-dev scripts/release/pins.py check
+                  uv run --locked actionlint
                   git diff --check
 
     patches:
@@ -62,19 +63,4 @@ jobs:
             - name: Apply ${{ matrix.stage }} patches
               env:
                   STAGE: ${{ matrix.stage }}
-              run: uv run --locked --no-dev scripts/shared/runtime.py prepare "$STAGE"
-
-    arm64-patches:
-        runs-on: ubuntu-24.04
-        timeout-minutes: 20
-        steps:
-            - name: Check out source
-              uses: actions/checkout@v7.0.1
-
-            - name: Install uv
-              uses: astral-sh/setup-uv@v10.0.1
-
-            - name: Apply the ARM64 patch set
-              run: |
-                  uv run --locked --no-dev scripts/shared/runtime.py prepare combined \
-                    --target native-arm64
+              run: uv run --locked --no-dev scripts/runtime.py prepare "$STAGE"

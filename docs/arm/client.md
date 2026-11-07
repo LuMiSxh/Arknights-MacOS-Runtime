@@ -11,8 +11,7 @@ of the runtime repository.
 | `RUNTIME.json` in the app bundle | The same values after the build. The build records the embedded lane in `architecture`. |
 
 `WineRuntime.discover()` checks `bin/Arknights`, decodes `RUNTIME.json`, and reads
-`interface.runtimeCapabilities`. The Python build validates the full interface before it embeds the
-runtime.
+`features`. The Python build validates the lock before it embeds the runtime.
 
 ## Implemented
 
@@ -25,47 +24,40 @@ runtime.
 | Prefix identity        | The x86 lane uses `Prefix`; the ARM64 lane uses `Prefix-ARM64`.                                        |
 | Rosetta gate           | The client skips the probe when `RUNTIME.json` names the arm lane.                                     |
 
-## Capability manifest
+## Runtime features
 
-The native-arm64 archive ships `runtime-capabilities-arm64.json`; the x86_64 archive keeps
-`runtime-capabilities.json`. Schema version 2 adds two optional booleans:
+The runtime lock and the embedded `RUNTIME.json` carry one `features` object:
 
-| Key           | Meaning                                                         |
-| ------------- | --------------------------------------------------------------- |
-| `aceCompat`   | The full ACE patch set for the lane is present. `false` on ARM. |
-| `nativeArm64` | The runtime runs without Rosetta. `true` on ARM.                |
+```json
+{
+    "hardwareCursor": true,
+    "metalFXSpatialUpscaling": true,
+    "nativeFullscreenSpace": true
+}
+```
 
-The client treats a missing key as `false`. Use `aceCompat` in the ACE warning and launch policy. Use
-`nativeArm64` for diagnostics and to keep the Rosetta copy off the ARM lane. The DXMT and Metal
-capabilities keep their current meaning. The ARM64 archive keeps `aceCompat` false until the ACE
-test passes. ACE is untested on ARM; the compact patches are present and gated by
-`LMISXH_AKMOCL=1`.
+The client treats a missing feature as `false`. `nativeArm64` is gone; the lane in `architecture`
+already identifies an ARM64 runtime. `aceCompat` is gone; it was About-only and had no launch policy.
 
 ## Window chrome
 
-The ARM64 loader records SDK 12.0. The window server selects the legacy title bar for that process.
-The client has no chrome bridge. In-process interposition and AppKit appearance changes do not change
-the real frame. See [entitlements](entitlements.md#window-chrome).
-
-With `com.apple.private.custom-x18-abi`, the loader can record the current SDK and keep `x18`. The
-window then uses the current design. Test the change after the signing identity carries the
-entitlement.
+The external ARM64 loader keeps its Developer ID signature and provisioning profile. Do not re-sign, relink, or replace it. The client has no chrome bridge. In-process interposition and AppKit appearance changes do not change the real frame. See [entitlements](entitlements.md#window-chrome).
 
 ## Local canary
 
-1. Build the ARM64 runtime archive and extract `Libraries/`.
-2. Prepare the runtime root that the client expects: the contents of `Libraries/Wine` at the root, `DXMT/`
-   beside it, and `runtime-capabilities-arm64.json` at the root.
-3. Confirm `armInterface.runtimeCapabilities` names `runtime-capabilities-arm64.json`.
-4. Build the app with the prepared runtime and the arm lane:
+1. Download the ARM64 runtime archive that `runtime.json` pins and verify its SHA-256.
+2. Extract `Libraries/`.
+3. Prepare the runtime root that the client expects: the contents of `Libraries/Wine` at the root and `DXMT/` beside it.
+4. Confirm the runtime `features` match the lane.
+5. Build the app with the prepared runtime and the arm lane:
 
     ```sh
     just app /path/to/runtime arm
     ```
 
-5. Confirm `Contents/Resources/RUNTIME.json` has `"architecture": "arm"` and the aarch64 interface.
-6. Start the app with a new prefix. Do not use an existing x86_64 prefix.
-7. Check the runtime, DXMT, and Metal device in the log. Run to the login screen, run the ACE check,
+6. Confirm `Contents/Resources/RUNTIME.json` has `"architecture": "arm"` and the aarch64 interface.
+7. Start the app with a new prefix. Do not use an existing x86_64 prefix.
+8. Check the runtime, DXMT, and Metal device in the log. Run to the login screen, run the ACE check,
    and record the frame time against the x86_64 control with the same scene and settings.
 
 ## Regression tests
@@ -75,7 +67,7 @@ entitlement.
 - The x86 and ARM64 lanes use different prefix paths.
 - A prefix does not mix module architectures.
 - The build fails when `runtime.json` and the runtime directory disagree.
-- A missing `aceCompat` or `nativeArm64` decodes as `false`.
+- A missing feature decodes as `false`.
 
 Test lane selection at the type level. Use an enum with an exhaustive `switch`, not a Boolean.
 

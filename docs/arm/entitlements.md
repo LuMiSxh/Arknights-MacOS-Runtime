@@ -1,55 +1,53 @@
-# Entitlements and removable workarounds
+# Entitlements and window chrome
 
-The current ARM64 lane has no Apple entitlement. Two restricted entitlements would remove the
-largest workarounds.
-
-Apple grants both entitlements only to approved signing identities. The current build is ad-hoc
-signed, so it cannot use them.
+The ARM64 runtime is built in the external
+[wine-build-new](https://github.com/riverfog7/wine-build-new) workspace. That build has the
+cross-architecture entitlement. This repository cannot obtain the same profile, so it pins the
+released artifact and never re-signs the loader.
 
 ## Entitlements
 
-| Entitlement                                                | Effect                                                                                                           |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `com.apple.private.custom-x18-abi`                         | Custom `x18` ABI. The kernel keeps `x18` across exceptions for a process linked with the current SDK.            |
-| `com.apple.developer.cross-architecture-support-unmanaged` | Unmanaged cross-architecture support. The loader can use the low 4 GB layout without relocating the shared page. |
+| Entitlement                                                | Effect                                                                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `com.apple.developer.cross-architecture-support`           | Cross-architecture support. The loader can use the low 4 GB layout without relocating the shared page. |
+| `com.apple.developer.cross-architecture-support-unmanaged` | The free-account variant of the same capability.                                                       |
+| `com.apple.private.custom-x18-abi`                         | Custom `x18` ABI. The kernel keeps `x18` across exceptions for a process linked with the current SDK.  |
 
-## Workarounds to remove
+Apple grants these entitlements only to approved signing identities. A profile binds one team, one
+App ID, and the Macs in the profile. Another team cannot reuse the signature.
 
-| Workaround                                 | Location                          | Entitlement                                                | Action                                                                                                           |
-| ------------------------------------------ | --------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Loader SDK 12.0 relink                     | `scripts/arm/build.py`            | `com.apple.private.custom-x18-abi`                         | Link the loader with the current SDK. Remove the `-platform_version` override and its comment.                   |
-| Shared-user-data relocation and 4 GB floor | `patches/arm/wine/address-space/` | `com.apple.developer.cross-architecture-support-unmanaged` | Remove the patch. Keep `KUSER_SHARED_DATA` at `0x7ffe0000` and the first TEB block below 4 GB.                   |
-| Mixed-host-page `PROT_EXEC` drop           | `patches/arm/wine/wx-pages/`      | `com.apple.developer.cross-architecture-support-unmanaged` | Port the reference 4K page and W^X model (`0011`, `0019`) first. Remove this patch only after that model passes. |
+## Workarounds
 
-The signed collaborator build in `wine-build-new` has the cross-architecture entitlement. The
-custom-x18 entitlement is still pending. The final profile must grant both before the loader
-relink and the address-space workarounds can be removed. See
-[collaborator runtime](wine-build-new.md).
+The external build uses the cross-architecture entitlement. It does not need the shared-user-data
+relocation, the 4 GB floor, or the mixed-page workaround. Those workarounds belong to the
+entitlement-free reference build and are not part of the shipped ARM64 path.
 
-Keep these patches. The entitlements do not replace them:
+The external build keeps these changes in its own patch queue:
 
-- `patches/arm/wine/ec-code-bitmap/`: the emulator must publish its JIT pages in the ARM64EC bitmap.
-- `patches/arm/wine/arm64ec-unix-call/`: fixes a WineCX table mismatch.
-- `patches/arm/wine/id-registers/`: macOS does not expose the ARM64 ID registers to EL0.
-- `patches/arm/wine/mono/`, the FEX patches, and the FEX registry wiring.
+- The ARM64EC code bitmap marks the emulator's JIT pages.
+- The ARM64EC unix-call table is fixed for the upstream Wine tree.
+- The ARM64 ID registers are synthesized from the `hw.optional.arm.*` sysctls.
+- FEX code buffers use the Hadron JIT and W^X model.
+
+See the [patch export](wine-build-new.md) for the Arknights patches and the workspace queue.
 
 ## Window chrome
 
-The ARM64 loader records SDK 12.0. The window server selects the window design from the main
-executable's `LC_BUILD_VERSION`, so the game window uses the legacy title bar.
+The window server selects the window design from the main executable's `LC_BUILD_VERSION`. The
+external loader keeps its signed build metadata and cannot be relinked or re-signed by this
+repository.
+
+With `com.apple.private.custom-x18-abi`, the loader can record the current SDK and keep `x18`. The
+window then uses the current design. The external profile currently grants only the
+cross-architecture entitlement, so expect the legacy window chrome until the profile also carries
+the custom-x18 entitlement.
 
 In-process workarounds do not change the real frame:
 
-- `UIDesignRequiresCompatibility=NO` has no effect on an SDK-12 process.
+- `UIDesignRequiresCompatibility=NO` has no effect on a legacy-SDK process.
 - Interposing `dyld_get_program_sdk_version` does not change the frame.
 - `_appearancePreferringSolarium` works only when the window is created titled. Wine creates a
   window borderless and adds the title bar later. The window server keeps the legacy design after
   that round trip.
-- Changing the loader's recorded SDK to 26.0 makes Wine hang before `cmd /c ver`, because the
-  current exception path still needs the SDK-12 kernel behavior.
 
-With `com.apple.private.custom-x18-abi`, link the loader with the current SDK. The window server
-should then select the current design. Expect the current title bar on the ARM64 lane. This is
-unverified until the signed loader runs.
-
-Until then, the ARM64 lane keeps the legacy window chrome. The client has no chrome bridge.
+The client has no chrome bridge. Do not add one.

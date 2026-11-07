@@ -1,34 +1,25 @@
 # Native ARM64 runtime
 
-This directory covers the native ARM64 lane. The x86_64 lane runs Wine under Rosetta 2 and remains
-the default.
+The ARM64 lane runs a native ARM64 Wine runtime on macOS 26.0 or newer. The x86_64 lane runs Wine under Rosetta 2 and remains the default.
 
-## Decision
+## Build model
 
-The project has no distributable signing identity. The two restricted entitlements need an Apple
-approved signing identity, so the current ad-hoc build cannot use them. The lane uses the
-entitlement-free address-space work instead. See [entitlements](entitlements.md) for the two
-entitlements and the workarounds they can remove.
+The ARM64 Wine runtime is built outside this repository in the [wine-build-new](https://github.com/riverfog7/wine-build-new) workspace. That workspace has the Developer ID signature and provisioning profile that this repository cannot obtain.
 
-The lane is 64-bit only and uses 16K host pages. i386, 4K host pages, Apple D3DMetal, Rosetta 2, and a
-native game build are out of scope. See [provenance](provenance.md#entitlement-availability) for the
-entitlement details.
+This repository pins the released Wine artifact `wine-11-18-arm64-v5` in [`runtime.lock.json`](../../runtime.lock.json). The **Draft ARM64 Release** workflow fetches that artifact, builds DXMT for ARM64EC, repacks the client contract, validates the tree, and creates a draft release.
+
+`native-arm64` is an external target. `scripts/runtime.py prepare --target native-arm64` refuses it. The lane receives no patches from this repository. The ARM64 patch export is in [`wine-build-new/`](../../wine-build-new/).
 
 ## Status
 
-| Item                            | State                                                                   |
-| ------------------------------- | ----------------------------------------------------------------------- |
-| ARM64 build target              | Works                                                                   |
-| Native ARM64 `wine cmd /c ver`  | Works                                                                   |
-| Shared user data and 4 GB floor | Ported                                                                  |
-| Wow64 wiring to the FEX modules | Ported                                                                  |
-| x86_64 program under FEX        | Runs; the probe prints `fex-ok`                                         |
-| ACE                             | Untested; the ARM patches are ported and the compact gate is active     |
-| Game                            | Opens; Global login works                                               |
-| Client ARM64 support            | Local app works; the game opens                                         |
-| Signed collaborator runtime     | Patch export prepared; build and ACE pending                            |
-| Dock and menu-bar name          | Baked into the loader as `Arknights`                                    |
-| Window chrome                   | Legacy; the custom x18 ABI entitlement should select the current design |
+| Item                 | State                                                 |
+| -------------------- | ----------------------------------------------------- |
+| ARM64 release target | External; macOS 26.0 or newer                         |
+| Wine payload         | `wine-11-18-arm64-v5` from `wine-build-new`           |
+| DXMT                 | Built from `sources.dxmt` for ARM64EC in the workflow |
+| Client ARM64 support | Implemented; the manual canary is pending             |
+| ACE                  | Untested on the ARM64 lane                            |
+| Window chrome        | The external loader keeps its signature               |
 
 The x86_64 lane stays the default until the game passes the compatibility checks.
 
@@ -43,22 +34,19 @@ The x86_64 lane stays the default until the game passes the compatibility checks
 | Lane        | One build and release target with its own pins and artifact.                   |
 | PAGEZERO    | The low 4 GB reservation that macOS gives to a native ARM64 process.           |
 | Target      | A named entry in `runtime.lock.json`.                                          |
-| WineCX      | The CodeWeavers Wine source that this repository builds.                       |
+| WineCX      | The CodeWeavers Wine source that this repository builds for x86_64.            |
 | xtajit64    | The Wine interface for an x86_64 emulator on ARM64.                            |
 
 ## Reading order
 
-1. [Architecture](architecture.md): the process model and the address space.
-2. [Porting](porting.md): the patch families and the remaining work.
-3. [Entitlements](entitlements.md): the removable workarounds and the window chrome.
-4. [Provenance](provenance.md): the reference runtime and its public sources.
-5. [Pipeline](pipeline.md): the second build target.
-6. [Client](client.md): the consumer changes and the local canary.
-7. [Collaborator runtime](wine-build-new.md): the signed ARM64 patch export.
+1. [Entitlements](entitlements.md): the entitlements and the window chrome.
+2. [Provenance](provenance.md): the shipped artifact and the reference capture.
+3. [Client](client.md): the consumer contract and the canary.
+4. [Patch export](wine-build-new.md): the `wine-build-new` export.
 
 ## References
 
-- Upstream sources: `dappermint/winecx`, `dappermint/FEX`, `3Shain/dxmt`.
-- Entitlement-free reference: `metalsharp/MetalSharp-Wine`.
+- External Wine artifact: [wine-build-new](https://github.com/riverfog7/wine-build-new).
+- DXMT source: `3Shain/dxmt`.
 - Runtime contract: [`runtime.lock.json`](../../runtime.lock.json) and
   [`docs/architecture.md`](../architecture.md).

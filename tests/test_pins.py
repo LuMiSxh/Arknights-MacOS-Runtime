@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-from scripts.shared.release import pins
+from scripts.release import pins
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 NEW_WINE = "a" * 40

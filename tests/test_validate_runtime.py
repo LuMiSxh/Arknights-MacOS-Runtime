@@ -8,7 +8,7 @@ from pathlib import Path
 from subprocess import CompletedProcess
 from unittest.mock import patch
 
-from scripts.shared.validate_runtime import (
+from scripts.validate_runtime import (
     RuntimeValidationError,
     validate_64_bit_only,
     validate_link_references,
@@ -33,7 +33,7 @@ class RuntimeStructureTests(unittest.TestCase):
         result = subprocess.run(
             [
                 sys.executable,
-                str(root / "scripts" / "shared" / "validate_runtime.py"),
+                str(root / "scripts" / "validate_runtime.py"),
                 "--help",
             ],
             capture_output=True,
@@ -41,6 +41,24 @@ class RuntimeStructureTests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_external_target_rejects_require_64_bit_only(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(root / "scripts" / "validate_runtime.py"),
+                str(self.root),
+                "--target",
+                "native-arm64",
+                "--require-64-bit-only",
+            ],
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("--require-64-bit-only", result.stderr)
 
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
@@ -88,7 +106,7 @@ class RuntimeStructureTests(unittest.TestCase):
             return CompletedProcess(command, 0, kind, "")
 
         with patch(
-            "scripts.shared.validate_runtime.subprocess.run", side_effect=command_result
+            "scripts.validate_runtime.subprocess.run", side_effect=command_result
         ):
             self.assertEqual(
                 validate_required_architectures(self.root, self.required), 2
@@ -98,9 +116,7 @@ class RuntimeStructureTests(unittest.TestCase):
         self.create_required_files()
         result = CompletedProcess([], 0, "PE32 executable Intel 80386", "")
         with (
-            patch(
-                "scripts.shared.validate_runtime.subprocess.run", return_value=result
-            ),
+            patch("scripts.validate_runtime.subprocess.run", return_value=result),
             self.assertRaisesRegex(RuntimeValidationError, "unexpected architecture"),
         ):
             validate_required_architectures(self.root, self.required)
@@ -116,7 +132,7 @@ class RuntimeStructureTests(unittest.TestCase):
                         path.write_bytes(bytes(64) + marker.ljust(32, b"\0"))
                         with (
                             patch(
-                                "scripts.shared.validate_runtime.subprocess.run",
+                                "scripts.validate_runtime.subprocess.run",
                                 return_value=CompletedProcess([], 0, kind, ""),
                             ),
                             self.assertRaisesRegex(
@@ -157,7 +173,7 @@ class RuntimeStructureTests(unittest.TestCase):
         path.parent.mkdir(parents=True)
         path.write_bytes(bytes(64) + b"Wine builtin DLL\0")
         with patch(
-            "scripts.shared.validate_runtime.subprocess.run",
+            "scripts.validate_runtime.subprocess.run",
             return_value=CompletedProcess([], 0, "PE32+ executable x86-64", ""),
         ):
             self.assertEqual(validate_required_architectures(self.root, [relative]), 1)
@@ -172,9 +188,7 @@ class RuntimeStructureTests(unittest.TestCase):
         (self.root / required[1]).parent.mkdir(parents=True, exist_ok=True)
         output = CompletedProcess([], 0, "Mach-O 64-bit bundle arm64", "")
 
-        with patch(
-            "scripts.shared.validate_runtime.subprocess.run", return_value=output
-        ):
+        with patch("scripts.validate_runtime.subprocess.run", return_value=output):
             for machine in (0xA641, 0xAA64):
                 with self.subTest(machine=hex(machine)):
                     (self.root / required[1]).write_bytes(pe_payload(machine))
@@ -194,7 +208,7 @@ class RuntimeStructureTests(unittest.TestCase):
         arm64 = CompletedProcess([], 0, "Mach-O 64-bit bundle arm64", "")
 
         with (
-            patch("scripts.shared.validate_runtime.subprocess.run", return_value=arm64),
+            patch("scripts.validate_runtime.subprocess.run", return_value=arm64),
             self.assertRaisesRegex(
                 RuntimeValidationError, "unexpected PE architecture"
             ),
@@ -204,9 +218,7 @@ class RuntimeStructureTests(unittest.TestCase):
         (self.root / required[1]).write_bytes(pe_payload(0xA641))
         x86_64 = CompletedProcess([], 0, "Mach-O 64-bit bundle x86_64", "")
         with (
-            patch(
-                "scripts.shared.validate_runtime.subprocess.run", return_value=x86_64
-            ),
+            patch("scripts.validate_runtime.subprocess.run", return_value=x86_64),
             self.assertRaisesRegex(RuntimeValidationError, "unexpected architecture"),
         ):
             validate_required_architectures(self.root, required)
@@ -240,7 +252,7 @@ class RuntimeStructureTests(unittest.TestCase):
             return CompletedProcess(command, 0, output, "")
 
         with patch(
-            "scripts.shared.validate_runtime.subprocess.run", side_effect=command_result
+            "scripts.validate_runtime.subprocess.run", side_effect=command_result
         ):
             self.assertEqual(
                 validate_macho_targets(candidate, "15.0", baseline), (1, 1)
@@ -249,7 +261,7 @@ class RuntimeStructureTests(unittest.TestCase):
         (candidate / "Wine" / "driver.so").write_bytes(b"changed")
         with (
             patch(
-                "scripts.shared.validate_runtime.subprocess.run",
+                "scripts.validate_runtime.subprocess.run",
                 side_effect=command_result,
             ),
             self.assertRaisesRegex(RuntimeValidationError, "newer than 15.0"),

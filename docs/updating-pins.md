@@ -25,7 +25,7 @@ The runtime pins four upstream inputs in [`runtime.lock.json`](../runtime.lock.j
 | Wine | Tip of the highest `wine11<N>` branch of `dappermint/winecx`. The version comes from the `VERSION` file at that commit. |
 | DXMT | Head of the default branch of `3Shain/dxmt`. The version has the `git describe` form `<tag>-<commits>-g<sha>`. |
 | Base archive | Newest `dappermint/Whisky` release with a `Libraries.tar.gz` asset. The hash comes from the digest of the asset. The recipe commit is the commit of the tag `runtime-<release tag>` in `dappermint/winecx-gptk`. |
-| nixpkgs | Tip of the channel branch `NIXPKGS_CHANNEL` in `scripts/shared/release/pins.py`. The channel is `nixos-25.05`, because the DXMT build needs `llvmPackages_15`, which later releases removed. |
+| nixpkgs | Tip of the channel branch `NIXPKGS_CHANNEL` in `scripts/release/pins.py`. The channel is `nixos-25.05`, because the DXMT build needs `llvmPackages_15`, which later releases removed. |
 
 ## Known-bad pins
 
@@ -74,7 +74,7 @@ To move a kept pin, port the failed patch to the new commit. Then run the update
 
 ## Check the mentions
 
-Run `just check`. It runs `scripts/shared/release/pins.py check`, which works offline. The check fails when a marker or an allowlisted file disagrees with the lock. The CI check workflow runs the same command.
+Run `just check`. It runs `scripts/release/pins.py check`, which works offline. The check fails when a marker or an allowlisted file disagrees with the lock. The CI check workflow runs the same command.
 
 ## Add a marker
 
@@ -104,7 +104,7 @@ Use `<!-- pin-block:table -->` and `<!-- /pin-block -->` on their own lines for 
 
 ## Add a file that is not Markdown
 
-1. Open `ALLOWLIST` in `scripts/shared/release/pins.py`.
+1. Open `ALLOWLIST` in `scripts/release/pins.py`.
 2. Add the path and the keys that the file states.
 3. Run `just check`. The check fails when the file lacks the value of a key.
 

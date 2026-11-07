@@ -1,0 +1,131 @@
+diff --git a/dlls/ntdll/unix/socket.c b/dlls/ntdll/unix/socket.c
+--- a/dlls/ntdll/unix/socket.c
++++ b/dlls/ntdll/unix/socket.c
+@@ -1831,7 +1831,7 @@ NTSTATUS sock_ioctl( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc
+         {
+             enum server_fd_type type;
+ 
+-            if (in_size != sizeof(NTSTATUS))
++            if (in_size != sizeof(NTSTATUS) && in_size != sizeof(struct afd_complete_async_params))
+                 return STATUS_BUFFER_TOO_SMALL;
+ 
+             if ((status = server_get_unix_fd( handle, 0, &fd, &needs_close, &type, &options )))
+@@ -1841,7 +1841,9 @@ NTSTATUS sock_ioctl( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc
+                 return STATUS_INVALID_DEVICE_REQUEST;
+ 
+             status = *(NTSTATUS *)in_buffer;
+-            file_complete_async( handle, options, event, apc, apc_user, io, status, 0 );
++            file_complete_async( handle, options, event, apc, apc_user, io, status,
++                                 in_size == sizeof(struct afd_complete_async_params) ?
++                                 ((const struct afd_complete_async_params *)in_buffer)->output_size : 0 );
+             return status;
+         }
+ 
+diff --git a/dlls/ws2_32/socket.c b/dlls/ws2_32/socket.c
+--- a/dlls/ws2_32/socket.c
++++ b/dlls/ws2_32/socket.c
+@@ -2767,6 +2767,75 @@ INT WINAPI WSAIoctl(SOCKET s, DWORD code, LPVOID in_buff, DWORD in_size, LPVOID
+         return ret ? -1 : 0;
+     }
+ 
++    case SIO_ADDRESS_LIST_SORT:
++    {
++        SOCKET_ADDRESS_LIST *in = in_buff, *out = out_buff;
++        const DWORD header_size = FIELD_OFFSET(SOCKET_ADDRESS_LIST, Address[0]);
++        DWORD list_size, total, offset, ret;
++        struct afd_complete_async_params complete = {STATUS_SUCCESS, 0};
++        int i;
++
++        TRACE("-> SIO_ADDRESS_LIST_SORT request\n");
++
++        if (!in || in_size < header_size || in->iAddressCount < 0)
++        {
++            *ret_size = 0;
++            SetLastError( WSAEINVAL );
++            return -1;
++        }
++        /* Bound the count before multiplying or reading the address array. */
++        if ((DWORD)in->iAddressCount > (in_size - header_size) / sizeof(in->Address[0]))
++        {
++            *ret_size = 0;
++            SetLastError( WSAEFAULT );
++            return -1;
++        }
++        list_size = header_size + in->iAddressCount * sizeof(in->Address[0]);
++        total = list_size;
++        for (i = 0; i < in->iAddressCount; i++)
++        {
++            const SOCKET_ADDRESS *address = &in->Address[i];
++
++            if (!address->lpSockaddr || address->iSockaddrLength <= 0 ||
++                (DWORD)address->iSockaddrLength > MAXDWORD - total)
++            {
++                *ret_size = 0;
++                SetLastError( WSAEINVAL );
++                return -1;
++            }
++            total += address->iSockaddrLength;
++        }
++        /* The in-place path keeps the original layout, including its padding. */
++        if (out == in) total = max(total, in_size);
++        if (!out || out_size < total)
++        {
++            *ret_size = total;
++            SetLastError( WSAEFAULT );
++            return -1;
++        }
++
++        /* Compatibility fallback: preserve the supplied address order. */
++        if (out != in)
++        {
++            memcpy( out, in, list_size );
++            offset = list_size;
++            for (i = 0; i < in->iAddressCount; i++)
++            {
++                SOCKET_ADDRESS *address = &out->Address[i];
++
++                memmove( (char *)out + offset, address->lpSockaddr, address->iSockaddrLength );
++                address->lpSockaddr = (SOCKADDR *)((char *)out + offset);
++                offset += address->iSockaddrLength;
++            }
++        }
++        complete.output_size = total;
++        ret = server_ioctl_sock( s, IOCTL_AFD_WINE_COMPLETE_ASYNC, &complete, sizeof(complete),
++                                 NULL, 0, ret_size, overlapped, completion );
++        *ret_size = total;
++        SetLastError( ret );
++        return ret ? -1 : 0;
++    }
++
+     case SIO_ADDRESS_LIST_CHANGE:
+     {
+         int force_async = !!overlapped;
+diff --git a/include/wine/afd.h b/include/wine/afd.h
+--- a/include/wine/afd.h
++++ b/include/wine/afd.h
+@@ -25,6 +25,14 @@
+ #include <winioctl.h>
+ #include <mswsock.h>
+ 
++/* Optional byte count for locally completed Winsock IOCTLs. */
++struct afd_complete_async_params
++{
++    NTSTATUS status;
++    UINT output_size;
++};
++C_ASSERT( sizeof(struct afd_complete_async_params) == 8 );
++
+ struct afd_wsabuf_32
+ {
+     UINT len;
+diff --git a/include/winsock2.h b/include/winsock2.h
+--- a/include/winsock2.h
++++ b/include/winsock2.h
+@@ -426,6 +426,7 @@ extern "C" {
+ #define SIO_ADDRESS_LIST_QUERY     _WSAIOR(IOC_WS2,22)
+ #define SIO_ADDRESS_LIST_CHANGE    _WSAIO(IOC_WS2,23)
+ #define SIO_QUERY_TARGET_PNP_HANDLE _WSAIOR(IOC_WS2,24)
++#define SIO_ADDRESS_LIST_SORT      _WSAIORW(IOC_WS2,25)
+ #define SIO_GET_INTERFACE_LIST     _IOR ('t', 127, ULONG)
+ #endif /* USE_WS_PREFIX */
+ 
