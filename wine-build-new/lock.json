@@ -106,7 +106,6 @@
       "reason": "The workspace ships no Wine Mono, the cross-architecture entitlement removes the low-4GB constraint, and WINEDLLOVERRIDES=mscoree=d covers a fresh prefix."
     }
   ],
-  "portfile_prefix": "../../third-party/arknights-macos-runtime/wine-build-new/patches/",
   "opt_outs": {
     "LMISXH_AKMOCL_EFLAGS": "Carry AF and DF across ARM64EC context switches.",
     "LMISXH_AKMOCL_HYBRID_THREAD": "Start a hybrid-module thread on its x64 export.",
@@ -116,5 +115,9 @@
     "LMISXH_AKMOCL_CEF": "Apply the Bilibili CEF 80.1.15 descriptor.",
     "LMISXH_AKMOCL_FULLSCREEN": "Put fullscreen games in a native macOS Space."
   },
-  "opt_out_semantics": "Unset or 1 enables the behavior; any other value disables it."
+  "opt_out_semantics": "Unset or 1 enables the behavior; any other value disables it.",
+  "patch_alias": "patches/wine/arknights-macos-runtime",
+  "patch_alias_target": "third-party/arknights-macos-runtime/wine-build-new/patches",
+  "patch_alias_mode": "per-file",
+  "portfile_prefix": "arknights-macos-runtime/"
 }
