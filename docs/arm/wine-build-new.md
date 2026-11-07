@@ -32,22 +32,24 @@ references them as `arknights-macos-runtime/0001-...` through `0010-...`.
 
 ## Export set
 
-| Export                                             | Source in this repository                     | Runtime gate                      | Need                  |
-| -------------------------------------------------- | --------------------------------------------- | --------------------------------- | --------------------- |
-| `0001-ntdll-carry-eflags-af-df.patch`              | `patches/arm/wine/ace-context/`               | none (general)                    | keep until ACE run    |
-| `0002-ntdll-hybrid-thread-entry.patch`             | `patches/arm/wine/ace-thread-entry/`          | none (general)                    | keep until ACE run    |
-| `0003-ntoskrnl-arknights-ace-imports.patch`        | `patches/shared/wine/ace/ntoskrnl/` (reduced) | none (general)                    | keep until ACE run    |
-| `0004-userenv-appcontainer-apis.patch`             | `patches/shared/wine/appcontainer/`           | none (general)                    | required for CEF      |
-| `0005-ws2_32-address-list-sort.patch`              | `patches/shared/wine/winsock/`                | none (general)                    | required for CEF      |
-| `0006-ntdll-bilibili-cef80-stack-base.patch`       | `patches/shared/wine/cef/` (rebased)          | master + `_CEF`                   | required for Bilibili |
-| `0007-win32u-winemac-bilibili-layered-child.patch` | `patches/shared/wine/cn/windowing/` (rebased) | master + `_CN`                    | required for Bilibili |
-| `0008-winemac-bilibili-join-all-spaces.patch`      | `patches/shared/wine/cn/windowing/`           | master + `_CN` (optional)         | required for Bilibili |
-| `0009-winemac-native-fullscreen-space.patch`       | `patches/shared/wine/fullscreen/` (rebased)   | master + `_FULLSCREEN` (optional) | ours, user-visible    |
-| `0010-ntdll-hide-software-cursor-asset.patch`      | `patches/shared/wine/hardware-cursor/`        | master + `_CURSOR` (optional)     | ours, user-visible    |
+| Export                                             | Source in this repository                     | Runtime gate                  | Need                  |
+| -------------------------------------------------- | --------------------------------------------- | ----------------------------- | --------------------- |
+| `0001-ntdll-carry-eflags-af-df.patch`              | `patches/arm/wine/ace-context/`               | opt-out `_EFLAGS`             | keep until ACE run    |
+| `0002-ntdll-hybrid-thread-entry.patch`             | `patches/arm/wine/ace-thread-entry/`          | opt-out `_HYBRID_THREAD`      | keep until ACE run    |
+| `0003-ntoskrnl-arknights-ace-imports.patch`        | `patches/shared/wine/ace/ntoskrnl/` (reduced) | opt-out `_ACE_IMPORTS`        | keep until ACE run    |
+| `0004-userenv-appcontainer-apis.patch`             | `patches/shared/wine/appcontainer/`           | opt-out `_APPCONTAINER`       | required for CEF      |
+| `0005-ws2_32-address-list-sort.patch`              | `patches/shared/wine/winsock/`                | opt-out `_WINSOCK`            | required for CEF      |
+| `0006-ntdll-bilibili-cef80-stack-base.patch`       | `patches/shared/wine/cef/` (rebased)          | opt-out `_CEF`                | required for Bilibili |
+| `0007-win32u-winemac-bilibili-layered-child.patch` | `patches/shared/wine/cn/windowing/` (rebased) | master + `_CN`                | required for Bilibili |
+| `0008-winemac-bilibili-join-all-spaces.patch`      | `patches/shared/wine/cn/windowing/`           | master + `_CN` (optional)     | required for Bilibili |
+| `0009-winemac-native-fullscreen-space.patch`       | `patches/shared/wine/fullscreen/` (rebased)   | opt-out `_FULLSCREEN`         | ours, user-visible    |
+| `0010-ntdll-hide-software-cursor-asset.patch`      | `patches/shared/wine/hardware-cursor/`        | master + `_CURSOR` (optional) | ours, user-visible    |
 
-The workspace applies all ten patches at build time. The gates select behavior at runtime;
-they do not select patches. `0008` uses the process check that `0007` adds, so the two are
-always applied together.
+The workspace applies all ten patches at build time. The variables select behavior at
+runtime; they do not select patches. `0001` to `0006` and `0009` are on by default and each
+has an opt-out. `0007`, `0008`, and `0010` stay opt-in behind `LMISXH_AKMOCL` and a
+modifier. `0008` uses the process check that `0007` adds, so the two are always applied
+together.
 
 `0003` is reduced. Wine 11.18 already has `PsGetProcessImageFileName`,
 `PsReferencePrimaryToken`, `PsGetProcessExitStatus`, `ObRegisterCallbacks`,
@@ -62,18 +64,18 @@ to its loader and winemac code. The behavior is the same.
 
 The export was audited against the workspace queue and the pinned upstream trees.
 
-| Question                                      | Result                                                                                                                                                                                                                            |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| FEX lookup-cache eager commit                 | Not needed. `patches/fex/local/0009` adds `LookupCache::CommitL1Window()` and calls it in the constructor, after a cache clear, and when the dynamic L1 window grows. Our patch rewrites the same constructor and does not apply. |
-| Mono skip                                     | Not needed. The workspace ships no Wine Mono, the entitlement removes the low-4 GB constraint, and `WINEDLLOVERRIDES=mscoree=d` covers a fresh prefix. Arknights does not use .NET.                                               |
-| ACE imports (`0003`)                          | Kept until an ACE run. Wine 11.18 lacks the exports, but no Arknights ACE import dump was available.                                                                                                                              |
-| Hybrid thread entry (`0002`)                  | Kept until an ACE run. The reference fix is an EA overlay case, not ACE.                                                                                                                                                          |
-| AF/DF context (`0001`)                        | Kept until an ACE run. FEX rebuilds emulated flags, but native ARM64EC context handling still drops them.                                                                                                                         |
-| AppContainer (`0004`)                         | Kept. It replaces a per-game `userenv.dll` shim and covers all clients.                                                                                                                                                           |
-| AsyncDns (`0005`)                             | Kept. It replaces a per-game `--disable-features=AsyncDns` workaround.                                                                                                                                                            |
-| Bilibili CEF and windowing (`0006` to `0008`) | Kept. There is no client-side equivalent for the CEF descriptor or layered surfaces. `0008` is a six-line Space fix that the old client bridge also performed.                                                                    |
-| Fullscreen (`0009`)                           | Kept. A Windows DLL cannot change the `NSWindow` collection behavior or the fullscreen handshake.                                                                                                                                 |
-| Hardware cursor (`0010`)                      | Kept. A proxy DLL only covers wrapped APIs. Deleting the assets is undone by Repair.                                                                                                                                              |
+| Question                                      | Result                                                                                                                                                                                                                                              |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FEX lookup-cache eager commit                 | Not needed. `patches/fex/local/0009` adds `LookupCache::CommitL1Window()` and calls it in the constructor, after a cache clear, and when the dynamic L1 window grows. Our patch rewrites the same constructor and does not apply.                   |
+| Mono skip                                     | Not needed. The workspace ships no Wine Mono, the entitlement removes the low-4 GB constraint, and `WINEDLLOVERRIDES=mscoree=d` covers a fresh prefix. Arknights does not use .NET.                                                                 |
+| ACE imports (`0003`)                          | Kept until an ACE run. Wine 11.18 lacks the exports, but no Arknights ACE import dump was available.                                                                                                                                                |
+| Hybrid thread entry (`0002`)                  | Kept until an ACE run. The reference fix is an EA overlay case, not ACE.                                                                                                                                                                            |
+| AF/DF context (`0001`)                        | Kept until an ACE run. FEX rebuilds emulated flags, but native ARM64EC context handling still drops them.                                                                                                                                           |
+| AppContainer (`0004`)                         | Kept. It replaces a per-game `userenv.dll` shim and covers all clients.                                                                                                                                                                             |
+| AsyncDns (`0005`)                             | Kept. It replaces a per-game `--disable-features=AsyncDns` workaround.                                                                                                                                                                              |
+| Bilibili CEF and windowing (`0006` to `0008`) | Kept. There is no client-side equivalent for the CEF descriptor or layered surfaces. `0006` is on by default with `_CEF=0` as the opt-out; `0007` and `0008` stay opt-in. `0008` is a six-line Space fix that the old client bridge also performed. |
+| Fullscreen (`0009`)                           | Kept. A Windows DLL cannot change the `NSWindow` collection behavior or the fullscreen handshake. It is on by default with `_FULLSCREEN=0` as the opt-out.                                                                                          |
+| Hardware cursor (`0010`)                      | Kept. A proxy DLL only covers wrapped APIs. Deleting the assets is undone by Repair.                                                                                                                                                                |
 
 ACE remains unverified. Drop `0001` to `0003` only after an ACE run on the signed runtime
 shows they are unnecessary. The China update must complete first.
@@ -119,25 +121,31 @@ The cross-architecture entitlement removes the shared-user-data relocation and t
 workaround. The custom-x18 entitlement removes the SDK-12 loader relink. Confirm both in the
 final profile before judging the window chrome. See [entitlements](entitlements.md).
 
-## Gates
+## Gates and opt-outs
 
-`LMISXH_AKMOCL=1` is the master switch for the Arknights-specific patches. Each modifier
-opts one behavior in. An absent or invalid modifier leaves that behavior off.
+`0001` to `0006` and `0009` are on by default. Each reads one opt-out variable. An unset
+variable or `1` keeps the behavior; any other value turns it off.
+
+```sh
+LMISXH_AKMOCL_EFLAGS=0          # Do not carry AF and DF
+LMISXH_AKMOCL_HYBRID_THREAD=0   # Do not fix up hybrid-module thread entries
+LMISXH_AKMOCL_ACE_IMPORTS=0     # Do not export the ACE kernel imports
+LMISXH_AKMOCL_APPCONTAINER=0    # Do not implement the AppContainer names
+LMISXH_AKMOCL_WINSOCK=0         # Do not implement SIO_ADDRESS_LIST_SORT
+LMISXH_AKMOCL_CEF=0             # Do not apply the Bilibili CEF descriptor
+LMISXH_AKMOCL_FULLSCREEN=0      # Do not use a native fullscreen Space
+```
+
+`0007`, `0008`, and `0010` stay opt-in. They need `LMISXH_AKMOCL=1` and their modifier:
 
 ```sh
 LMISXH_AKMOCL=1
-LMISXH_AKMOCL_CEF=1         # Bilibili CEF 80.1.15 descriptor
-LMISXH_AKMOCL_CN=1          # CN window behavior
-LMISXH_AKMOCL_FULLSCREEN=1  # Native fullscreen Space
-LMISXH_AKMOCL_CURSOR=1      # Hide the software cursor asset
+LMISXH_AKMOCL_CN=1      # Bilibili window behavior (0007 and 0008)
+LMISXH_AKMOCL_CURSOR=1  # Hide the software cursor asset (0010)
 ```
 
-The general patches do not read `LMISXH_AKMOCL`. They are safe for any user of the runtime:
-AppContainer, Winsock, AF/DF context, hybrid thread entry, and the three kernel imports.
-ACE is therefore not separately gated.
-
-The Global client does not need `_CEF` or `_CN`. It does not load the Bilibili CEF build.
-The Global CEF build is not covered by `0006`.
+The Global client does not need `_CN`. It does not load the Bilibili CEF build. The Global
+CEF build is not covered by `0006`.
 
 ## Yaagl
 
@@ -146,8 +154,8 @@ environment variables in each client's `program-launch-game.ts`. It already uses
 `WINEDLLOVERRIDES`, `WINEMSYNC`, `WINEESYNC`, and `WINE_ENABLE_TIMEOUT_FIX`.
 
 Upstream Yaagl has no Arknights client, so this change adds nothing to Yaagl. A future
-Arknights client sets `LMISXH_AKMOCL=1` and the modifiers it needs. General patches must
-not depend on that client.
+Arknights client sets the opt-outs it needs; the CN and cursor patches still need
+`LMISXH_AKMOCL` and their modifier.
 
 ## Validation
 

@@ -22,18 +22,22 @@ See [collaborator runtime](../docs/arm/wine-build-new.md) for the mapping and th
 The workspace applies all ten patches at build time. The `LMISXH_AKMOCL_*` variables gate
 behavior at runtime; they do not select patches at build time.
 
-| Patch                                              | Runtime gate           | Need                  | Purpose                                                  |
-| -------------------------------------------------- | ---------------------- | --------------------- | -------------------------------------------------------- |
-| `0001-ntdll-carry-eflags-af-df.patch`              | none                   | keep until ACE run    | Keeps AF and DF across ARM64EC context switches.         |
-| `0002-ntdll-hybrid-thread-entry.patch`             | none                   | keep until ACE run    | Starts a hybrid-module thread on its x64 export.         |
-| `0003-ntoskrnl-arknights-ace-imports.patch`        | none                   | keep until ACE run    | Adds three kernel imports that ACE resolves.             |
-| `0004-userenv-appcontainer-apis.patch`             | none                   | required for CEF      | Adds the AppContainer names Chromium resolves.           |
-| `0005-ws2_32-address-list-sort.patch`              | none                   | required for CEF      | Implements `SIO_ADDRESS_LIST_SORT` for AsyncDns.         |
-| `0006-ntdll-bilibili-cef80-stack-base.patch`       | master + `_CEF`        | required for Bilibili | Bilibili CEF 80.1.15 stack-base descriptors.             |
-| `0007-win32u-winemac-bilibili-layered-child.patch` | master + `_CN`         | required for Bilibili | Bilibili layered child window.                           |
-| `0008-winemac-bilibili-join-all-spaces.patch`      | master + `_CN`         | required for Bilibili | Bilibili payment window on every Space. Requires `0007`. |
-| `0009-winemac-native-fullscreen-space.patch`       | master + `_FULLSCREEN` | ours, user-visible    | Puts fullscreen games in a native macOS Space.           |
-| `0010-ntdll-hide-software-cursor-asset.patch`      | master + `_CURSOR`     | ours, user-visible    | Hides the two game software-cursor assets.               |
+| Patch                                              | Runtime gate             | Need                  | Purpose                                                  |
+| -------------------------------------------------- | ------------------------ | --------------------- | -------------------------------------------------------- |
+| `0001-ntdll-carry-eflags-af-df.patch`              | opt-out `_EFLAGS`        | keep until ACE run    | Keeps AF and DF across ARM64EC context switches.         |
+| `0002-ntdll-hybrid-thread-entry.patch`             | opt-out `_HYBRID_THREAD` | keep until ACE run    | Starts a hybrid-module thread on its x64 export.         |
+| `0003-ntoskrnl-arknights-ace-imports.patch`        | opt-out `_ACE_IMPORTS`   | keep until ACE run    | Adds three kernel imports that ACE resolves.             |
+| `0004-userenv-appcontainer-apis.patch`             | opt-out `_APPCONTAINER`  | required for CEF      | Adds the AppContainer names Chromium resolves.           |
+| `0005-ws2_32-address-list-sort.patch`              | opt-out `_WINSOCK`       | required for CEF      | Implements `SIO_ADDRESS_LIST_SORT` for AsyncDns.         |
+| `0006-ntdll-bilibili-cef80-stack-base.patch`       | opt-out `_CEF`           | required for Bilibili | Bilibili CEF 80.1.15 stack-base descriptors.             |
+| `0007-win32u-winemac-bilibili-layered-child.patch` | master + `_CN`           | required for Bilibili | Bilibili layered child window.                           |
+| `0008-winemac-bilibili-join-all-spaces.patch`      | master + `_CN`           | required for Bilibili | Bilibili payment window on every Space. Requires `0007`. |
+| `0009-winemac-native-fullscreen-space.patch`       | opt-out `_FULLSCREEN`    | ours, user-visible    | Puts fullscreen games in a native macOS Space.           |
+| `0010-ntdll-hide-software-cursor-asset.patch`      | master + `_CURSOR`       | ours, user-visible    | Hides the two game software-cursor assets.               |
+
+`0001` to `0006` and `0009` are on by default. Each reads one opt-out variable: unset or
+`1` keeps the behavior, and any other value turns it off. `0007`, `0008`, and `0010` stay
+opt-in behind `LMISXH_AKMOCL` and their modifier.
 
 ### Why the ACE patches stay
 
@@ -59,7 +63,8 @@ shim. Both are general Chromium correctness fixes.
 The workspace queue has no equivalent. Fullscreen needs winemac because a Windows DLL
 cannot reach the `NSWindow` that owns the Space and the fullscreen handshake. The cursor
 filter could be approximated by a proxy DLL, but that only covers wrapped APIs and is
-less durable than the shared NT name resolver. Both are runtime-gated and optional.
+less durable than the shared NT name resolver. `0009` is on by default with an opt-out;
+`0010` stays opt-in.
 
 ## What is not in the export
 
@@ -77,28 +82,41 @@ less durable than the shared NT name resolver. Both are runtime-gated and option
 - **Loader name, audio, and DXMT.** Not required for login or ACE. The DXMT patch also
   targets a different DXMT pin.
 
-## Gates
+## Gates and opt-outs
 
-`LMISXH_AKMOCL=1` is the master switch for the Arknights-specific patches. Each modifier
-opts one behavior in. An absent or invalid modifier leaves that behavior off.
+`0001` to `0006` and `0009` are on by default. Each reads one opt-out variable. An unset
+variable or `1` keeps the behavior; any other value turns it off.
+
+```sh
+LMISXH_AKMOCL_EFLAGS=0          # Do not carry AF and DF
+LMISXH_AKMOCL_HYBRID_THREAD=0   # Do not fix up hybrid-module thread entries
+LMISXH_AKMOCL_ACE_IMPORTS=0     # Do not export the ACE kernel imports
+LMISXH_AKMOCL_APPCONTAINER=0    # Do not implement the AppContainer names
+LMISXH_AKMOCL_WINSOCK=0         # Do not implement SIO_ADDRESS_LIST_SORT
+LMISXH_AKMOCL_CEF=0             # Do not apply the Bilibili CEF descriptor
+LMISXH_AKMOCL_FULLSCREEN=0      # Do not use a native fullscreen Space
+```
+
+`0007`, `0008`, and `0010` stay opt-in. They need `LMISXH_AKMOCL=1` and their modifier:
 
 ```sh
 LMISXH_AKMOCL=1
-LMISXH_AKMOCL_CEF=1         # Bilibili CEF 80.1.15 descriptor
-LMISXH_AKMOCL_CN=1          # CN window behavior
-LMISXH_AKMOCL_FULLSCREEN=1  # Native fullscreen Space
-LMISXH_AKMOCL_CURSOR=1      # Hide the software cursor asset
+LMISXH_AKMOCL_CN=1      # Bilibili window behavior (0007 and 0008)
+LMISXH_AKMOCL_CURSOR=1  # Hide the software cursor asset (0010)
 ```
 
-The general patches do not read `LMISXH_AKMOCL`. ACE is not separately gated.
 `0008` uses the process check that `0007` adds, so the two are always applied together.
+ACE is not separately gated.
 
 ## Known limitations
 
 - `0006` patches Bilibili `libcef.dll` in memory after a byte preflight. It does not
-  verify the image hash and is not atomic if a later page protection change fails.
+  verify the image hash and is not atomic if a later page protection change fails. Set
+  `LMISXH_AKMOCL_CEF=0` to disable it.
 - `0007` adds a property and class lookup to every layered window update before the gate
-  check. The behavior is gated, but the code is compiled in for every user.
+  check. The behavior is opt-in, but the code is compiled in for every user.
+- `0009` selects windows by shape, not by application name. Set
+  `LMISXH_AKMOCL_FULLSCREEN=0` if a non-game borderless window should stay on its Space.
 - The CN payment window check is fixture-backed, not verified against the live client.
 
 ## Workspace integration
