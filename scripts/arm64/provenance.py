@@ -11,36 +11,34 @@ external artifact URL.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
 from pathlib import Path
 from typing import Any
 
 if __package__:
+    from ..build_common import (
+        NATIVE_ARM64_TARGET,
+        WINE_BUILD_NEW_REPOSITORY,
+        sha256,
+    )
     from ..lib.console import error, success
-    from ..runtime import LockError, load_lock
+    from ..runtime import LockError
+    from .fetch_external import require_external_lock
 else:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from scripts.arm64.fetch_external import require_external_lock
+    from scripts.build_common import (
+        NATIVE_ARM64_TARGET,
+        WINE_BUILD_NEW_REPOSITORY,
+        sha256,
+    )
     from scripts.lib.console import error, success
-    from scripts.runtime import LockError, load_lock
-
-
-ARM64_TARGET = "native-arm64"
-
-WINE_BUILD_NEW_REPOSITORY = "https://github.com/riverfog7/wine-build-new"
+    from scripts.runtime import LockError
 
 
 class ProvenanceError(RuntimeError):
     """Provenance cannot be produced."""
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        while chunk := source.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def write_provenance(
@@ -57,7 +55,9 @@ def write_provenance(
         raise ProvenanceError("provenance requires an external target")
 
     interface = lock.get("interface") or {}
-    minimum_macos = interface.get("minimumMacOS") or lock.get("deploymentTarget")
+    minimum_macos = interface.get("minimumMacOS")
+    if not isinstance(minimum_macos, str) or not minimum_macos:
+        raise ProvenanceError("the lock interface must state minimumMacOS")
     revision = lock["sources"]["wine"]["commit"]
 
     provenance = {
@@ -72,25 +72,35 @@ def write_provenance(
         },
         "runtimeArchive": {
             "name": runtime_archive.name,
-            "sha256": _sha256(runtime_archive),
+            "sha256": sha256(runtime_archive),
         },
         "correspondingSourceArchive": {
             "name": source_archive.name,
-            "sha256": _sha256(source_archive),
+            "sha256": sha256(source_archive),
         },
     }
     if external_artifact is not None:
         try:
             artifact = json.loads(external_artifact.read_text(encoding="utf-8"))
-            provenance["externalArtifact"] = {
-                "id": artifact["id"],
-                "sha256": artifact["sha256"],
-                "size": artifact.get("size"),
-            }
+            artifact_id = artifact["id"]
+            artifact_sha256 = artifact["sha256"]
+            artifact_size = artifact.get("size")
         except (OSError, json.JSONDecodeError, KeyError, TypeError) as problem:
             raise ProvenanceError(
                 "external artifact metadata is incomplete"
             ) from problem
+        locked = lock.get("artifact") or {}
+        if artifact_id != locked.get("release") or artifact_sha256 != locked.get(
+            "sha256"
+        ):
+            raise ProvenanceError(
+                "external artifact metadata does not match the lock pin"
+            )
+        provenance["externalArtifact"] = {
+            "id": artifact_id,
+            "sha256": artifact_sha256,
+            "size": artifact_size,
+        }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
     return provenance
@@ -98,7 +108,7 @@ def write_provenance(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target", default=ARM64_TARGET)
+    parser.add_argument("--target", default=NATIVE_ARM64_TARGET)
     parser.add_argument("--tag", required=True)
     parser.add_argument("--runtime-archive", type=Path, required=True)
     parser.add_argument("--source-archive", type=Path, required=True)
@@ -106,7 +116,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
     try:
-        lock = load_lock(target=arguments.target)
+        lock = require_external_lock(arguments.target)
         write_provenance(
             lock,
             arguments.tag,

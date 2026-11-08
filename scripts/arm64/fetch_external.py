@@ -12,7 +12,6 @@ DXMT is built locally by `build_dxmt.py`, not downloaded.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -25,15 +24,17 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 if __package__:
-    from ..lib.console import error, info, success
+    from ..build_common import NATIVE_ARM64_TARGET, ROOT, sha256
+    from ..lib.console import error, info, success, warning
+    from ..release.pins import write_artifact_pin
     from ..runtime import LockError, load_lock
 else:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from scripts.lib.console import error, info, success
+    from scripts.build_common import NATIVE_ARM64_TARGET, ROOT, sha256
+    from scripts.lib.console import error, info, success, warning
+    from scripts.release.pins import write_artifact_pin
     from scripts.runtime import LockError, load_lock
 
-
-ARM64_TARGET = "native-arm64"
 
 # The catalog URL is a secret. It is never logged, so a leaked catalog or archive
 # location stays out of CI output.
@@ -46,14 +47,6 @@ _BUILD_NUMBER = re.compile(r"-v(\d+)$")
 
 class FetchError(RuntimeError):
     """The external artifact cannot be fetched or verified."""
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        while chunk := source.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _urlopen_bytes(url: str) -> bytes:
@@ -106,13 +99,13 @@ def _releases(catalog: dict[str, Any]) -> list[Any]:
 
 def _published_at(release: dict[str, Any]) -> datetime:
     value = release.get("published_at")
-    if isinstance(value, str):
-        try:
-            parsed = datetime.fromisoformat(value)
-            return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
-        except ValueError:
-            pass
-    return datetime.min.replace(tzinfo=UTC)
+    if not isinstance(value, str):
+        raise FetchError("catalog release has no published_at")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as problem:
+        raise FetchError("catalog release has an invalid published_at") from problem
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
 
 
 def _build_number(release: dict[str, Any]) -> int:
@@ -187,26 +180,11 @@ def fetch_selected_release(
         if partial.stat().st_size != expected_size:
             raise FetchError("archive size does not match the catalog size")
 
-    actual = _sha256_file(partial)
+    actual = sha256(partial)
     if actual != declared:
         raise FetchError("archive SHA-256 does not match the catalog SHA-256")
     partial.replace(output)
     return release, output
-
-
-def fetch_release(
-    env_name: str,
-    release_id: str,
-    expected_sha256: str,
-    output: Path,
-    fetch: Callable[[str], bytes] | None = None,
-) -> Path:
-    """Download one pinned release after its catalog fields and bytes are verified."""
-
-    _, path = fetch_selected_release(
-        env_name, release_id, output, expected_sha256, fetch
-    )
-    return path
 
 
 def _validate_member(member: tarfile.TarInfo) -> None:
@@ -234,8 +212,10 @@ def _extract_archive(archive: Path, destination: Path) -> None:
             # any that escape the destination. The checks above reject absolute
             # paths, "..", Windows drive prefixes, and macOS metadata entries.
             tar.extractall(destination, filter="data")
-        except (tarfile.FilterError, tarfile.TarError, OSError, ValueError) as problem:
+        except tarfile.FilterError as problem:
             raise FetchError("archive member escapes the destination") from problem
+        except (tarfile.TarError, OSError, ValueError) as problem:
+            raise FetchError(f"cannot extract the wine archive: {problem}") from problem
 
 
 def _fetch_target(lock: dict[str, Any], output: Path, release_id: str) -> None:
@@ -261,12 +241,28 @@ def _fetch_target(lock: dict[str, Any], output: Path, release_id: str) -> None:
     _extract_archive(archive, output)
     if not (output / "wine").is_dir():
         raise FetchError("extracted archive has no wine directory")
+    if release["id"] != artifact["release"] and write_artifact_pin(
+        ROOT, lock["target"], release["id"], release["sha256"]
+    ):
+        warning(
+            f"Updated the {lock['target']} artifact pin to {release['id']} "
+            f"({release['sha256']})"
+        )
     success("Fetched and verified the wine archive")
+
+
+def require_external_lock(target: str = NATIVE_ARM64_TARGET) -> dict[str, Any]:
+    """Load the lock for one target and require its external build mode."""
+
+    lock = load_lock(target=target)
+    if lock["buildMode"] != "external":
+        raise LockError(f"the {lock['target']} target is not an external target")
+    return lock
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target", default=ARM64_TARGET)
+    parser.add_argument("--target", default=NATIVE_ARM64_TARGET)
     parser.add_argument(
         "--release-id",
         default="",
@@ -275,10 +271,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
     try:
-        lock = load_lock(target=arguments.target)
-        if lock["buildMode"] != "external":
-            error(f"the {lock['target']} target is not an external target")
-            return 1
+        lock = require_external_lock(arguments.target)
         _fetch_target(lock, arguments.output, arguments.release_id.strip())
     except (FetchError, LockError, KeyError, OSError) as caught_error:
         error(str(caught_error))

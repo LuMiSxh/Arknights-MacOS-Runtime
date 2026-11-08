@@ -1,0 +1,31 @@
+diff --git a/dlls/winemac.drv/cocoa_app.m b/dlls/winemac.drv/cocoa_app.m
+index 1f9083103ff..3fccbd54e23 100644
+--- a/dlls/winemac.drv/cocoa_app.m
++++ b/dlls/winemac.drv/cocoa_app.m
+@@ -45,6 +45,13 @@
+ bool macdrv_warn_on;
+ bool macdrv_trace_on;
+ 
++static BOOL lmisxh_akmocl_flag( const char *name )
++{
++    const char *value = getenv( name );
++
++    return !value || (value[0] == '1' && !value[1]);
++}
++
+ 
+ #if !defined(MAC_OS_VERSION_14_0) || MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_VERSION_14_0
+ @interface NSApplication (CooperativeActivationSelectorsForOldSDKs)
+@@ -286,7 +293,11 @@ - (void) transformProcessToForeground:(BOOL)activateIfTransformed
+             else
+                 title = WineLocalizedString(STRING_MENU_ITEM_QUIT);
+             item = [submenu addItemWithTitle:title action:@selector(terminate:) keyEquivalent:@"q"];
+-            [item setKeyEquivalentModifierMask:NSEventModifierFlagCommand | NSEventModifierFlagOption];
++            /* Command-Q quits; LMISXH_AKMOCL_MENU=0 restores the upstream Command-Option-Q. */
++            if (lmisxh_akmocl_flag( "LMISXH_AKMOCL_MENU" ))
++                [item setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
++            else
++                [item setKeyEquivalentModifierMask:NSEventModifierFlagCommand | NSEventModifierFlagOption];
+             item = [[[NSMenuItem alloc] init] autorelease];
+             [item setTitle:WineLocalizedString(STRING_MENU_WINE)];
+             [item setSubmenu:submenu];

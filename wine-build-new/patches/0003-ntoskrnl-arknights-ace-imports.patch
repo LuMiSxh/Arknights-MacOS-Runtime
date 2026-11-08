@@ -71,10 +71,7 @@ index b23b530..51b11b2 100644
  /***********************************************************************
   *           PsGetCurrentProcessSessionId   (NTOSKRNL.EXE.@)
   */
-@@ -5000,6 +5016,16 @@ BOOLEAN WINAPI SeSinglePrivilegeCheck(LUID privilege, KPROCESSOR_MODE mode)
- /*********************************************************************
-  *           SePrivilegeCheck    (NTOSKRNL.@)
-  */
+@@ -4619,6 +4675,16 @@ BOOLEAN WINAPI SeSinglePrivilegeCheck(LUID privilege, KPROCESSOR_MODE mode)
 +/*********************************************************************
 + *           SeSetAuditParameter    (NTOSKRNL.@)
 + */
@@ -85,6 +82,9 @@ index b23b530..51b11b2 100644
 +    return STATUS_SUCCESS;
 +}
 +
+ /*********************************************************************
+  *           SePrivilegeCheck    (NTOSKRNL.@)
+  */
  BOOLEAN WINAPI SePrivilegeCheck(PRIVILEGE_SET *privileges, SECURITY_SUBJECT_CONTEXT *context, KPROCESSOR_MODE mode)
  {
      FIXME("stub: %p %p %u\n", privileges, context, mode);

@@ -244,7 +244,7 @@ class UpdateTests(PinsTestCase):
 
     def test_guard_keeps_the_old_pin_when_a_patch_fails(self) -> None:
         runner = RecordingRunner(
-            failing_patch="0001-ntdll-hide-software-cursor-asset.patch"
+            failing_patch="0010-ntdll-hide-software-cursor-asset.patch"
         )
 
         result = self.update(runner)

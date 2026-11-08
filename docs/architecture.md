@@ -22,11 +22,11 @@ Since runtime 0.7.0:
 
 ## Runtime flags
 
-Each owning component parses its own flags. Accepted values and defaults are in the [README](../README.md#patch-families-and-runtime-controls). An absent or invalid value keeps the default.
+Each patch parses only its own gate. Accepted values and defaults are in the [Wine patch table](../patches/wine/README.md). A default-on gate is on when its variable is unset or exactly `1`; any other value turns it off. A default-off gate is on only for exactly `1`.
 
 - ACE gate: Kernel, dispatcher, Rosetta, and timing routes.
 - CEF gate: Descriptor-driven CEF loader preflights.
-- CN gate: Bilibili window preflights ([patch registry](patch-registry.md#cn)); legacy CEF fallback only when CEF is absent.
+- CN gate: Bilibili window preflights ([patch registry](patch-registry.md#cn)).
 - Fullscreen gate: Native fullscreen Space for a screen-sized game window ([patch registry](patch-registry.md#fullscreen)).
 - Hardware Cursor gate: Hides the exact Yostar/TW or Bilibili CN cursor asset basename in shared Wine path resolution, so open, attribute, and create-if-missing calls agree.
 

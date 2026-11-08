@@ -2,21 +2,6 @@ name: Candidate
 
 on:
     workflow_dispatch:
-        inputs:
-            stage:
-                description: Patch family to build
-                type: choice
-                default: combined
-                options:
-                    - base
-                    - audio
-                    - hardware-cursor
-                    - performance
-                    - ace
-                    - cef
-                    - cn
-                    - fullscreen
-                    - combined
 
 permissions:
     contents: read
@@ -27,13 +12,16 @@ concurrency:
 
 env:
     PYTHONDONTWRITEBYTECODE: "1"
+    CCACHE_DIR: ${{ github.workspace }}/.ccache
+    CCACHE_BASEDIR: ${{ github.workspace }}
+    CCACHE_COMPILERCHECK: content
+    CCACHE_MAXSIZE: 1G
+    LMISXH_AKMOCL_CCACHE: ccache
 
 jobs:
     build:
         runs-on: xcode-27
         timeout-minutes: 300
-        env:
-            RUNTIME_STAGE: ${{ inputs.stage }}
         steps:
             - name: Check out source
               uses: actions/checkout@v7.0.1
@@ -53,16 +41,37 @@ jobs:
             - name: Install build tools
               run: brew install ccache mingw-w64 meson ninja
 
+            - name: Restore compiler cache
+              uses: actions/cache@v4.3.0
+              with:
+                  path: ${{ github.workspace }}/.ccache
+                  key: ${{ runner.os }}-${{ runner.arch }}-ccache-canary-${{ hashFiles('runtime.lock.json') }}-${{ github.sha }}
+                  restore-keys: |
+                      ${{ runner.os }}-${{ runner.arch }}-ccache-canary-${{ hashFiles('runtime.lock.json') }}-
+                      ${{ runner.os }}-${{ runner.arch }}-ccache-canary-
+
+            - name: Restore downloaded sources
+              uses: actions/cache@v4.3.0
+              with:
+                  path: ${{ github.workspace }}/.build/downloads
+                  key: ${{ runner.os }}-${{ runner.arch }}-downloads-${{ hashFiles('runtime.lock.json') }}
+                  restore-keys: |
+                      ${{ runner.os }}-${{ runner.arch }}-downloads-
+
             - name: Build isolated overlay canary
-              run: uv run --locked --no-dev scripts/build.py canary "$RUNTIME_STAGE"
+              run: uv run --locked --no-dev scripts/build.py canary
+
+            - name: Report compiler cache statistics
+              if: ${{ always() }}
+              run: ccache -s
 
             - name: Upload runtime canary
               uses: actions/upload-artifact@v7.0.1
               with:
-                  name: Arknights-MacOS-Runtime-${{ env.RUNTIME_STAGE }}-${{ github.sha }}
+                  name: Arknights-MacOS-Runtime-canary-${{ github.sha }}
                   path: |
-                      .build/stages/${{ env.RUNTIME_STAGE }}/Arknights-MacOS-Runtime-${{ env.RUNTIME_STAGE }}.tar.gz
-                      .build/stages/${{ env.RUNTIME_STAGE }}/Arknights-MacOS-Runtime-${{ env.RUNTIME_STAGE }}.tar.gz.sha256
+                      .build/runtime/Arknights-MacOS-Runtime.tar.gz
+                      .build/runtime/Arknights-MacOS-Runtime.tar.gz.sha256
                       .build/reports/*.json
                   if-no-files-found: error
                   retention-days: 3

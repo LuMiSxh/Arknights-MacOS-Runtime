@@ -7,7 +7,7 @@ The runtime pins four upstream inputs in [`runtime.lock.json`](../runtime.lock.j
 <!-- pin-block:table -->
 | Pin | Value |
 | --- | --- |
-| `wine.commit` | `e0aa380780b73e20fabcfe78fd42713b94929a53` |
+| `wine.commit` | `a54b8240683e92bf4c15cb1ba6bf92a9539bd768` |
 | `wine.version` | `11.17` |
 | `dxmt.commit` | `9839e55f98d4aca103957ee4132d6395a325a9ed` |
 | `dxmt.version` | `0.80-361-g9839e55` |
@@ -84,7 +84,7 @@ Run `just check`. It runs `scripts/release/pins.py check`, which works offline. 
 
 ```markdown
 Wine <!-- pin:wine.version -->11.17<!-- /pin -->
-<!-- pin:wine.commit|code -->`e0aa380780b73e20fabcfe78fd42713b94929a53`<!-- /pin -->
+<!-- pin:wine.commit|code -->`a54b8240683e92bf4c15cb1ba6bf92a9539bd768`<!-- /pin -->
 ```
 
 Fenced code blocks are not scanned. An unknown key fails the check.

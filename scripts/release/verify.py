@@ -15,7 +15,8 @@ from typing import Any
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 if __package__:
-    from ..runtime import LockError, _sha256_file, load_lock
+    from ..build_common import NATIVE_ARM64_TARGET, sha256
+    from ..runtime import LockError, load_lock
     from .licenses import (
         ARCHIVE_LICENSES_DIRECTORY,
         ARCHIVE_NOTICE,
@@ -26,6 +27,7 @@ if __package__:
 else:
     if str(REPOSITORY_ROOT) not in sys.path:
         sys.path.insert(0, str(REPOSITORY_ROOT))
+    from scripts.build_common import NATIVE_ARM64_TARGET, sha256
     from scripts.release.licenses import (
         ARCHIVE_LICENSES_DIRECTORY,
         ARCHIVE_NOTICE,
@@ -33,7 +35,7 @@ else:
         INDEX_NAME,
         TARGET_COMPONENTS,
     )
-    from scripts.runtime import LockError, _sha256_file, load_lock
+    from scripts.runtime import LockError, load_lock
 
 
 SEMVER_CORE_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
@@ -54,8 +56,8 @@ NOTICE_FILES = (
     "LICENSES/runtime/MIT-DXMT.txt",
 )
 SOURCE_ARCHIVE_MEMBERS = (
-    "wine-combined",
-    "dxmt-combined",
+    "wine",
+    "dxmt",
     "runtime-component-inventory.tsv",
     "scripts",
     "Justfile",
@@ -63,12 +65,12 @@ SOURCE_ARCHIVE_MEMBERS = (
     "uv.lock",
 )
 SOURCE_DIRECTORIES = SOURCE_ARCHIVE_MEMBERS[:2]
-REQUIRED_PATCH_FAMILIES = frozenset(
-    ("audio", "hardware-cursor", "performance", "ace", "cef", "cn")
+REQUIRED_PATCHES = frozenset(
+    [("wine", number) for number in range(3, 16)] + [("dxmt", 1)]
 )
 
 DEFAULT_TARGET = "rosetta-x86_64"
-EXTERNAL_TARGET = "native-arm64"
+EXTERNAL_TARGET = NATIVE_ARM64_TARGET
 
 EXTERNAL_SOURCE_ARCHIVE_MEMBERS = (
     "wine-build-new",
@@ -85,8 +87,8 @@ TARGET_SOURCE_DIRECTORIES = {
     DEFAULT_TARGET: SOURCE_DIRECTORIES,
     EXTERNAL_TARGET: EXTERNAL_SOURCE_DIRECTORIES,
 }
-TARGET_REQUIRED_PATCH_FAMILIES = {
-    DEFAULT_TARGET: REQUIRED_PATCH_FAMILIES,
+TARGET_REQUIRED_PATCHES = {
+    DEFAULT_TARGET: REQUIRED_PATCHES,
     EXTERNAL_TARGET: frozenset(),
 }
 
@@ -141,7 +143,7 @@ def _regular_file(path: Path, description: str) -> Path:
 
 
 def _sha256(path: Path) -> str:
-    return _sha256_file(_regular_file(path, "file"))
+    return sha256(_regular_file(path, "file"))
 
 
 def _verify_checksum(artifact: Path, checksum: Path, description: str) -> str:
@@ -304,12 +306,15 @@ def _validate_notices(repository_root: Path, lock: dict[str, Any]) -> None:
         raise ReleaseValidationError("patch registry is missing: " + ", ".join(missing))
 
 
-def _validate_patch_families(lock: dict[str, Any], families: frozenset[str]) -> None:
-    found_families = {patch["family"] for patch in lock["patches"]}
-    missing = sorted(families - found_families)
+def _validate_required_patches(
+    lock: dict[str, Any], required: frozenset[tuple[str, int]]
+) -> None:
+    found = {(patch["component"], patch["number"]) for patch in lock["patches"]}
+    missing = sorted(required - found)
     if missing:
         raise ReleaseValidationError(
-            "release lock is missing patch families: " + ", ".join(missing)
+            "release lock is missing patches: "
+            + ", ".join(f"{component} {number:04d}" for component, number in missing)
         )
 
 
@@ -435,7 +440,7 @@ def verify_release(
             f"runtime lock validation failed: {error}"
         ) from error
     if not external:
-        _validate_patch_families(lock, TARGET_REQUIRED_PATCH_FAMILIES[target])
+        _validate_required_patches(lock, TARGET_REQUIRED_PATCHES[target])
     _validate_notices(repository_root, lock)
     inventory_text: str | None = None
     if external:

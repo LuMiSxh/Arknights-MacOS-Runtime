@@ -5,7 +5,7 @@ The clean release build starts with an empty `Libraries/` directory. It installs
 ## Identified components
 
 - WineCX / Wine: Windows compatibility runtime.
-    - Pinned source: <!-- pin:wine.link -->[`dappermint/winecx@e0aa380`](https://github.com/dappermint/winecx/tree/e0aa380780b73e20fabcfe78fd42713b94929a53)<!-- /pin -->
+    - Pinned source: <!-- pin:wine.link -->[`dappermint/winecx@a54b824`](https://github.com/dappermint/winecx/tree/a54b8240683e92bf4c15cb1ba6bf92a9539bd768)<!-- /pin -->
     - License evidence: `LGPL-2.1-or-later`; [`LICENSES/Wine-LGPL-2.1.txt`](../../LICENSES/Wine-LGPL-2.1.txt)
     - Source obligation: Ship complete corresponding source for the modified build and the applicable LGPL materials.
 - DXMT: D3D10/D3D11/Metal payload and WineMetal bridge.
@@ -15,7 +15,7 @@ The clean release build starts with an empty `Libraries/` directory. It installs
     - Linked code: DXMT links LLVM 15 (Apache-2.0 WITH LLVM-exception) into `winemetal.so`. See [`LICENSES/notices/llvm.txt`](../../LICENSES/notices/llvm.txt). The `-static` link flag probably puts libstdc++, libgcc, and the mingw-w64 runtime into the DXMT DLLs. This is an inference from the link flag. The binaries are not verified. The expected licenses are `ZPL-2.1`, `MIT` (winpthreads), and `GPL-3.0-or-later WITH GCC-exception-3.1`. See [`LICENSES/notices/dxmt-toolchain.txt`](../../LICENSES/notices/dxmt-toolchain.txt).
     - Source obligation: Ship complete corresponding source for the modified build and the LGPL-2.1 text. The source archive contains the DXMT source.
 - FEX: x86_64 emulator for the native ARM64 lane.
-    - Pinned source: [`dappermint/FEX@4efc3abc`](https://github.com/dappermint/FEX/tree/4efc3abc8aca8a0d3a8aca1f153ef6c4299f4426)
+    - Pinned source: [`FEX-Emu/FEX@14c92681`](https://github.com/FEX-Emu/FEX/tree/14c92681f4d62cf84d901460e0358de09c8847a7)
     - License evidence: `MIT`; [`LICENSES/runtime/MIT.txt`](../../LICENSES/runtime/MIT.txt). The copyright notice is in [`LICENSES/notices/fex.txt`](../../LICENSES/notices/fex.txt).
     - Source obligation: Ship the corresponding source and the FEX patches. The source archive of the same release contains the patches.
 - MoltenVK: Vulkan-to-Metal dynamic library. This component is x86_64 only.

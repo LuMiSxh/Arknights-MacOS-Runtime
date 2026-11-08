@@ -560,7 +560,7 @@ index a4d4412..5d6cea4 100644
      if (!get_config_key(hkey, appkey, "CaptureDisplaysForFullscreen", buffer, sizeof(buffer)))
          capture_displays_for_fullscreen = IS_OPTION_TRUE(buffer[0]);
 
-+    /* Runtime opt-out: unset or "1" enables native fullscreen Spaces. */
++    /* Runtime opt-out: unset or "1" keeps native fullscreen Spaces; any other value turns them off. */
 +    {
 +        const char *value = getenv("LMISXH_AKMOCL_FULLSCREEN");
 +        native_fullscreen_space = !value || (value[0] == '1' && !value[1]);

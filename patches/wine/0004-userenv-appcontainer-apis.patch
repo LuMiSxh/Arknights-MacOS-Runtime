@@ -12,7 +12,7 @@ diff --git a/dlls/userenv/userenv.spec b/dlls/userenv/userenv.spec
 diff --git a/dlls/userenv/userenv_main.c b/dlls/userenv/userenv_main.c
 --- a/dlls/userenv/userenv_main.c
 +++ b/dlls/userenv/userenv_main.c
-@@ -26,6 +26,8 @@
+@@ -26,6 +30,8 @@
  #include "winreg.h"
  #include "winternl.h"
  #include "winnls.h"
@@ -21,10 +21,47 @@ diff --git a/dlls/userenv/userenv_main.c b/dlls/userenv/userenv_main.c
  #include "sddl.h"
  #include "objbase.h"
  #include "userenv.h"
-@@ -687,12 +689,100 @@ BOOL WINAPI USERENV_138( int csidl, LPCSTR lnk_dir, LPCSTR lnk_filename,
+@@ -687,12 +693,142 @@ BOOL WINAPI USERENV_138( int csidl, LPCSTR lnk_dir, LPCSTR lnk_filename,
      return FALSE;
  }
  
++static BOOL lmisxh_akmocl_flag( const char *name )
++{
++    WCHAR nameW[32];
++    WCHAR valueW[2];
++    UNICODE_STRING nameU, valueU;
++    NTSTATUS status;
++    unsigned int i;
++
++    for (i = 0; name[i] && i < sizeof(nameW) / sizeof(nameW[0]) - 1; i++)
++        nameW[i] = (unsigned char)name[i];
++    nameW[i] = 0;
++
++    nameU.Length = i * sizeof(WCHAR);
++    nameU.MaximumLength = (i + 1) * sizeof(WCHAR);
++    nameU.Buffer = nameW;
++    valueU.Length = 0;
++    valueU.MaximumLength = sizeof(valueW);
++    valueU.Buffer = valueW;
++
++    status = RtlQueryEnvironmentVariable_U( NULL, &nameU, &valueU );
++    if (status == STATUS_VARIABLE_NOT_FOUND) return TRUE;
++    return status == STATUS_SUCCESS && valueU.Length == sizeof(WCHAR) && valueW[0] == '1';
++}
++
++static BOOL lmisxh_akmocl_appcontainer_enabled(void)
++{
++    static LONG state = -1;
++    LONG value = state;
++
++    if (value == -1)
++    {
++        value = lmisxh_akmocl_flag( "LMISXH_AKMOCL_APPCONTAINER" );
++        InterlockedCompareExchange( &state, value, -1 );
++    }
++    return value;
++}
++
 +static HRESULT result_from_last_error(void)
 +{
 +    DWORD error = GetLastError();
@@ -49,6 +86,7 @@ diff --git a/dlls/userenv/userenv_main.c b/dlls/userenv/userenv_main.c
 +
 +    if (!app_container_sid) return E_POINTER;
 +    *app_container_sid = NULL;
++    if (!lmisxh_akmocl_appcontainer_enabled()) return E_NOTIMPL;
 +    if (!app_container_name || !app_container_name[0]) return E_INVALIDARG;
 +
 +    name_length = wcslen(app_container_name);
@@ -105,6 +143,8 @@ diff --git a/dlls/userenv/userenv_main.c b/dlls/userenv/userenv_main.c
 +HRESULT WINAPI DeleteAppContainerProfile(PCWSTR container_name)
 +{
 +    TRACE("(%s)\n", debugstr_w(container_name));
++    if (!lmisxh_akmocl_appcontainer_enabled()) return E_NOTIMPL;
++    /* Profiles are not stored, so nothing is deleted. S_OK stays because CEF needs it. */
 +    return S_OK;
 +}
 +
@@ -113,6 +153,7 @@ diff --git a/dlls/userenv/userenv_main.c b/dlls/userenv/userenv_main.c
 +    TRACE("(%lx, %p)\n", desired_access, app_container_key);
 +    if (!app_container_key) return E_POINTER;
 +    *app_container_key = NULL;
++    if (!lmisxh_akmocl_appcontainer_enabled()) return E_NOTIMPL;
 +    return E_NOTIMPL;
 +}
 +
@@ -121,13 +162,14 @@ diff --git a/dlls/userenv/userenv_main.c b/dlls/userenv/userenv_main.c
 +    TRACE("(%s, %p)\n", debugstr_w(app_container_sid), folder_path);
 +    if (!folder_path) return E_POINTER;
 +    *folder_path = NULL;
++    if (!lmisxh_akmocl_appcontainer_enabled()) return E_NOTIMPL;
      return E_NOTIMPL;
  }
 diff --git a/dlls/kernelbase/kernelbase.spec b/dlls/kernelbase/kernelbase.spec
 index ae8f3486..dc4c04aa 100644
 --- a/dlls/kernelbase/kernelbase.spec
 +++ b/dlls/kernelbase/kernelbase.spec
-@@ -177,7 +177,7 @@
+@@ -177,7 +313,7 @@
  @ stdcall CopySid(long ptr ptr)
  # @ stub CouldMultiUserAppsBehaviorBePossibleForPackage
  @ stdcall CreateActCtxW(ptr)
@@ -136,7 +178,7 @@ index ae8f3486..dc4c04aa 100644
  @ stdcall CreateBoundaryDescriptorW(wstr long)
  @ stdcall CreateConsoleScreenBuffer(long long ptr long ptr)
  @ stdcall CreateDirectoryA(str ptr)
-@@ -421,7 +421,7 @@
+@@ -421,7 +557,7 @@
  # @ stub GetAdjustObjectAttributesForPrivateNamespaceRoutine
  # @ stub GetAlternatePackageRoots
  # @ stub GetAppContainerAce
@@ -149,7 +191,7 @@ diff --git a/dlls/kernelbase/security.c b/dlls/kernelbase/security.c
 index 7642574f..34382b29 100644
 --- a/dlls/kernelbase/security.c
 +++ b/dlls/kernelbase/security.c
-@@ -1607,3 +1607,27 @@ done:
+@@ -1607,3 +1743,27 @@ done:
      }
      return set_ntstatus( status );
  }

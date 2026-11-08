@@ -38,35 +38,35 @@
       {
         "order": 75,
         "path": "wine-build-new/patches/0003-ntoskrnl-arknights-ace-imports.patch",
-        "sha256": "729737a1f8f3dfcc803d768db6d354d73f89061bcd5b7edb830c01882e4476a0",
+        "sha256": "4a707e62aa8472cde73c32167e8a51275a4489cd664757f1d2d3ad91fa78222a",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_ACE_IMPORTS"
       },
       {
         "order": 76,
         "path": "wine-build-new/patches/0004-userenv-appcontainer-apis.patch",
-        "sha256": "fe56b85ccc68fa09d5ca31e41bf587f6a49b3a1ec0ae843cebf7150360f656cf",
+        "sha256": "6d280a63900fcd54da21c8fa7d852d4f6d3dcf5bf3ca3d03fd5f8593c1aa8cc4",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_APPCONTAINER"
       },
       {
         "order": 77,
         "path": "wine-build-new/patches/0005-ws2_32-address-list-sort.patch",
-        "sha256": "5870f9c2da9cc65075abefe3037cdb52d22b756b079829b6c278f0d26202663c",
+        "sha256": "7b0314606a0382db420a0595d6e3f24f00a490dd42144f23b7797771137387a0",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_WINSOCK"
       },
       {
         "order": 78,
         "path": "wine-build-new/patches/0006-ntdll-bilibili-cef80-stack-base.patch",
-        "sha256": "68370330f0c190fc9c9549db2a8f9fc5da1e7c5611375e544e40647169cd0dcc",
+        "sha256": "8d6c2edc02926defa061207a1ac7df45d086bc54862fbb8af32b3feb5331b8ee",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_CEF"
       },
       {
         "order": 79,
         "path": "wine-build-new/patches/0007-win32u-winemac-bilibili-layered-child.patch",
-        "sha256": "d670eb2a2ee616e8b42a6d6c75c9b9db63228265020733b78bbb075de6bf65e5",
+        "sha256": "9abc952c23ccb2231f513c409b40a7866bbbb57d46f0a11a5c0692a1484c8f8d",
         "modifier": "LMISXH_AKMOCL_CN",
         "default": "off"
       },
@@ -81,7 +81,7 @@
       {
         "order": 81,
         "path": "wine-build-new/patches/0009-winemac-native-fullscreen-space.patch",
-        "sha256": "2ad97f303225a76525131cf5c08b7b5dad8c2e12789a7cba23c04a4b17f76860",
+        "sha256": "b2cf2bc9fe5cd7806bc0431170e630b4d9474cf4dfc984aacfd26b410a646e58",
         "default": "on",
         "optional": true,
         "opt_out": "LMISXH_AKMOCL_FULLSCREEN"
@@ -93,6 +93,14 @@
         "modifier": "LMISXH_AKMOCL_CURSOR",
         "default": "off",
         "optional": true
+      },
+      {
+        "order": 83,
+        "path": "wine-build-new/patches/0011-winemac-command-q-quit.patch",
+        "sha256": "594daa344c8bb3bb34115bdd19ed653301e69af8d167482d6e4b459d88192122",
+        "default": "on",
+        "optional": true,
+        "opt_out": "LMISXH_AKMOCL_MENU"
       }
     ]
   },
@@ -113,9 +121,10 @@
     "LMISXH_AKMOCL_APPCONTAINER": "Implement the AppContainer names Chromium resolves.",
     "LMISXH_AKMOCL_WINSOCK": "Implement SIO_ADDRESS_LIST_SORT.",
     "LMISXH_AKMOCL_CEF": "Apply the Bilibili CEF 80.1.15 descriptor.",
-    "LMISXH_AKMOCL_FULLSCREEN": "Put fullscreen games in a native macOS Space."
+    "LMISXH_AKMOCL_FULLSCREEN": "Put fullscreen games in a native macOS Space.",
+    "LMISXH_AKMOCL_MENU": "Make Command+Q quit from the app menu."
   },
-  "opt_out_semantics": "Unset or 1 enables the behavior; any other value disables it.",
+  "opt_out_semantics": "Unset or `1` keeps the patch on; any other value turns it off.",
   "patch_alias": "patches/wine/arknights-macos-runtime",
   "patch_alias_target": "third-party/arknights-macos-runtime/wine-build-new/patches",
   "patch_alias_mode": "per-file",

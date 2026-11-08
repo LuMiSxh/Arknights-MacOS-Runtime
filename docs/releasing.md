@@ -37,7 +37,7 @@ The repository variables `LLVM_MINGW_URL` and `LLVM_MINGW_SHA256` pin the llvm-m
 4. `scripts/arm64/assemble.py` repacks the client tree as `Libraries/Wine`, `Libraries/DXMT`, `Licenses/`, and `NOTICE.md`. The signed `wine.app` keeps its Developer ID signature.
 5. `scripts/validate_runtime.py --target native-arm64` validates the tree. The workflow also rejects a Mach-O whose `minos` is above 26.0.
 6. The publish job re-checks the tag and release, attests the archives, and creates the tag and a draft release at the built SHA. The release is normal, not a prerelease.
-7. The release assets are the runtime archive, its checksum, the corresponding source archive, its checksum, `provenance.json`, and `NOTICE.md`. The source archive contains `wine-build-new`, `runtime.lock.json`, and `docs/arm/provenance.md`.
+7. The release assets are the runtime archive, its checksum, the corresponding source archive, its checksum, `provenance.json`, and `NOTICE.md`. The source archive contains `wine-build-new`, `runtime.lock.json`, and `docs/arm/README.md`.
 8. Inspect and test those exact assets. Publish the unchanged draft only after the source, notice, and manual compatibility review.
 
 The release notes and `provenance.json` credit `https://github.com/riverfog7/wine-build-new`. The release notes name the selected catalog release. `provenance.json` records its id and SHA-256 under `externalArtifact`. The ARM runtime archive and corresponding source archive form one immutable versioned contract. The client pins the archive URL and SHA-256.

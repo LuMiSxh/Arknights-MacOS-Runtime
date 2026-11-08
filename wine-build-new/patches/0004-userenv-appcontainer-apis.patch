@@ -78,7 +78,7 @@ index 54f713e..00a0080 100644
  #include "sddl.h"
  #include "objbase.h"
  #include "userenv.h"
-@@ -687,12 +689,141 @@ BOOL WINAPI USERENV_138( int csidl, LPCSTR lnk_dir, LPCSTR lnk_filename,
+@@ -687,12 +690,142 @@ BOOL WINAPI USERENV_138( int csidl, LPCSTR lnk_dir, LPCSTR lnk_filename,
      return FALSE;
  }
 
@@ -199,8 +199,9 @@ index 54f713e..00a0080 100644
 +
 +HRESULT WINAPI DeleteAppContainerProfile(PCWSTR container_name)
 +{
-+    TRACE("(%s)\n", debugstr_w(container_name));
++    FIXME("(%s): stub\n", debugstr_w(container_name));
 +    if (!lmisxh_akmocl_appcontainer_enabled()) return E_NOTIMPL;
++    /* Profiles are not stored, so nothing is deleted. S_OK stays because CEF needs it. */
 +    return S_OK;
 +}
 +

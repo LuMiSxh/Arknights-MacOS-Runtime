@@ -28,7 +28,7 @@ class ReleaseVerificationTests(unittest.TestCase):
         self.checksum = self.root / "runtime.tar.gz.sha256"
         self._write_checksum(self.archive, self.checksum)
         self.source_root = self.root / "sources"
-        for name in ("wine-combined", "dxmt-combined"):
+        for name in ("wine", "dxmt"):
             path = self.source_root / name
             path.mkdir(parents=True)
             (path / "source.c").write_text("source\n", encoding="utf-8")
@@ -73,8 +73,8 @@ class ReleaseVerificationTests(unittest.TestCase):
             else:
                 path.write_text("build file\n", encoding="utf-8")
         members = {
-            "wine-combined": self.source_root / "wine-combined",
-            "dxmt-combined": self.source_root / "dxmt-combined",
+            "wine": self.source_root / "wine",
+            "dxmt": self.source_root / "dxmt",
             "runtime-component-inventory.tsv": self.component_inventory,
             "scripts": self.root / "scripts",
             "Justfile": self.root / "Justfile",
@@ -87,38 +87,23 @@ class ReleaseVerificationTests(unittest.TestCase):
                     archive.add(path, arcname=arcname)
 
     def _write_repository(self) -> None:
-        patch_definitions = (
-            ("example-audio", "audio"),
-            ("example-hardware-cursor", "hardware-cursor"),
-            ("example-performance", "performance"),
-            ("example-ace", "ace"),
-            ("example-cef", "cef"),
-            ("example-cn", "cn"),
-        )
+        patch_definitions = [("wine", number) for number in range(3, 16)]
+        patch_definitions.append(("dxmt", 1))
         patches = []
-        for patch_id, family in patch_definitions:
+        for component, number in patch_definitions:
+            patch_id = f"example-{component}-{number:04d}"
             patch = self.root / f"patches/{patch_id}.patch"
             patch.parent.mkdir(parents=True, exist_ok=True)
-            if family == "hardware-cursor":
-                content = (
-                    "+static BOOL lmisxh_akmocl_cursor_enabled(void)\n"
-                    "+{\n"
-                    '+    const char *master = getenv( "LMISXH_AKMOCL" );\n'
-                    '+    const char *setting = getenv( "LMISXH_AKMOCL_CURSOR" );\n'
-                    '+    return master && !strcmp( master, "1" ) && setting && !strcmp( setting, "1" );\n'
-                    "+}\n"
-                    "+if (lmisxh_akmocl_cursor_enabled() &&\n"
-                    '+    (!strcasecmp( name, "a9d41799f1af1868f2db495671227cd4.bin" ) ||\n'
-                    '+     !strcasecmp( name, "f7bcd64480c4566f25d65d642f5fba95.bin" )))\n'
-                )
-            else:
-                content = f"{patch_id}\n"
+            content = f"{patch_id}\n"
             patch.write_text(content, encoding="utf-8")
             patches.append(
                 {
                     "id": patch_id,
-                    "component": "dxmt" if family == "performance" else "wine",
-                    "family": family,
+                    "component": component,
+                    "number": number,
+                    "gate": None,
+                    "default": True,
+                    "targets": ["rosetta-x86_64"],
                     "path": str(patch.relative_to(self.root)),
                     "sha256": hashlib.sha256(content.encode()).hexdigest(),
                 }
@@ -258,25 +243,20 @@ class ReleaseVerificationTests(unittest.TestCase):
         with self.assertRaisesRegex(ReleaseValidationError, "not release eligible"):
             self._verify()
 
-    def test_rejects_a_release_lock_missing_a_patch_family(self) -> None:
+    def test_rejects_a_release_lock_missing_a_required_patch(self) -> None:
         lock_path = self.root / "runtime.lock.json"
         lock = json.loads(lock_path.read_text(encoding="utf-8"))
-        for family in (
-            "audio",
-            "hardware-cursor",
-            "performance",
-            "ace",
-            "cef",
-            "cn",
-        ):
-            with self.subTest(family=family):
+        for missing in (("wine", 3), ("wine", 15), ("dxmt", 1)):
+            with self.subTest(missing=missing):
                 incomplete_lock = dict(lock)
                 incomplete_lock["patches"] = [
-                    patch for patch in lock["patches"] if patch["family"] != family
+                    patch
+                    for patch in lock["patches"]
+                    if (patch["component"], patch["number"]) != missing
                 ]
                 lock_path.write_text(json.dumps(incomplete_lock), encoding="utf-8")
 
-                with self.assertRaisesRegex(ReleaseValidationError, "patch families"):
+                with self.assertRaisesRegex(ReleaseValidationError, "missing patches"):
                     self._verify()
 
     def test_rejects_checksum_that_names_another_artifact(self) -> None:
@@ -289,8 +269,8 @@ class ReleaseVerificationTests(unittest.TestCase):
             self._verify()
 
     def test_rejects_a_missing_or_symlinked_source_checkout(self) -> None:
-        (self.source_root / "wine-combined" / "source.c").unlink()
-        (self.source_root / "wine-combined").rmdir()
+        (self.source_root / "wine" / "source.c").unlink()
+        (self.source_root / "wine").rmdir()
         with self.assertRaisesRegex(ReleaseValidationError, "missing source checkout"):
             self._verify()
 
@@ -377,7 +357,7 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
             Path(__file__).resolve().parents[1] / ".github/workflows/release.yml"
         ).read_text(encoding="utf-8")
 
-        self.assertNotIn("just build combined", workflow)
+        self.assertNotIn("just build\n", workflow)
         self.assertNotIn("build-canary.sh", workflow)
         self.assertIn("just build-release", workflow)
 

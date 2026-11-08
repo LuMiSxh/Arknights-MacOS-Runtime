@@ -2,52 +2,46 @@ diff --git a/dlls/ntdll/loader.c b/dlls/ntdll/loader.c
 index 22d2ef7e..4bd6e0f9 100644
 --- a/dlls/ntdll/loader.c
 +++ b/dlls/ntdll/loader.c
-@@ -2991,6 +2991,174 @@ static void apply_fuzzy_binary_patches( WINE_MODREF *wm )
+@@ -2991,6 +2991,166 @@ static void apply_fuzzy_binary_patches( WINE_MODREF *wm )
  #endif
  
  #if defined(__i386__) || defined(__x86_64__)
 +#ifdef __x86_64__
-+/* CEF compatibility is opt-in and descriptor-driven. The master switch and
-+ * LMISXH_AKMOCL_CEF=1 enable every regional descriptor. */
-+enum lmisxh_cef_compat_mode
++/* CEF compatibility is descriptor-driven. Each descriptor preflights the
++ * exact module name, RVAs, and bytes before it writes anything. */
++static BOOL lmisxh_akmocl_flag( const char *name )
 +{
-+    LMISXH_CEF_COMPAT_DISABLED,
-+    LMISXH_CEF_COMPAT_ENABLED
-+};
++    WCHAR nameW[32];
++    WCHAR valueW[2];
++    UNICODE_STRING nameU, valueU;
++    NTSTATUS status;
++    unsigned int i;
 +
-+enum lmisxh_cef_descriptor_region
-+{
-+    LMISXH_CEF_REGION_CN
-+};
++    for (i = 0; name[i] && i < sizeof(nameW) / sizeof(nameW[0]) - 1; i++)
++        nameW[i] = (unsigned char)name[i];
++    nameW[i] = 0;
 +
-+static const WCHAR lmisxh_akmocl_nameW[] =
-+    {'L','M','I','S','X','H','_','A','K','M','O','C','L',0};
-+static const WCHAR lmisxh_cef_compat_nameW[] =
-+    {'L','M','I','S','X','H','_','A','K','M','O','C','L','_','C','E','F',0};
++    nameU.Length = i * sizeof(WCHAR);
++    nameU.MaximumLength = (i + 1) * sizeof(WCHAR);
++    nameU.Buffer = nameW;
++    valueU.Length = 0;
++    valueU.MaximumLength = sizeof(valueW);
++    valueU.Buffer = valueW;
 +
-+static BOOL lmisxh_akmocl_flag( const WCHAR *name, USHORT name_length )
-+{
-+    WCHAR value[2] = {0};
-+    UNICODE_STRING nameW = {name_length, name_length + sizeof(WCHAR), (WCHAR *)name};
-+    UNICODE_STRING valueW = {0, sizeof(value), value};
-+    NTSTATUS status = RtlQueryEnvironmentVariable_U( NULL, &nameW, &valueW );
-+
-+    return status == STATUS_SUCCESS && valueW.Length == sizeof(WCHAR) && value[0] == '1';
++    status = RtlQueryEnvironmentVariable_U( NULL, &nameU, &valueU );
++    if (status == STATUS_VARIABLE_NOT_FOUND) return TRUE;
++    return status == STATUS_SUCCESS && valueU.Length == sizeof(WCHAR) && valueW[0] == '1';
 +}
 +
-+static enum lmisxh_cef_compat_mode lmisxh_cef_compat_mode(void)
++static BOOL lmisxh_akmocl_cef_enabled(void)
 +{
 +    static LONG state = -1;
 +    LONG value = state;
 +
 +    if (value == -1)
 +    {
-+        value = (lmisxh_akmocl_flag( lmisxh_akmocl_nameW,
-+                                    sizeof(lmisxh_akmocl_nameW) - sizeof(WCHAR) ) &&
-+                 lmisxh_akmocl_flag( lmisxh_cef_compat_nameW,
-+                                    sizeof(lmisxh_cef_compat_nameW) - sizeof(WCHAR) ))
-+            ? LMISXH_CEF_COMPAT_ENABLED : LMISXH_CEF_COMPAT_DISABLED;
-+        InterlockedCompareExchange(&state, value, -1);
++        value = lmisxh_akmocl_flag( "LMISXH_AKMOCL_CEF" );
++        InterlockedCompareExchange( &state, value, -1 );
 +    }
 +    return value;
 +}
@@ -65,17 +59,14 @@ index 22d2ef7e..4bd6e0f9 100644
 +    const WCHAR *module_name;
 +    const struct arknights_cef_patch *patches;
 +    unsigned int patch_count;
-+    enum lmisxh_cef_descriptor_region region;
 +};
 +
-+static BOOL arknights_apply_cef_descriptor( WINE_MODREF *wm,
-+                                            const struct arknights_cef_descriptor *descriptor,
-+                                            enum lmisxh_cef_compat_mode mode )
++static BOOL lmisxh_akmocl_apply_cef_descriptor( WINE_MODREF *wm,
++                                            const struct arknights_cef_descriptor *descriptor )
 +{
 +    unsigned int i;
 +
-+    if (mode == LMISXH_CEF_COMPAT_DISABLED ||
-+        wcscmp( wm->ldr.BaseDllName.Buffer, descriptor->module_name ))
++    if (wcscmp( wm->ldr.BaseDllName.Buffer, descriptor->module_name ))
 +        return FALSE;
 +
 +    /* Preflight all expected bytes before writing any patch bytes. */
@@ -168,16 +159,17 @@ index 22d2ef7e..4bd6e0f9 100644
 +        { 0x24c425f, before_stackbase_check, after_stackbase_check, sizeof(before_stackbase_check) }
 +    };
 +    static const struct arknights_cef_descriptor descriptor =
-+        {cef_name, patches, ARRAY_SIZE(patches), LMISXH_CEF_REGION_CN};
++        {cef_name, patches, ARRAY_SIZE(patches)};
 +
-+    arknights_apply_cef_descriptor( wm, &descriptor, lmisxh_cef_compat_mode() );
++    if (!lmisxh_akmocl_cef_enabled()) return;
++    lmisxh_akmocl_apply_cef_descriptor( wm, &descriptor );
 +}
 +#endif
 +
  static void apply_binary_patches( WINE_MODREF* wm )
  {
  #ifdef __x86_64__
-@@ -3382,6 +3561,10 @@ static void apply_binary_patches( WINE_MODREF* wm )
+@@ -3382,6 +3542,10 @@ static void apply_binary_patches( WINE_MODREF* wm )
      SIZE_T pagesize = page_size;
      WCHAR *libname = wm->ldr.BaseDllName.Buffer;
  

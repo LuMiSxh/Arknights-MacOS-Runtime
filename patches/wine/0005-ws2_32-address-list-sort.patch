@@ -24,7 +24,55 @@ diff --git a/dlls/ntdll/unix/socket.c b/dlls/ntdll/unix/socket.c
 diff --git a/dlls/ws2_32/socket.c b/dlls/ws2_32/socket.c
 --- a/dlls/ws2_32/socket.c
 +++ b/dlls/ws2_32/socket.c
-@@ -2767,6 +2767,75 @@ INT WINAPI WSAIoctl(SOCKET s, DWORD code, LPVOID in_buff, DWORD in_size, LPVOID
+@@ -29,8 +31,47 @@
+ #include "ws2_32_private.h"
+ 
++#include "winternl.h"
++
+ #define FILE_USE_FILE_POINTER_POSITION ((LONGLONG)-2)
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(winsock);
+ WINE_DECLARE_DEBUG_CHANNEL(winediag);
+ 
++static BOOL lmisxh_akmocl_flag( const char *name )
++{
++    WCHAR nameW[32];
++    WCHAR valueW[2];
++    UNICODE_STRING nameU, valueU;
++    NTSTATUS status;
++    unsigned int i;
++
++    for (i = 0; name[i] && i < sizeof(nameW) / sizeof(nameW[0]) - 1; i++)
++        nameW[i] = (unsigned char)name[i];
++    nameW[i] = 0;
++
++    nameU.Length = i * sizeof(WCHAR);
++    nameU.MaximumLength = (i + 1) * sizeof(WCHAR);
++    nameU.Buffer = nameW;
++    valueU.Length = 0;
++    valueU.MaximumLength = sizeof(valueW);
++    valueU.Buffer = valueW;
++
++    status = RtlQueryEnvironmentVariable_U( NULL, &nameU, &valueU );
++    if (status == STATUS_VARIABLE_NOT_FOUND) return TRUE;
++    return status == STATUS_SUCCESS && valueU.Length == sizeof(WCHAR) && valueW[0] == '1';
++}
++
++static BOOL lmisxh_akmocl_winsock_enabled(void)
++{
++    static LONG state = -1;
++    LONG value = state;
++
++    if (value == -1)
++    {
++        value = lmisxh_akmocl_flag( "LMISXH_AKMOCL_WINSOCK" );
++        InterlockedCompareExchange( &state, value, -1 );
++    }
++    return value;
++}
++
+ #define TIMEOUT_INFINITE _I64_MAX
+@@ -2805,6 +2846,81 @@ INT WINAPI WSAIoctl(SOCKET s, DWORD code, LPVOID in_buff, DWORD in_size, LPVOID
          return ret ? -1 : 0;
      }
  
@@ -38,6 +86,12 @@ diff --git a/dlls/ws2_32/socket.c b/dlls/ws2_32/socket.c
 +
 +        TRACE("-> SIO_ADDRESS_LIST_SORT request\n");
 +
++        if (!lmisxh_akmocl_winsock_enabled())
++        {
++            *ret_size = 0;
++            SetLastError( WSAEOPNOTSUPP );
++            return -1;
++        }
 +        if (!in || in_size < header_size || in->iAddressCount < 0)
 +        {
 +            *ret_size = 0;
@@ -103,7 +157,7 @@ diff --git a/dlls/ws2_32/socket.c b/dlls/ws2_32/socket.c
 diff --git a/include/wine/afd.h b/include/wine/afd.h
 --- a/include/wine/afd.h
 +++ b/include/wine/afd.h
-@@ -25,6 +25,14 @@
+@@ -25,6 +141,14 @@
  #include <winioctl.h>
  #include <mswsock.h>
  
@@ -121,7 +175,7 @@ diff --git a/include/wine/afd.h b/include/wine/afd.h
 diff --git a/include/winsock2.h b/include/winsock2.h
 --- a/include/winsock2.h
 +++ b/include/winsock2.h
-@@ -426,6 +426,7 @@ extern "C" {
+@@ -426,6 +550,7 @@ extern "C" {
  #define SIO_ADDRESS_LIST_QUERY     _WSAIOR(IOC_WS2,22)
  #define SIO_ADDRESS_LIST_CHANGE    _WSAIO(IOC_WS2,23)
  #define SIO_QUERY_TARGET_PNP_HANDLE _WSAIOR(IOC_WS2,24)

@@ -296,6 +296,23 @@ def apply_state(lock: dict[str, Any], component: str, state: Any) -> None:
         lock["build"]["nixpkgs"]["commit"] = state.commit
 
 
+def write_artifact_pin(root: Path, target: str, release: str, sha256: str) -> bool:
+    """Update one external target's artifact pin and rewrite the lock in place.
+
+    Return True when the lock changed. The text keeps the same
+    ``json.dumps(lock, indent=2)`` formatting that `run_update` writes, so
+    `pins.py check` and `runtime.py validate-lock` keep passing.
+    """
+
+    lock = _read_lock(root)
+    artifact = lock["targets"][target]["artifact"]
+    if artifact.get("release") == release and artifact.get("sha256") == sha256:
+        return False
+    artifact.update(release=release, sha256=sha256)
+    (root / LOCK_NAME).write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
+    return True
+
+
 def _slug(repository: str) -> str:
     return repository.removeprefix("https://github.com/").removesuffix(".git")
 

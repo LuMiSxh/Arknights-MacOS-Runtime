@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import subprocess
@@ -17,45 +16,15 @@ from typing import Any
 from urllib.parse import urlparse
 
 if __package__:
+    from .build_common import sha256
     from .lib.console import Progress, error, info, success
 else:
+    from build_common import sha256
     from lib.console import Progress, error, info, success
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCK_PATH = ROOT / "runtime.lock.json"
 BUILD_ROOT = ROOT / ".build"
-STAGES = (
-    "base",
-    "audio",
-    "hardware-cursor",
-    "performance",
-    "ace",
-    "cef",
-    "cn",
-    "fullscreen",
-    "combined",
-)
-PATCH_FAMILIES = frozenset(
-    {
-        "address-space",
-        "audio",
-        "hardware-cursor",
-        "performance",
-        "ace",
-        "cef",
-        "cn",
-        "menu",
-        "fullscreen",
-        "fex",
-        "mono",
-        "arm64ec",
-        "wx",
-        "id-registers",
-        "loader",
-        "winsock",
-        "appcontainer",
-    }
-)
 SCHEMA_VERSION = 3
 ARCHIVE_SCHEMA_VERSION = 2
 # A target entry replaces these keys as a whole. Anything absent is inherited
@@ -92,14 +61,6 @@ class SourcePin:
     name: str
     repository: str
     commit: str
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        while chunk := source.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _require_mapping(value: Any, name: str) -> dict[str, Any]:
@@ -268,6 +229,28 @@ def _validate_features(value: Any, context: str) -> dict[str, Any]:
     return features
 
 
+def _validate_toolchain(value: Any) -> dict[str, Any] | None:
+    """Validate the optional top-level toolchain pins."""
+
+    if value is None:
+        return None
+    toolchain = _require_mapping(value, "toolchain")
+    unknown = sorted(set(toolchain) - {"llvmMingw"})
+    if unknown:
+        raise LockError(f"toolchain has unknown keys: {', '.join(unknown)}")
+    llvm = toolchain.get("llvmMingw")
+    if llvm is None:
+        return toolchain
+    entry = _require_mapping(llvm, "toolchain.llvmMingw")
+    url = _require_string(entry, "url", "toolchain.llvmMingw")
+    digest = _require_string(entry, "sha256", "toolchain.llvmMingw")
+    if not url.startswith("https://"):
+        raise LockError("toolchain.llvmMingw.url must use HTTPS")
+    if HASH_PATTERN.fullmatch(digest) is None:
+        raise LockError("toolchain.llvmMingw.sha256 must be a lowercase SHA-256 hash")
+    return toolchain
+
+
 def _validate_targets(lock: dict[str, Any]) -> dict[str, dict[str, Any]]:
     declared = _require_mapping(lock.get("targets"), "targets")
     if not declared:
@@ -332,6 +315,7 @@ def _resolve_target(
         "target": name,
         "baseProvenance": lock.get("baseProvenance"),
         "build": lock.get("build"),
+        "toolchain": lock.get("toolchain"),
         "patches": [],
     }
     for key in (
@@ -373,6 +357,7 @@ def load_lock(
         _source_pin(provenance.get(component), f"baseProvenance.{component}")
     build = _require_mapping(lock.get("build"), "build")
     _source_pin(build.get("nixpkgs"), "build.nixpkgs")
+    _validate_toolchain(lock.get("toolchain"))
 
     resolved = {
         name: _resolve_target(lock, name, overrides)
@@ -408,14 +393,20 @@ def load_lock(
         patch = _require_mapping(value, context)
         patch_id = _require_string(patch, "id", context)
         component = _require_string(patch, "component", context)
-        family = _require_string(patch, "family", context)
+        number = patch.get("number")
+        if not isinstance(number, int) or isinstance(number, bool) or number < 1:
+            raise LockError(f"{context}.number must be a positive integer")
+        gate = patch.get("gate")
+        if gate is not None and not isinstance(gate, str):
+            raise LockError(f"{context}.gate must be a string or null")
+        default = patch.get("default")
+        if not isinstance(default, bool):
+            raise LockError(f"{context}.default must be a boolean")
         relative = _require_string(patch, "path", context)
         expected = _require_string(patch, "sha256", context)
         if patch_id in seen_ids:
             raise LockError(f"duplicate patch id: {patch_id}")
         seen_ids.add(patch_id)
-        if family not in PATCH_FAMILIES:
-            raise LockError(f"unknown patch family: {family}")
         names = _patch_targets(patch, targets, context)
         for name in names:
             if component not in resolved[name]["sources"]:
@@ -425,7 +416,7 @@ def load_lock(
                 )
         if HASH_PATTERN.fullmatch(expected) is None:
             raise LockError(f"patch {patch_id} has an invalid SHA-256 hash")
-        actual = _sha256_file(_contained_file(repository_root, relative))
+        actual = sha256(_contained_file(repository_root, relative))
         if actual != expected:
             raise LockError(f"patch {patch_id} hash mismatch: {actual} != {expected}")
         applicability[patch_id] = names
@@ -439,29 +430,18 @@ def load_lock(
     return resolved[selected]
 
 
-def patches_for_stage(lock: dict[str, Any], stage: str) -> list[dict[str, Any]]:
-    if stage not in STAGES:
-        raise LockError(f"unknown stage {stage!r}; expected one of {', '.join(STAGES)}")
-    if stage == "base":
-        return []
-    if stage == "combined":
-        return list(lock["patches"])
-    return [patch for patch in lock["patches"] if patch["family"] == stage]
-
-
 def _run(*command: str, cwd: Path | None = None) -> None:
     subprocess.run(command, cwd=cwd, check=True)
 
 
-def source_directory(component: str, stage: str, lock: dict[str, Any]) -> str:
-    """Name a prepared source directory. The default target keeps the legacy name."""
+def source_directory(component: str, lock: dict[str, Any]) -> str:
+    """Name a prepared source directory. The default target adds no suffix."""
 
     target = "" if lock["target"] == lock["defaultTarget"] else f"-{lock['target']}"
-    return f"{component}{target}-{stage}"
+    return f"{component}{target}"
 
 
 def prepare(
-    stage: str,
     destination_root: Path = BUILD_ROOT / "sources",
     *,
     target: str | None = None,
@@ -473,21 +453,21 @@ def prepare(
         raise LockError(
             f"the {lock['target']} target is built externally; use the arm64 wrapper"
         )
-    selected = patches_for_stage(lock, stage)
+    selected = list(lock["patches"])
     declared = {patch["id"] for patch in lock["patches"]}
     unknown = sorted(set(skip_patches) - declared)
     if unknown:
         raise LockError(f"unknown patch to skip: {', '.join(unknown)}")
     components = {patch["component"] for patch in selected}
-    if stage == "base" or all_sources:
+    if all_sources:
         components = set(lock["sources"])
     for component in sorted(components):
         source = lock["sources"][component]
-        destination = destination_root / source_directory(component, stage, lock)
+        destination = destination_root / source_directory(component, lock)
         if destination.exists():
             raise LockError(f"source destination already exists: {destination}")
         destination.parent.mkdir(parents=True, exist_ok=True)
-        info(f"Preparing {component} source for the {stage} stage")
+        info(f"Preparing {component} source")
         _run(
             "git",
             "clone",
@@ -520,7 +500,7 @@ def fetch_base(*, target: str | None = None) -> Path:
     downloads.mkdir(parents=True, exist_ok=True)
     destination = downloads / "Libraries.tar.gz"
     partial = downloads / "Libraries.tar.gz.part"
-    if destination.is_file() and _sha256_file(destination) == artifact["sha256"]:
+    if destination.is_file() and sha256(destination) == artifact["sha256"]:
         success("Using verified base runtime archive from the local cache")
         return destination
     info("Downloading the pinned base runtime archive")
@@ -539,7 +519,7 @@ def fetch_base(*, target: str | None = None) -> Path:
                 progress.update(current)
         finally:
             progress.finish()
-    actual = _sha256_file(partial)
+    actual = sha256(partial)
     if actual != artifact["sha256"]:
         raise LockError(
             f"base artifact hash mismatch: {actual} != {artifact['sha256']}"
@@ -555,13 +535,13 @@ def main() -> int:
     validate_parser = subparsers.add_parser("validate-lock")
     validate_parser.add_argument("--target")
     prepare_parser = subparsers.add_parser("prepare")
-    prepare_parser.add_argument("stage", choices=STAGES)
+
     prepare_parser.add_argument("--destination-root", type=Path)
     prepare_parser.add_argument("--target")
     prepare_parser.add_argument(
         "--all-sources",
         action="store_true",
-        help="clone every source of the target, not only the ones the stage patches",
+        help="clone every source of the target, not only the ones the patches change",
     )
     prepare_parser.add_argument(
         "--skip-patch",
@@ -582,7 +562,6 @@ def main() -> int:
                 success(f"Validated runtime.lock.json for the {lock['target']} target")
         elif arguments.command == "prepare":
             prepare(
-                arguments.stage,
                 arguments.destination_root or BUILD_ROOT / "sources",
                 target=arguments.target,
                 all_sources=arguments.all_sources,

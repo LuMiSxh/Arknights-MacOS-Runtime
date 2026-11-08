@@ -50,7 +50,7 @@ index b0335f4..b946e18 100644
 +}
 +
  #define TIMEOUT_INFINITE _I64_MAX
-@@ -2767,6 +2767,81 @@ INT WINAPI WSAIoctl(SOCKET s, DWORD code, LPVOID in_buff, DWORD in_size, LPVOID
+@@ -2767,6 +2806,81 @@ INT WINAPI WSAIoctl(SOCKET s, DWORD code, LPVOID in_buff, DWORD in_size, LPVOID
          return ret ? -1 : 0;
      }
 

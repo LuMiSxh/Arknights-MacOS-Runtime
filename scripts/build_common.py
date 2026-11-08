@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -24,7 +25,31 @@ else:
 ROOT = Path(__file__).resolve().parents[1]
 
 
-RUNTIME_CLI = ROOT / "scripts" / "runtime.py"
+WINE_PREFIX = "/opt/whiskywine"
+
+
+WINE_CONFIGURE_FLAGS = (
+    "--without-ffmpeg",
+    "--without-gstreamer",
+    "--without-x",
+    "--without-wayland",
+    "--without-oss",
+    "--without-alsa",
+    "--without-pulse",
+    "--without-sane",
+    "--without-usb",
+    "--without-v4l2",
+    "--without-pcap",
+    "--without-capi",
+    "--without-opencl",
+    "--without-cups",
+)
+
+
+NATIVE_ARM64_TARGET = "native-arm64"
+
+
+WINE_BUILD_NEW_REPOSITORY = "https://github.com/riverfog7/wine-build-new"
 
 
 VALIDATE_CLI = ROOT / "scripts" / "validate_runtime.py"
@@ -42,16 +67,20 @@ ARCHIVE_BUNDLED_LIBRARIES = ("libfreetype.6.dylib", "libgnutls.30.dylib")
 MACHO_MAGIC = (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe")
 
 
+MACHO_SUFFIXES = (".so", ".dylib")
+
+
+LOADER_RPATH = "@loader_path/../../"
+
+
 CLEARED_DOS_STUB = bytes.fromhex("0e1fba0e00b409cd21b8014ccd219090")
-
-
-LOADER_SDK_VERSION = "12.0"
 
 
 HOST_BUILD_VARIABLES = (
     "CFLAGS",
     "CXXFLAGS",
     "CPPFLAGS",
+    "CROSSCFLAGS",
     "LDFLAGS",
     "OBJCFLAGS",
     "CC",
@@ -60,6 +89,11 @@ HOST_BUILD_VARIABLES = (
     "SDKROOT",
     "MACOSX_DEPLOYMENT_TARGET",
 )
+
+
+# Set this to a launcher command, for example `ccache`, to route the Meson
+# cross-compilers of a build lane through a compiler cache.
+CCACHE_ENVIRONMENT_VARIABLE = "LMISXH_AKMOCL_CCACHE"
 
 
 NIX_STORE = "/nix/store/"
@@ -134,9 +168,11 @@ class Builder:
             text=True,
         )
         if result.returncode != 0 and not allow_failure:
-            raise BuildError(
-                f"command failed: {' '.join(str(part) for part in command)}"
-            )
+            message = f"command failed: {' '.join(str(part) for part in command)}"
+            tail = result.stderr.strip().splitlines()[-20:]
+            if tail:
+                message = f"{message}\n{'\n'.join(tail)}"
+            raise BuildError(message)
         return result.stdout
 
     def require(self, *names: str) -> None:
@@ -194,11 +230,21 @@ def clone_tree(source: Path, destination: Path) -> None:
 
     result = subprocess.run(
         ["cp", "-cR", str(source), str(destination)],
-        capture_output=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
         check=False,
     )
-    if result.returncode != 0:
+    if result.returncode == 0:
+        return
+    if destination.is_symlink() or not destination.is_dir():
+        destination.unlink(missing_ok=True)
+    else:
+        shutil.rmtree(destination)
+    try:
         shutil.copytree(source, destination, symlinks=True)
+    except OSError as failure:
+        stderr = result.stderr.decode(errors="replace").strip()
+        raise BuildError(f"cannot copy {source}: {failure}\ncp: {stderr}") from failure
 
 
 def logical_cpu_count() -> str:
@@ -218,11 +264,16 @@ def is_macho(path: Path) -> bool:
         return False
 
 
-def sign_directory(builder: Builder, directory: Path) -> None:
-    for path in sorted(directory.rglob("*")):
-        if path.is_symlink() or not path.is_file() or not is_macho(path):
-            continue
-        builder.run("codesign", "--force", "--sign", "-", path)
+def clear_dos_stub(path: Path) -> None:
+    """Blank the DOS stub of a PE so the loader skips it."""
+
+    with path.open("r+b") as file:
+        file.seek(64)
+        file.write(CLEARED_DOS_STUB)
+
+
+def adhoc_sign(builder: Builder, path: Path) -> None:
+    builder.run("codesign", "--force", "--sign", "-", path)
 
 
 def references_in(builder: Builder, binary: Path, prefix: str) -> list[str]:
@@ -234,7 +285,12 @@ def references_in(builder: Builder, binary: Path, prefix: str) -> list[str]:
     return references
 
 
-def nix_build(builder: Builder, attribute: str) -> Path | None:
+def ensure_loader_rpath(builder: Builder, binary: Path) -> None:
+    if LOADER_RPATH not in builder.capture("otool", "-l", binary):
+        builder.run("install_name_tool", "-add_rpath", LOADER_RPATH, binary)
+
+
+def nix_build(builder: Builder, attribute: str) -> Path:
     output = builder.capture(
         "nix",
         "--extra-experimental-features",
@@ -243,9 +299,10 @@ def nix_build(builder: Builder, attribute: str) -> Path | None:
         "--no-link",
         "--print-out-paths",
         attribute,
-        allow_failure=True,
     ).strip()
-    return Path(output) if output else None
+    if not output:
+        raise BuildError(f"nix build produced no output for {attribute}")
+    return Path(output)
 
 
 def nix_package_outputs(
@@ -256,12 +313,12 @@ def nix_package_outputs(
     outputs: list[Path] = []
     for package in packages:
         for output_name in ("dev", "out", "lib"):
-            output = nix_build(
-                builder,
-                f"{nixpkgs}#legacyPackages.{system}.{package}.{output_name}",
+            outputs.append(
+                nix_build(
+                    builder,
+                    f"{nixpkgs}#legacyPackages.{system}.{package}.{output_name}",
+                )
             )
-            if output is not None:
-                outputs.append(output)
     return outputs
 
 
@@ -292,7 +349,7 @@ def fix_release_macho(builder: Builder, directory: Path, binary: Path) -> None:
                 f"@loader_path/{relative}/{name}",
                 binary,
             )
-    builder.run("codesign", "--force", "--sign", "-", binary)
+    adhoc_sign(builder, binary)
 
 
 def write_dxmt_native_file(root: Path, deployment: str) -> Path:
@@ -308,6 +365,35 @@ def write_dxmt_native_file(root: Path, deployment: str) -> Path:
         f"cpp_link_args = {flags}\n",
         encoding="utf-8",
     )
+    return path
+
+
+def compiler_launcher(environment: dict[str, str]) -> tuple[str, ...]:
+    """Return the opt-in compiler launcher prefix of the build environment."""
+
+    value = environment.get(CCACHE_ENVIRONMENT_VARIABLE, "").strip()
+    return tuple(value.split()) if value else ()
+
+
+def write_compiler_launcher_cross_file(
+    directory: Path, compilers: dict[str, str], environment: dict[str, str]
+) -> Path | None:
+    """Write a Meson cross-file that routes compilers through the launcher.
+
+    The lane passes the file after the upstream cross-file, so Meson prefers
+    these compiler entries. The function returns None when no launcher is set,
+    which keeps local builds unchanged.
+    """
+
+    launcher = compiler_launcher(environment)
+    if not launcher:
+        return None
+    lines = ["[binaries]"]
+    for language, compiler in compilers.items():
+        parts = ", ".join(f"'{part}'" for part in (*launcher, compiler))
+        lines.append(f"{language} = [{parts}]")
+    path = directory / "compiler-launcher.ini"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
 
 
@@ -336,30 +422,41 @@ def bundle_nix_libraries(
     """
 
     directory = candidate / "Wine" / "lib"
-    inventory: list[str] = []
-    queue = [
+    inventory: set[str] = set()
+    queue = deque(
         output / "lib" / name
         for output in outputs
         for name in ARCHIVE_BUNDLED_LIBRARIES
         if (output / "lib" / name).is_file()
-    ]
+    )
     for module in sorted((directory / "wine").glob("*-unix/*.so")):
         queue.extend(
             Path(reference) for reference in references_in(builder, module, NIX_STORE)
         )
 
+    copied: dict[str, Path] = {}
+    seen: set[Path] = set()
     while queue:
-        reference = queue.pop(0)
+        reference = queue.popleft()
+        if reference in seen:
+            continue
+        seen.add(reference)
         name = reference.name
+        if name in copied:
+            if copied[name] != reference:
+                raise BuildError(
+                    f"library name collision: {name} from "
+                    f"{copied[name]} and {reference}"
+                )
+            continue
         if (directory / name).exists():
             continue
         shutil.copy2(reference, directory / name)
         destination = directory / name
         destination.chmod(0o644)
+        copied[name] = reference
         if reference.as_posix().startswith(NIX_STORE):
-            inventory.append(
-                NIX_STORE + reference.as_posix().split(NIX_STORE, 1)[1].split("/", 1)[0]
-            )
+            inventory.add(str(Path(*reference.parts[:4])))
         queue.extend(
             Path(next_reference)
             for next_reference in references_in(builder, destination, NIX_STORE)
@@ -373,9 +470,6 @@ def bundle_nix_libraries(
     link.unlink(missing_ok=True)
     link.symlink_to("libfreetype.6.dylib")
     for binary in sorted((directory / "wine").glob("*-unix/*.so")):
-        if "@loader_path/../../" not in builder.capture("otool", "-l", binary):
-            builder.run(
-                "install_name_tool", "-add_rpath", "@loader_path/../../", binary
-            )
-        builder.run("codesign", "--force", "--sign", "-", binary)
-    return sorted(set(inventory))
+        ensure_loader_rpath(builder, binary)
+        adhoc_sign(builder, binary)
+    return sorted(inventory)
