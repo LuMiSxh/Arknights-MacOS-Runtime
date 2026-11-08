@@ -7,6 +7,7 @@ import pytest
 from scripts.arm64.build_dxmt import (
     LC_BUILD_VERSION,
     LC_VERSION_MIN_MACOSX,
+    MINIMAL_WINE_TARGETS,
     deployment_target,
     macho_minimum_macos,
     meson_setup_command,
@@ -14,6 +15,7 @@ from scripts.arm64.build_dxmt import (
     reject_macho_above,
     stage_winemac_so,
     verify_dxmt_install,
+    verify_minimal_wine_outputs,
 )
 from scripts.build_common import BuildError
 
@@ -82,6 +84,19 @@ def test_verify_dxmt_install_requires_every_payload(tmp_path):
     (install / names[-1]).unlink()
     with pytest.raises(BuildError, match="winemetal.dll"):
         verify_dxmt_install(install)
+
+
+def test_verify_minimal_wine_outputs_requires_every_target(tmp_path):
+    for relative in MINIMAL_WINE_TARGETS:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"payload")
+
+    verify_minimal_wine_outputs(tmp_path)
+
+    (tmp_path / MINIMAL_WINE_TARGETS[-1]).unlink()
+    with pytest.raises(BuildError, match="ntdll.so"):
+        verify_minimal_wine_outputs(tmp_path)
 
 
 def test_stage_winemac_so_links_the_external_unixlib(tmp_path):
