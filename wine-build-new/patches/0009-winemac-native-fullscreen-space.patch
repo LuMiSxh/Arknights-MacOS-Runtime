@@ -1,5 +1,5 @@
 diff --git a/dlls/winemac.drv/cocoa_app.h b/dlls/winemac.drv/cocoa_app.h
-index 088304e..f19ff07 100644
+index 088304e..5f600b0 100644
 --- a/dlls/winemac.drv/cocoa_app.h
 +++ b/dlls/winemac.drv/cocoa_app.h
 @@ -23,6 +23,8 @@
@@ -11,21 +11,22 @@ index 088304e..f19ff07 100644
 
  /* Internal notification sent on NSApp for display configuration changes. The
     userInfo contains the two keys, NSNumbers for the effected CGDirectDisplayID
-@@ -112,6 +114,7 @@ @interface WineApplicationController : NSObject <NSApplicationDelegate>
-
+@@ -112,6 +114,8 @@ enum {
+ 
      + (WineApplicationController*) sharedController;
-
+ 
 +    - (void) reassertCursorClipping;
++    - (CGFloat) nativeSpaceMouseOffset;
      - (void) transformProcessToForeground:(BOOL)activateIfTransformed;
      - (void) tryToActivateIgnoringOtherApps:(BOOL)ignore;
 
-@@ -157,3 +160,4 @@ @interface WineApplication : NSApplication
+@@ -157,3 +161,4 @@ void OnMainThreadAsync(dispatch_block_t block);
 
  void LogError(const char* func, NSString* format, ...);
  void LogErrorv(const char* func, NSString* format, va_list args);
 +void LogMessage(const char* cls, const char* func, NSString* format, ...);
 diff --git a/dlls/winemac.drv/cocoa_app.m b/dlls/winemac.drv/cocoa_app.m
-index 2c743ab..1f90831 100644
+index 2c743ab..e847177 100644
 --- a/dlls/winemac.drv/cocoa_app.m
 +++ b/dlls/winemac.drv/cocoa_app.m
 @@ -42,6 +42,8 @@
@@ -37,7 +38,7 @@ index 2c743ab..1f90831 100644
 
 
  #if !defined(MAC_OS_VERSION_14_0) || MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_VERSION_14_0
-@@ -1245,6 +1247,17 @@ - (BOOL) stopClippingCursor
+@@ -1245,6 +1247,35 @@ - (BOOL) stopClippingCursor
          return TRUE;
      }
 
@@ -52,10 +53,52 @@ index 2c743ab..1f90831 100644
 +            WARN(@"failed to reapply the cursor confinement rect\n");
 +    }
 +
++    /* Offset of the window that is in a native Space below a camera housing
++       (see -[WineWindow updateNativeSpaceMouseOffset]).  The cursor APIs name no
++       window, so use the key window, else the first window with an offset. */
++    - (CGFloat) nativeSpaceMouseOffset
++    {
++        NSWindow* window = [NSApp keyWindow];
++
++        if ([window isKindOfClass:[WineWindow class]] && ((WineWindow*)window).nativeSpaceMouseOffset > 0)
++            return ((WineWindow*)window).nativeSpaceMouseOffset;
++
++        for (window in [NSApp windows])
++        {
++            if ([window isKindOfClass:[WineWindow class]] && ((WineWindow*)window).nativeSpaceMouseOffset > 0)
++                return ((WineWindow*)window).nativeSpaceMouseOffset;
++        }
++        return 0;
++    }
++
      - (BOOL) clippingCursor
      {
          return clipCursorHandler.clippingCursor;
-@@ -2462,6 +2475,22 @@ void LogErrorv(const char* func, NSString* format, va_list args)
+@@ -1426,6 +1457,7 @@ - (void) handleMouseMove:(NSEvent*)anEvent
+             {
+                 if (self.clippingCursor)
+                     [clipCursorHandler clipCursorLocation:&point];
++                point.y -= targetWindow.nativeSpaceMouseOffset;
+                 point = cgpoint_win_from_mac(point);
+                 flags |= MOUSEEVENTF_ABSOLUTE;
+
+@@ -1559,6 +1591,7 @@ - (void) handleMouseButton:(NSEvent*)theEvent
+             {
+                 unsigned int button = [theEvent buttonNumber], flags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE, data = 0;
+                 unsigned long time_ms = [self ticksForEventTime:[theEvent timestamp]];
++                pt.y -= ((WineWindow*)window).nativeSpaceMouseOffset;
+                 pt = cgpoint_win_from_mac(pt);
+
+                 if (pressed)
+@@ -1661,6 +1694,7 @@ - (void) handleScrollWheel:(NSEvent*)theEvent
+                 double x, y;
+                 BOOL continuous = FALSE;
+
++                pt.y -= ((WineWindow*)window).nativeSpaceMouseOffset;
+                 pt = cgpoint_win_from_mac(pt);
+
+                 if (CGEventGetIntegerValueField(cgevent, kCGScrollWheelEventIsContinuous))
+@@ -2462,6 +2496,22 @@ void LogErrorv(const char* func, NSString* format, va_list args)
  }
  }
 
@@ -78,11 +121,44 @@ index 2c743ab..1f90831 100644
  /***********************************************************************
   *              macdrv_window_rejected_focus
   *
+@@ -2593,6 +2643,7 @@ int macdrv_get_cursor_position(CGPoint *pos)
+     OnMainThread(^{
+         NSPoint location = [NSEvent mouseLocation];
+         location = [[WineApplicationController sharedController] flippedMouseLocation:location];
++        location.y -= [[WineApplicationController sharedController] nativeSpaceMouseOffset];
+         *pos = cgpoint_win_from_mac(NSPointToCGPoint(location));
+     });
+
+@@ -2610,7 +2661,11 @@ int macdrv_set_cursor_position(CGPoint pos)
+     __block int ret;
+
+     OnMainThread(^{
+-        ret = [[WineApplicationController sharedController] setCursorPosition:cgpoint_mac_from_win(pos)];
++        WineApplicationController* controller = [WineApplicationController sharedController];
++        CGPoint macpos = cgpoint_mac_from_win(pos);
++
++        macpos.y += [controller nativeSpaceMouseOffset];
++        ret = [controller setCursorPosition:macpos];
+     });
+
+     return ret;
+@@ -2655,7 +2710,11 @@ int macdrv_clip_cursor(CGRect r)
+         }
+
+         if (clipping)
++        {
++            /* The decision above uses Wine's rect.  The rect itself is in screen points. */
++            rect.origin.y += [controller nativeSpaceMouseOffset];
+             ret = [controller startClippingCursor:rect];
++        }
+         else
+             ret = [controller stopClippingCursor];
+     });
 diff --git a/dlls/winemac.drv/cocoa_window.h b/dlls/winemac.drv/cocoa_window.h
-index 4d573c9..a44091f 100644
+index 4d573c9..a4d215d 100644
 --- a/dlls/winemac.drv/cocoa_window.h
 +++ b/dlls/winemac.drv/cocoa_window.h
-@@ -68,6 +68,20 @@
+@@ -68,6 +68,21 @@
      NSRect nonFullscreenFrame;
      NSTimeInterval enteredFullScreenTime;
 
@@ -98,13 +174,22 @@ index 4d573c9..a44091f 100644
 +    NSRect lastWineContentRect;
 +    NSRect spaceRepostRect;
 +    int spaceRepostCount;
-+    BOOL spaceRepostPending;
++    NSRect nativeSpaceWineRect;
++    CGFloat nativeSpaceMouseOffset;
 +
      int draggingPhase;
      NSPoint dragStartPosition;
      NSPoint dragWindowStartPosition;
+@@ -96,6 +111,7 @@
+    the user on-screen. That means it has a non-zero size and is not empty-
+    shaped, or has a child window that meets those criteria. */
+ @property (readonly, nonatomic) BOOL presentsVisibleContent;
++@property (readonly, nonatomic) CGFloat nativeSpaceMouseOffset;
+
+     - (NSInteger) minimumLevelForActive:(BOOL)active;
+     - (void) updateFullscreen;
 diff --git a/dlls/winemac.drv/cocoa_window.m b/dlls/winemac.drv/cocoa_window.m
-index 9f16932..a6ae3cf 100644
+index 9f16932..4245e87 100644
 --- a/dlls/winemac.drv/cocoa_window.m
 +++ b/dlls/winemac.drv/cocoa_window.m
 @@ -348,6 +348,16 @@ - (BOOL) mouseDownCanMoveWindow
@@ -124,7 +209,15 @@ index 9f16932..a6ae3cf 100644
      - (NSFocusRingType) focusRingType
      {
          return NSFocusRingTypeNone;
-@@ -946,6 +956,9 @@ + (WineWindow*) createWindowWithFeatures:(const struct macdrv_window_features*)w
+@@ -925,6 +935,7 @@ @implementation WineWindow
+     @synthesize shapeChangedSinceLastDraw;
+     @synthesize usePerPixelAlpha;
+     @synthesize himc, commandDone;
++    @synthesize nativeSpaceMouseOffset;
+     @synthesize contentViewMaskLayer;
+
+     + (WineWindow*) createWindowWithFeatures:(const struct macdrv_window_features*)wf
+@@ -946,6 +957,9 @@ + (WineWindow*) createWindowWithFeatures:(const struct macdrv_window_features*)w
 
          if (!window) return nil;
 
@@ -134,7 +227,7 @@ index 9f16932..a6ae3cf 100644
          /* Standardize windows to eliminate differences between titled and
             borderless windows and between NSWindow and NSPanel. */
          [window setHidesOnDeactivate:NO];
-@@ -1061,12 +1074,57 @@ - (void) adjustFeaturesForState
+@@ -1061,12 +1075,57 @@ - (void) adjustFeaturesForState
              [self setMovable:[self allowsMovingWithMaximized:maximized]];
      }
 
@@ -194,7 +287,7 @@ index 9f16932..a6ae3cf 100644
              !(self.parentWindow || self.latentParentWindow))
          {
              behavior |= NSWindowCollectionBehaviorFullScreenPrimary;
-@@ -1076,7 +1134,7 @@ - (void) adjustFullScreenBehavior:(NSWindowCollectionBehavior)behavior
+@@ -1076,7 +1135,7 @@ - (void) adjustFullScreenBehavior:(NSWindowCollectionBehavior)behavior
          {
              behavior &= ~NSWindowCollectionBehaviorFullScreenPrimary;
              behavior |= NSWindowCollectionBehaviorFullScreenAuxiliary;
@@ -203,7 +296,7 @@ index 9f16932..a6ae3cf 100644
                  [super toggleFullScreen:nil];
          }
 
-@@ -1093,14 +1151,44 @@ - (void) adjustFullScreenBehavior:(NSWindowCollectionBehavior)behavior
+@@ -1093,14 +1152,44 @@ - (void) adjustFullScreenBehavior:(NSWindowCollectionBehavior)behavior
          }
      }
 
@@ -248,7 +341,7 @@ index 9f16932..a6ae3cf 100644
          self.preventsAppActivation = wf->prevents_app_activation;
 
          if (newStyle != currentStyle)
-@@ -1141,6 +1229,9 @@ - (void) setWindowFeatures:(const struct macdrv_window_features*)wf
+@@ -1141,6 +1230,9 @@ - (void) setWindowFeatures:(const struct macdrv_window_features*)wf
                  [self setTitle:title];
          }
 
@@ -258,7 +351,7 @@ index 9f16932..a6ae3cf 100644
          resizable = wf->resizable;
          [self adjustFeaturesForState];
          [self setHasShadow:wf->shadow];
-@@ -1758,6 +1849,8 @@ - (void) orderBelow:(WineWindow*)prev orAbove:(WineWindow*)next activate:(BOOL)a
+@@ -1758,6 +1850,8 @@ - (void) orderBelow:(WineWindow*)prev orAbove:(WineWindow*)next activate:(BOOL)a
                 it if nothing actually changed. */
              [self windowDidResize:nil skipSizeMove:TRUE];
 
@@ -267,7 +360,7 @@ index 9f16932..a6ae3cf 100644
              if (![self isExcludedFromWindowsMenu])
                  [NSApp addWindowsItem:self title:[self title] filename:NO];
          }
-@@ -1787,6 +1880,14 @@ - (void) doOrderOut
+@@ -1787,6 +1881,14 @@ - (void) doOrderOut
 
          pendingOrderOut = FALSE;
 
@@ -282,7 +375,7 @@ index 9f16932..a6ae3cf 100644
          if ([self isMiniaturized])
              pendingMinimize = TRUE;
 
-@@ -1836,6 +1937,145 @@ - (void) updateFullscreen
+@@ -1836,6 +1938,155 @@ - (void) updateFullscreen
 
              [controller adjustWindowLevels];
          }
@@ -360,20 +453,11 @@ index 9f16932..a6ae3cf 100644
 +                if ([self isOrderedIn])
 +                    [self windowDidResize:nil skipSizeMove:TRUE];
 +            }
-+            else
++            else if (spaceRepostCount == 2)
 +            {
-+                /* A window that answers every resize with the same request would
-+                 * loop forever.  Stop answering at once, but report the actual
-+                 * frame when the requests stop: Wine now holds the requested rect
-+                 * and must not keep it, or its mouse origin is off by the height
-+                 * of the camera housing. */
-+                if (spaceRepostCount == 2)
-+                {
-+                    spaceRepostCount++;
-+                    WARN(@"window %p keeps requesting content rect %@ in a Space, reposting its frame later\n",
-+                         hwnd, NSStringFromRect(contentRect));
-+                }
-+                [self scheduleSpaceFrameReport];
++                spaceRepostCount++;
++                WARN(@"window %p keeps requesting content rect %@ in a Space, not reposting its frame again\n",
++                     hwnd, NSStringFromRect(contentRect));
 +            }
 +            return TRUE;
 +        }
@@ -386,28 +470,47 @@ index 9f16932..a6ae3cf 100644
 +        return TRUE;
 +    }
 +
-+    /* Reports the actual frame of the window to Wine once the requests of Wine
-+       have stopped for a moment.  Further requests share the pending report. */
-+    - (void) scheduleSpaceFrameReport
++    /* On a Mac with a camera housing, the Space frame sits below the housing
++       while Wine keeps the full monitor rect.  The client area is drawn from
++       the top of the window, so it appears this many points lower than Wine
++       thinks.  Mouse positions are screen points: the pointer APIs subtract
++       this offset on the way to Wine and add it on the way back.  Zero unless
++       the window shows Wine's rect moved straight down below a housing. */
++    - (void) updateNativeSpaceMouseOffset
 +    {
-+        if (spaceRepostPending)
-+            return;
++        CGFloat offset = 0, inset = 0;
++        NSRect wineRect = nativeSpaceWineRect;
++        NSRect actualRect = NSZeroRect;
 +
-+        spaceRepostPending = TRUE;
-+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 100 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-+            spaceRepostPending = FALSE;
-+            if (([self styleMask] & NSWindowStyleMaskFullScreen) && [self isOrderedIn])
-+            {
-+                TRACE(@"window %p is in a Space, reposting its frame after repeated requests\n", hwnd);
-+                [self windowDidResize:nil skipSizeMove:TRUE];
-+            }
-+        });
++        if (native_fullscreen_space && ([self styleMask] & NSWindowStyleMaskFullScreen) &&
++            !enteringFullScreen && !exitingFullScreen && !NSIsEmptyRect(wineRect))
++        {
++            CGFloat delta;
++
++            actualRect = [self contentRectForFrameRect:[self frame]];
++            if (@available(macOS 12.0, *))
++                inset = [[self screen] safeAreaInsets].top;
++            delta = NSMaxY(wineRect) - NSMaxY(actualRect);
++            if (inset > 0 && delta > 0 &&
++                fabs(NSMinX(wineRect) - NSMinX(actualRect)) < 0.5 &&
++                fabs(NSWidth(wineRect) - NSWidth(actualRect)) < 0.5 &&
++                fabs(NSHeight(wineRect) - NSHeight(actualRect)) < 0.5)
++                offset = delta;
++        }
++
++        if (offset != nativeSpaceMouseOffset)
++        {
++            nativeSpaceMouseOffset = offset;
++            WARN(@"window %p native Space mouse offset %g (wine %@ actual %@ inset %g)\n",
++                 hwnd, offset, NSStringFromRect(wineRect), NSStringFromRect(actualRect), inset);
++        }
 +    }
 +
 +    - (void) finishNativeSpaceTransition
 +    {
 +        NSRect contentRect = lastWineContentRect;
 +
++        [self updateNativeSpaceMouseOffset];
 +        [[WineApplicationController sharedController] reassertCursorClipping];
 +
 +        /* Every Space starts with a new repost budget. */
@@ -428,7 +531,19 @@ index 9f16932..a6ae3cf 100644
      }
 
      - (void) setFrameAndWineFrame:(NSRect)frame
-@@ -1876,6 +2079,10 @@ - (void) setFrameFromWine:(NSRect)contentRect
+@@ -1870,12 +2121,22 @@ - (void) setFrameFromWine:(NSRect)contentRect
+            (left, bottom) in a bottom-up space. */
+         [[WineApplicationController sharedController] flipRect:&contentRect];
+
++        if (native_fullscreen_space && !NSIsEmptyRect(contentRect))
++        {
++            nativeSpaceWineRect = contentRect;
++            [self updateNativeSpaceMouseOffset];
++        }
++
+         /* The back end is establishing a new window size and position.  It's
+            not interested in any stale events regarding those that may be sitting
+            in the queue. */
          [queue discardEventsMatchingMask:event_mask_for_type(WINDOW_FRAME_CHANGED)
                                 forWindow:self];
 
@@ -439,7 +554,20 @@ index 9f16932..a6ae3cf 100644
          if (!NSIsEmptyRect(contentRect))
          {
              NSRect frame, oldFrame;
-@@ -2496,6 +2703,14 @@ - (void) miniaturize:(id)sender
+@@ -2111,6 +2372,12 @@ - (void) postWindowFrameChanged:(NSRect)frame fullscreen:(BOOL)isFullscreen resi
+         else
+             style &= ~NSWindowStyleMaskFullScreen;
+         frame = [[self class] contentRectForFrameRect:frame styleMask:style];
++        if (native_fullscreen_space)
++        {
++            /* Wine adopts the reported rect. */
++            nativeSpaceWineRect = frame;
++            [self updateNativeSpaceMouseOffset];
++        }
+         [[WineApplicationController sharedController] flipRect:&frame];
+
+         /* Coalesce events by discarding any previous ones still in the queue. */
+@@ -2496,6 +2763,14 @@ - (void) miniaturize:(id)sender
 
      - (void) toggleFullScreen:(id)sender
      {
@@ -454,7 +582,7 @@ index 9f16932..a6ae3cf 100644
          if (!self.disabled && !maximized)
              [super toggleFullScreen:sender];
      }
-@@ -2717,6 +2932,9 @@ - (NSSize) window:(NSWindow*)window willUseFullScreenContentSize:(NSSize)propose
+@@ -2717,6 +2992,9 @@ - (NSSize) window:(NSWindow*)window willUseFullScreenContentSize:(NSSize)propose
          macdrv_query* query;
          NSSize size;
 
@@ -464,7 +592,7 @@ index 9f16932..a6ae3cf 100644
          query = macdrv_create_query();
          query->type = QUERY_MIN_MAX_INFO;
          query->window = [self retain];
-@@ -2785,6 +3003,12 @@ - (void) windowDidEnterFullScreen:(NSNotification*)notification
+@@ -2785,6 +3063,12 @@ - (void) windowDidEnterFullScreen:(NSNotification*)notification
      {
          enteringFullScreen = FALSE;
          enteredFullScreenTime = [[NSProcessInfo processInfo] systemUptime];
@@ -477,7 +605,7 @@ index 9f16932..a6ae3cf 100644
          if (pendingOrderOut)
              [self doOrderOut];
      }
-@@ -2794,6 +3018,14 @@ - (void) windowDidExitFullScreen:(NSNotification*)notification
+@@ -2794,6 +3078,14 @@ - (void) windowDidExitFullScreen:(NSNotification*)notification
          exitingFullScreen = FALSE;
          [self setFrameAndWineFrame:nonFullscreenFrame];
          [self windowDidResize:nil];
@@ -492,7 +620,7 @@ index 9f16932..a6ae3cf 100644
          if (pendingOrderOut)
              [self doOrderOut];
      }
-@@ -2802,6 +3034,12 @@ - (void) windowDidFailToEnterFullScreen:(NSWindow*)window
+@@ -2802,6 +3094,12 @@ - (void) windowDidFailToEnterFullScreen:(NSWindow*)window
      {
          enteringFullScreen = FALSE;
          enteredFullScreenTime = 0;
@@ -505,7 +633,7 @@ index 9f16932..a6ae3cf 100644
          if (pendingOrderOut)
              [self doOrderOut];
      }
-@@ -2810,6 +3048,12 @@ - (void) windowDidFailToExitFullScreen:(NSWindow*)window
+@@ -2810,6 +3108,12 @@ - (void) windowDidFailToExitFullScreen:(NSWindow*)window
      {
          exitingFullScreen = FALSE;
          [self windowDidResize:nil];
@@ -518,7 +646,7 @@ index 9f16932..a6ae3cf 100644
          if (pendingOrderOut)
              [self doOrderOut];
      }
-@@ -2880,6 +3124,9 @@ - (void)windowDidResize:(NSNotification *)notification
+@@ -2880,6 +3184,9 @@ - (void)windowDidResize:(NSNotification *)notification
 
      - (BOOL)windowShouldClose:(id)sender
      {
@@ -528,6 +656,20 @@ index 9f16932..a6ae3cf 100644
          macdrv_event* event = macdrv_create_event(WINDOW_CLOSE_REQUESTED, self);
          [queue postEvent:event];
          macdrv_release_event(event);
+@@ -2929,11 +3236,13 @@ - (void) windowWillEnterFullScreen:(NSNotification*)notification
+     {
+         enteringFullScreen = TRUE;
+         nonFullscreenFrame = self.wine_fractionalFrame;
++        [self updateNativeSpaceMouseOffset];
+     }
+
+     - (void) windowWillExitFullScreen:(NSNotification*)notification
+     {
+         exitingFullScreen = TRUE;
++        [self updateNativeSpaceMouseOffset];
+         [self postWindowFrameChanged:nonFullscreenFrame fullscreen:FALSE resizing:FALSE skipSizeMove:FALSE];
+     }
+
 diff --git a/dlls/winemac.drv/macdrv_cocoa.h b/dlls/winemac.drv/macdrv_cocoa.h
 index 30e2aee..b284587 100644
 --- a/dlls/winemac.drv/macdrv_cocoa.h
@@ -553,7 +695,7 @@ index 30e2aee..b284587 100644
 
  struct macdrv_window_state {
 diff --git a/dlls/winemac.drv/macdrv_main.c b/dlls/winemac.drv/macdrv_main.c
-index a4d4412..5d6cea4 100644
+index a4d4412..6af88c3 100644
 --- a/dlls/winemac.drv/macdrv_main.c
 +++ b/dlls/winemac.drv/macdrv_main.c
 @@ -29,6 +29,7 @@
@@ -626,7 +768,7 @@ index a4d4412..5d6cea4 100644
      {
          ERR("Failed to start Cocoa app main loop\n");
 diff --git a/dlls/winemac.drv/window.c b/dlls/winemac.drv/window.c
-index 9941ff0..c6d8d65 100644
+index 6ddb890..8c44ca7 100644
 --- a/dlls/winemac.drv/window.c
 +++ b/dlls/winemac.drv/window.c
 @@ -64,6 +64,7 @@ static struct macdrv_window_features get_window_features_for_style(DWORD style,

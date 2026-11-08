@@ -110,6 +110,10 @@ window is ordered out.
 Content clicks stay in the Wine view and do not reach the Cocoa frame drag
 handler. Layered windows stay auxiliary to the fullscreen game. In a Space the
 close button sends the normal Win32 close.
+On a Mac with a camera housing, the Space frame sits below the housing while Wine
+keeps the full monitor rect. The patch subtracts that height from pointer
+positions it sends to Wine and adds it to positions Wine sets, so the pointer
+matches the picture. The offset is zero on other Macs.
 The feature is off for the whole process when the program is
 `PlatformProcess.exe` or `PlatformProcess.original.helper.exe`.
 The ARM copy has extra includes and an earlier shader-cache helper, so its

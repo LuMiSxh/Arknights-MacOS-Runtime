@@ -205,7 +205,7 @@
         "rosetta-x86_64"
       ],
       "path": "patches/wine/0009-winemac-native-fullscreen-space.patch",
-      "sha256": "2adb3a9efdd5002cdf3aa33a847921713100bedf3f235a97dd54976c64cb44d5"
+      "sha256": "3f0c0babb3f32d843f1ef156fedb1f28fba17d53c2550b058d96856f2693b607"
     },
     {
       "id": "wine-hardware-cursor-suppression",
