@@ -82,7 +82,7 @@ diff --git a/dlls/winemac.drv/cocoa_window.h b/dlls/winemac.drv/cocoa_window.h
 index 4d573c9..a44091f 100644
 --- a/dlls/winemac.drv/cocoa_window.h
 +++ b/dlls/winemac.drv/cocoa_window.h
-@@ -68,6 +101,19 @@
+@@ -68,6 +101,20 @@
      NSRect nonFullscreenFrame;
      NSTimeInterval enteredFullScreenTime;
 
@@ -98,6 +98,7 @@ index 4d573c9..a44091f 100644
 +    NSRect lastWineContentRect;
 +    NSRect spaceRepostRect;
 +    int spaceRepostCount;
++    BOOL spaceRepostPending;
 +
      int draggingPhase;
      NSPoint dragStartPosition;
@@ -281,7 +282,7 @@ index af510e7..ef8aa76 100644
          if ([self isMiniaturized])
              pendingMinimize = TRUE;
 
-@@ -1833,6 +1980,108 @@ - (void) updateFullscreen
+@@ -1833,6 +1980,145 @@ - (void) updateFullscreen
 
              [controller adjustWindowLevels];
          }
@@ -359,11 +360,20 @@ index af510e7..ef8aa76 100644
 +                if ([self isOrderedIn])
 +                    [self windowDidResize:nil skipSizeMove:TRUE];
 +            }
-+            else if (spaceRepostCount == 2)
++            else
 +            {
-+                spaceRepostCount++;
-+                WARN(@"window %p keeps requesting content rect %@ in a Space, not reposting its frame again\n",
-+                     hwnd, NSStringFromRect(contentRect));
++                /* A window that answers every resize with the same request would
++                 * loop forever.  Stop answering at once, but report the actual
++                 * frame when the requests stop: Wine now holds the requested rect
++                 * and must not keep it, or its mouse origin is off by the height
++                 * of the camera housing. */
++                if (spaceRepostCount == 2)
++                {
++                    spaceRepostCount++;
++                    WARN(@"window %p keeps requesting content rect %@ in a Space, reposting its frame later\n",
++                         hwnd, NSStringFromRect(contentRect));
++                }
++                [self scheduleSpaceFrameReport];
 +            }
 +            return TRUE;
 +        }
@@ -376,14 +386,42 @@ index af510e7..ef8aa76 100644
 +        return TRUE;
 +    }
 +
++    /* Reports the actual frame of the window to Wine once the requests of Wine
++       have stopped for a moment.  Further requests share the pending report. */
++    - (void) scheduleSpaceFrameReport
++    {
++        if (spaceRepostPending)
++            return;
++
++        spaceRepostPending = TRUE;
++        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 100 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
++            spaceRepostPending = FALSE;
++            if (([self styleMask] & NSWindowStyleMaskFullScreen) && [self isOrderedIn])
++            {
++                TRACE(@"window %p is in a Space, reposting its frame after repeated requests\n", hwnd);
++                [self windowDidResize:nil skipSizeMove:TRUE];
++            }
++        });
++    }
++
 +    - (void) finishNativeSpaceTransition
 +    {
 +        NSRect contentRect = lastWineContentRect;
 +
 +        [[WineApplicationController sharedController] reassertCursorClipping];
 +
++        /* Every Space starts with a new repost budget. */
++        spaceRepostRect = NSZeroRect;
++        spaceRepostCount = 0;
++
 +        if (!deferredWineContentRect)
++        {
++            /* Events of the transition may have been discarded or may predate the
++               final frame.  Wine must know the frame the OS really gave the window. */
++            if (([self styleMask] & NSWindowStyleMaskFullScreen) && [self isOrderedIn])
++                [self windowDidResize:nil skipSizeMove:TRUE];
 +            return;
++        }
 +        deferredWineContentRect = FALSE;
 +        [[WineApplicationController sharedController] flipRect:&contentRect];
 +        [self setFrameFromWine:contentRect];
