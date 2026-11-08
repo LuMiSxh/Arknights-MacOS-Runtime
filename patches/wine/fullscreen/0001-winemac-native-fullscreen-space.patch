@@ -79,14 +79,15 @@ index c57ca47..bcac5f6 100644
   *              macdrv_window_rejected_focus
   *
 diff --git a/dlls/winemac.drv/cocoa_window.h b/dlls/winemac.drv/cocoa_window.h
-index 4d573c9..a57c6d1 100644
+index 4d573c9..a44091f 100644
 --- a/dlls/winemac.drv/cocoa_window.h
 +++ b/dlls/winemac.drv/cocoa_window.h
-@@ -68,6 +68,18 @@ @interface WineWindow : NSPanel <NSWindowDelegate>
+@@ -68,6 +68,19 @@
      NSRect nonFullscreenFrame;
      NSTimeInterval enteredFullScreenTime;
 
 +    /* Native fullscreen Space (LMISXH_AKMOCL_FULLSCREEN) */
++    BOOL layered;
 +    BOOL nativeSpaceCandidate;
 +    BOOL nativeSpaceExempt;
 +    BOOL wineCloseButton;
@@ -102,19 +103,37 @@ index 4d573c9..a57c6d1 100644
      NSPoint dragStartPosition;
      NSPoint dragWindowStartPosition;
 diff --git a/dlls/winemac.drv/cocoa_window.m b/dlls/winemac.drv/cocoa_window.m
-index af510e7..2603220 100644
+index af510e7..ef8aa76 100644
 --- a/dlls/winemac.drv/cocoa_window.m
 +++ b/dlls/winemac.drv/cocoa_window.m
-@@ -952,6 +952,8 @@ + (WineWindow*) createWindowWithFeatures:(const struct macdrv_window_features*)w
+@@ -350,6 +350,16 @@ - (BOOL) mouseDownCanMoveWindow
+         return NO;
+     }
+
++    - (void) mouseDown:(NSEvent*)event
++    {
++        /* Wine already received this click in handleMouseButton:.  Do not let
++         * native fullscreen content clicks reach NSThemeFrame's drag handler,
++         * which reactivates the app and triggers a display refresh per click. */
++        if (native_fullscreen_space && ([[self window] styleMask] & NSWindowStyleMaskFullScreen))
++            return;
++        [super mouseDown:event];
++    }
++
+     - (NSFocusRingType) focusRingType
+     {
+         return NSFocusRingTypeNone;
+@@ -952,6 +962,9 @@ + (WineWindow*) createWindowWithFeatures:(const struct macdrv_window_features*)w
 
          if (!window) return nil;
 
++        window->layered = wf->layered;
 +        window->wineCloseButton = (style_mask_for_features(wf) & NSWindowStyleMaskClosable) != 0;
 +
          /* Standardize windows to eliminate differences between titled and
             borderless windows and between NSWindow and NSPanel. */
          [window setHidesOnDeactivate:NO];
-@@ -1067,12 +1069,56 @@ - (void) adjustFeaturesForState
+@@ -1067,12 +1080,57 @@ - (void) adjustFeaturesForState
              [self setMovable:[self allowsMovingWithMaximized:maximized]];
      }
 
@@ -150,7 +169,7 @@ index af510e7..2603220 100644
 +           throw a window out of its Space; it only blocks entering one. */
 +        BOOL inSpace = (style & NSWindowStyleMaskFullScreen) || enteringFullScreen;
 +
-+        return !nativeSpaceExempt &&
++        return !layered && !nativeSpaceExempt &&
 +               (behavior & NSWindowCollectionBehaviorParticipatesInCycle) &&
 +               !(behavior & (NSWindowCollectionBehaviorIgnoresCycle | pinnedBehavior)) &&
 +               !(style & NSWindowStyleMaskUtilityWindow) && !maximized &&
@@ -163,16 +182,18 @@ index af510e7..2603220 100644
      {
          NSUInteger style = [self styleMask];
 
+-        if (behavior & NSWindowCollectionBehaviorParticipatesInCycle &&
+-            style & NSWindowStyleMaskResizable && !(style & NSWindowStyleMaskUtilityWindow) && !maximized &&
 +        if (native_fullscreen_space)
 +            nativeSpaceCandidate = [self qualifiesForNativeSpace:behavior];
 +
-         if (behavior & NSWindowCollectionBehaviorParticipatesInCycle &&
--            style & NSWindowStyleMaskResizable && !(style & NSWindowStyleMaskUtilityWindow) && !maximized &&
++        if (!(native_fullscreen_space && layered) &&
++            behavior & NSWindowCollectionBehaviorParticipatesInCycle &&
 +            (style & NSWindowStyleMaskResizable || nativeSpaceCandidate) && !(style & NSWindowStyleMaskUtilityWindow) && !maximized &&
              !(self.parentWindow || self.latentParentWindow))
          {
              behavior |= NSWindowCollectionBehaviorFullScreenPrimary;
-@@ -1082,7 +1128,7 @@ - (void) adjustFullScreenBehavior:(NSWindowCollectionBehavior)behavior
+@@ -1082,7 +1140,7 @@ - (void) adjustFullScreenBehavior:(NSWindowCollectionBehavior)behavior
          {
              behavior &= ~NSWindowCollectionBehaviorFullScreenPrimary;
              behavior |= NSWindowCollectionBehaviorFullScreenAuxiliary;
@@ -181,7 +202,7 @@ index af510e7..2603220 100644
                  [super toggleFullScreen:nil];
          }
 
-@@ -1093,6 +1139,30 @@ - (void) adjustFullScreenBehavior:(NSWindowCollectionBehavior)behavior
+@@ -1093,14 +1151,44 @@ - (void) adjustFullScreenBehavior:(NSWindowCollectionBehavior)behavior
          }
      }
 
@@ -212,7 +233,10 @@ index af510e7..2603220 100644
      - (void) setWindowFeatures:(const struct macdrv_window_features*)wf
      {
          static const NSUInteger usedStyles = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable |
-@@ -1101,6 +1171,10 @@ - (void) setWindowFeatures:(const struct macdrv_window_features*)wf
+                                              NSWindowStyleMaskResizable | NSWindowStyleMaskUtilityWindow | NSWindowStyleMaskBorderless |
+                                              NSWindowStyleMaskNonactivatingPanel;
++        BOOL layeredChanged = layered != wf->layered;
++        layered = wf->layered;
          NSUInteger currentStyle = [self styleMask];
          NSUInteger newStyle = style_mask_for_features(wf) | (currentStyle & ~usedStyles);
 
@@ -223,7 +247,17 @@ index af510e7..2603220 100644
          self.preventsAppActivation = wf->prevents_app_activation;
 
          if (newStyle != currentStyle)
-@@ -1755,6 +1829,8 @@ - (void) orderBelow:(WineWindow*)prev orAbove:(WineWindow*)next activate:(BOOL)a
+@@ -1141,6 +1229,9 @@ - (void) setWindowFeatures:(const struct macdrv_window_features*)wf
+                 [self setTitle:title];
+         }
+
++        if (layeredChanged && newStyle == currentStyle)
++            [self adjustFullScreenBehavior:[self collectionBehavior]];
++
+         resizable = wf->resizable;
+         [self adjustFeaturesForState];
+         [self setHasShadow:wf->shadow];
+@@ -1755,6 +1846,8 @@ - (void) orderBelow:(WineWindow*)prev orAbove:(WineWindow*)next activate:(BOOL)a
                 it if nothing actually changed. */
              [self windowDidResize:nil skipSizeMove:TRUE];
 
@@ -232,7 +266,7 @@ index af510e7..2603220 100644
              if (![self isExcludedFromWindowsMenu])
                  [NSApp addWindowsItem:self title:[self title] filename:NO];
          }
-@@ -1784,6 +1860,14 @@ - (void) doOrderOut
+@@ -1784,6 +1877,14 @@ - (void) doOrderOut
 
          pendingOrderOut = FALSE;
 
@@ -247,7 +281,7 @@ index af510e7..2603220 100644
          if ([self isMiniaturized])
              pendingMinimize = TRUE;
 
-@@ -1833,6 +1917,108 @@ - (void) updateFullscreen
+@@ -1833,6 +1934,108 @@ - (void) updateFullscreen
 
              [controller adjustWindowLevels];
          }
@@ -356,7 +390,7 @@ index af510e7..2603220 100644
      }
 
      - (void) setFrameAndWineFrame:(NSRect)frame
-@@ -1873,6 +2059,10 @@ - (void) setFrameFromWine:(NSRect)contentRect
+@@ -1873,6 +2076,10 @@ - (void) setFrameFromWine:(NSRect)contentRect
          [queue discardEventsMatchingMask:event_mask_for_type(WINDOW_FRAME_CHANGED)
                                 forWindow:self];
 
@@ -367,7 +401,7 @@ index af510e7..2603220 100644
          if (!NSIsEmptyRect(contentRect))
          {
              NSRect frame, oldFrame;
-@@ -2571,6 +2761,14 @@ - (void) miniaturize:(id)sender
+@@ -2571,6 +2778,14 @@ - (void) miniaturize:(id)sender
 
      - (void) toggleFullScreen:(id)sender
      {
@@ -382,7 +416,7 @@ index af510e7..2603220 100644
          if (!self.disabled && !maximized)
              [super toggleFullScreen:sender];
      }
-@@ -2805,6 +3003,9 @@ - (NSSize) window:(NSWindow*)window willUseFullScreenContentSize:(NSSize)propose
+@@ -2805,6 +3020,9 @@ - (NSSize) window:(NSWindow*)window willUseFullScreenContentSize:(NSSize)propose
          macdrv_query* query;
          NSSize size;
 
@@ -392,7 +426,7 @@ index af510e7..2603220 100644
          query = macdrv_create_query();
          query->type = QUERY_MIN_MAX_INFO;
          query->window = (macdrv_window)[self retain];
-@@ -2873,6 +3074,12 @@ - (void) windowDidEnterFullScreen:(NSNotification*)notification
+@@ -2873,6 +3091,12 @@ - (void) windowDidEnterFullScreen:(NSNotification*)notification
      {
          enteringFullScreen = FALSE;
          enteredFullScreenTime = [[NSProcessInfo processInfo] systemUptime];
@@ -405,7 +439,7 @@ index af510e7..2603220 100644
          if (pendingOrderOut)
              [self doOrderOut];
      }
-@@ -2882,6 +3089,14 @@ - (void) windowDidExitFullScreen:(NSNotification*)notification
+@@ -2882,6 +3106,14 @@ - (void) windowDidExitFullScreen:(NSNotification*)notification
          exitingFullScreen = FALSE;
          [self setFrameAndWineFrame:nonFullscreenFrame];
          [self windowDidResize:nil];
@@ -420,7 +454,7 @@ index af510e7..2603220 100644
          if (pendingOrderOut)
              [self doOrderOut];
      }
-@@ -2890,6 +3105,12 @@ - (void) windowDidFailToEnterFullScreen:(NSWindow*)window
+@@ -2890,6 +3122,12 @@ - (void) windowDidFailToEnterFullScreen:(NSWindow*)window
      {
          enteringFullScreen = FALSE;
          enteredFullScreenTime = 0;
@@ -433,7 +467,7 @@ index af510e7..2603220 100644
          if (pendingOrderOut)
              [self doOrderOut];
      }
-@@ -2898,6 +3119,12 @@ - (void) windowDidFailToExitFullScreen:(NSWindow*)window
+@@ -2898,6 +3136,12 @@ - (void) windowDidFailToExitFullScreen:(NSWindow*)window
      {
          exitingFullScreen = FALSE;
          [self windowDidResize:nil];
@@ -446,7 +480,7 @@ index af510e7..2603220 100644
          if (pendingOrderOut)
              [self doOrderOut];
      }
-@@ -2968,6 +3195,9 @@ - (void)windowDidResize:(NSNotification *)notification
+@@ -2968,6 +3212,9 @@ - (void)windowDidResize:(NSNotification *)notification
 
      - (BOOL)windowShouldClose:(id)sender
      {
@@ -457,10 +491,10 @@ index af510e7..2603220 100644
          [queue postEvent:event];
          macdrv_release_event(event);
 diff --git a/dlls/winemac.drv/macdrv_cocoa.h b/dlls/winemac.drv/macdrv_cocoa.h
-index c6552ba..96f8a37 100644
+index c6552ba..036493f 100644
 --- a/dlls/winemac.drv/macdrv_cocoa.h
 +++ b/dlls/winemac.drv/macdrv_cocoa.h
-@@ -130,8 +130,11 @@
+@@ -130,8 +130,11 @@ struct macdrv_query;
 
  /* main */
  extern bool macdrv_err_on;
@@ -472,6 +506,14 @@ index c6552ba..96f8a37 100644
  /* CrossOver Hack 10912: Mac Edit menu */
  extern int mac_edit_menu;
  extern bool left_option_is_alt;
+@@ -509,6 +512,7 @@ struct macdrv_window_features {
+     unsigned int    utility:1;
+     unsigned int    shadow:1;
+     unsigned int    prevents_app_activation:1;
++    unsigned int    layered:1;
+ };
+
+ struct macdrv_window_state {
 diff --git a/dlls/winemac.drv/macdrv_main.c b/dlls/winemac.drv/macdrv_main.c
 index 05aaa57..a0f9468 100644
 --- a/dlls/winemac.drv/macdrv_main.c
@@ -545,3 +587,23 @@ index 05aaa57..a0f9468 100644
      if (macdrv_start_cocoa_app(NtGetTickCount()))
      {
          ERR("Failed to start Cocoa app main loop\n");
+diff --git a/dlls/winemac.drv/window.c b/dlls/winemac.drv/window.c
+index d31cd24..1b2587b 100644
+--- a/dlls/winemac.drv/window.c
++++ b/dlls/winemac.drv/window.c
+@@ -86,6 +86,7 @@ static struct macdrv_window_features get_window_features_for_style(DWORD style,
+     struct macdrv_window_features wf = {0};
+
+     if (ex_style & WS_EX_NOACTIVATE) wf.prevents_app_activation = TRUE;
++    wf.layered = !!(ex_style & WS_EX_LAYERED);
+
+     if ((style & WS_CAPTION) == WS_CAPTION && !(ex_style & WS_EX_LAYERED))
+     {
+@@ -118,6 +119,7 @@ static struct macdrv_window_features get_cocoa_window_features(struct macdrv_win
+     struct macdrv_window_features wf = {0};
+
+     if (ex_style & WS_EX_NOACTIVATE) wf.prevents_app_activation = TRUE;
++    wf.layered = !!(ex_style & WS_EX_LAYERED);
+     if (EqualRect(&data->rects.window, &data->rects.visible)) return wf;
+
+     /* CrossOver Hack #16933 */
