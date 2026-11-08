@@ -181,7 +181,7 @@
         "rosetta-x86_64"
       ],
       "path": "patches/wine/0007-win32u-winemac-bilibili-layered-child.patch",
-      "sha256": "542a4abddf1330cd453afa431b72bbea6899e66be3a5bae938894a996367074e"
+      "sha256": "dffbed7e28f838b68a075bae7ceba407d9944479cec7404ae46cd7dd10d0a632"
     },
     {
       "id": "wine-cn-bilibili-join-all-spaces",

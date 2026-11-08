@@ -29,7 +29,7 @@ index 9a57c00..0eef6fb 100644
 +
 +    if (value == -1)
 +    {
-+        value = lmisxh_akmocl_flag("LMISXH_AKMOCL") && lmisxh_akmocl_flag("LMISXH_AKMOCL_CN");
++        value = lmisxh_akmocl_flag("LMISXH_AKMOCL_CN");
 +        InterlockedCompareExchange(&state, value, -1);
 +    }
 +    return value;
@@ -494,9 +494,9 @@ index dd1aca0..3dfe197 100644
 +
 +static BOOL lmisxh_akmocl_cn_enabled(void)
 +{
-+    const char *master = getenv("LMISXH_AKMOCL"), *flag = getenv("LMISXH_AKMOCL_CN");
++    const char *flag = getenv("LMISXH_AKMOCL_CN");
 +
-+    return master && master[0] == '1' && !master[1] && flag && flag[0] == '1' && !flag[1];
++    return flag && flag[0] == '1' && !flag[1];
 +}
 +
 +static BOOL command_line_has_cef_type(void)
