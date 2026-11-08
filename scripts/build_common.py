@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -312,14 +313,28 @@ def nix_package_outputs(
 
     outputs: list[Path] = []
     for package in packages:
+        attribute = f"{nixpkgs}#legacyPackages.{system}.{package}"
+        available = set(nix_output_names(builder, attribute))
+        # Not every package splits out dev or lib (freetype has no lib output).
         for output_name in ("dev", "out", "lib"):
-            outputs.append(
-                nix_build(
-                    builder,
-                    f"{nixpkgs}#legacyPackages.{system}.{package}.{output_name}",
-                )
-            )
+            if output_name in available:
+                outputs.append(nix_build(builder, f"{attribute}.{output_name}"))
     return outputs
+
+
+def nix_output_names(builder: Builder, attribute: str) -> list[str]:
+    output = builder.capture(
+        "nix",
+        "--extra-experimental-features",
+        "nix-command flakes",
+        "eval",
+        "--json",
+        f"{attribute}.outputs",
+    )
+    names = json.loads(output)
+    if not isinstance(names, list) or not all(isinstance(name, str) for name in names):
+        raise BuildError(f"nix eval returned unexpected outputs for {attribute}")
+    return names
 
 
 def fix_release_macho(builder: Builder, directory: Path, binary: Path) -> None:
