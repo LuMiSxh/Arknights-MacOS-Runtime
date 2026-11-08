@@ -189,7 +189,7 @@ jobs:
                   tag="$TAG"
                   source_archive=".build/arm64/release/Arknights-MacOS-Runtime-$tag-source.tar.gz"
                   tar -czf "$source_archive" \
-                    wine-build-new runtime.lock.json docs/arm/provenance.md
+                    wine-build-new runtime.lock.json docs/arm/README.md
                   shasum -a 256 "$source_archive" > "$source_archive.sha256"
 
             - name: Write provenance
