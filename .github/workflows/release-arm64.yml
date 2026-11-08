@@ -41,6 +41,8 @@ jobs:
 
             - uses: astral-sh/setup-uv@v10.0.1
 
+            - uses: extractions/setup-just@v4.0.0
+
             - name: Normalize the version
               id: version
               env:
@@ -153,7 +155,7 @@ jobs:
 
             - name: Report compiler cache statistics
               if: ${{ always() }}
-              run: ccache -s
+              run: if command -v ccache >/dev/null; then ccache -s; fi
 
             - name: Repack the client runtime tree
               run: |
