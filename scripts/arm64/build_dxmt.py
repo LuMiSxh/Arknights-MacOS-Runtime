@@ -232,7 +232,9 @@ def _resolve_llvm(builder: Builder, candidate: Path | None) -> Path:
     llvm = Path(value) if value else Path(_brew_prefix(builder, "llvm@15"))
     if not (llvm / "bin" / "llvm-config").is_file():
         raise BuildError("set --llvm or LLVM_ROOT to an LLVM 15 install")
-    return llvm.resolve()
+    # Keep the Homebrew `opt` symlink: DXMT links Homebrew's static zstd only when
+    # the LLVM path starts with `/opt/homebrew/opt`, and resolving it yields the Cellar path.
+    return llvm.absolute()
 
 
 def _resolve_llvm_mingw(builder: Builder, candidate: Path | None) -> None:
