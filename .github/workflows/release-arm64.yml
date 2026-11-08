@@ -195,15 +195,18 @@ jobs:
             - name: Write provenance
               env:
                   TAG: ${{ steps.version.outputs.tag }}
+                  BUILD_COMMIT: ${{ steps.version.outputs.build_commit }}
               run: |
                   set -euo pipefail
                   tag="$TAG"
                   uv run --locked --no-dev scripts/arm64/provenance.py \
                     --target native-arm64 \
                     --tag "$tag" \
+                    --commit "$BUILD_COMMIT" \
                     --runtime-archive ".build/arm64/release/Arknights-MacOS-Runtime-$tag.tar.gz" \
                     --source-archive ".build/arm64/release/Arknights-MacOS-Runtime-$tag-source.tar.gz" \
                     --external-artifact .build/arm64/incoming/external.json \
+                    --validation-report .build/reports/arm64-validation.json \
                     --output .build/arm64/release/provenance.json
 
             - name: Copy the notices

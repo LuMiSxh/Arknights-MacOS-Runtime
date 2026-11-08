@@ -18,7 +18,8 @@ from scripts.arm64.fetch_external import (
     select_release,
 )
 from scripts.arm64.provenance import ProvenanceError, write_provenance
-from scripts.build_common import CLEARED_DOS_STUB
+from scripts.build_common import CLEARED_DOS_STUB, ROOT
+from scripts.release.provenance import runtime_lock_provenance
 
 RELEASE_ID = "wine-11-18-arm64-v5"
 
@@ -593,16 +594,35 @@ def test_provenance_records_the_external_build_without_urls(tmp_path):
         "sources": {"wine": {"commit": "7b3fff76fa5178f6ce0141b2c776afa2a822f101"}},
     }
 
+    runtime_lock = {
+        "path": "runtime.lock.json",
+        "sha256": "d" * 64,
+        "contents": lock,
+    }
+    validation = {
+        "target": "native-arm64",
+        "deploymentTarget": "26.0",
+        "inheritedMachOAboveTarget": 0,
+        "releaseEligible": False,
+        "builtExternally": True,
+    }
+
     write_provenance(
         lock,
         "v0.9.0+arm",
         runtime_archive,
         source_archive,
         tmp_path / "provenance.json",
+        source_commit="c" * 40,
+        runtime_lock=runtime_lock,
+        validation=validation,
     )
 
     data = json.loads((tmp_path / "provenance.json").read_text())
     assert data["releaseTag"] == "v0.9.0+arm"
+    assert data["sourceCommit"] == "c" * 40
+    assert data["runtimeLock"] == runtime_lock
+    assert data["validation"] == validation
     assert data["target"] == "native-arm64"
     assert data["minimumMacOS"] == "26.0"
     assert data["features"] == {
@@ -654,12 +674,20 @@ def test_provenance_records_the_selected_catalog_artifact(tmp_path):
         "sources": {"wine": {"commit": "7b3fff76fa5178f6ce0141b2c776afa2a822f101"}},
     }
 
+    runtime_lock = {
+        "path": "runtime.lock.json",
+        "sha256": "d" * 64,
+        "contents": lock,
+    }
+
     write_provenance(
         lock,
         "v0.9.0+arm",
         runtime_archive,
         source_archive,
         tmp_path / "provenance.json",
+        source_commit="c" * 40,
+        runtime_lock=runtime_lock,
         external_artifact=external,
     )
 
@@ -691,6 +719,12 @@ def test_provenance_rejects_artifact_metadata_that_differs_from_the_lock(tmp_pat
         "sources": {"wine": {"commit": "7b3fff76fa5178f6ce0141b2c776afa2a822f101"}},
     }
 
+    runtime_lock = {
+        "path": "runtime.lock.json",
+        "sha256": "d" * 64,
+        "contents": lock,
+    }
+
     with pytest.raises(ProvenanceError, match="lock pin"):
         write_provenance(
             lock,
@@ -698,5 +732,48 @@ def test_provenance_rejects_artifact_metadata_that_differs_from_the_lock(tmp_pat
             runtime_archive,
             source_archive,
             tmp_path / "provenance.json",
+            source_commit="c" * 40,
+            runtime_lock=runtime_lock,
             external_artifact=external,
         )
+
+
+def test_provenance_rejects_a_short_build_commit(tmp_path):
+    runtime_archive = tmp_path / "runtime.tar.gz"
+    runtime_archive.write_bytes(b"runtime")
+    source_archive = tmp_path / "source.tar.gz"
+    source_archive.write_bytes(b"source")
+    lock = {
+        "buildMode": "external",
+        "target": "native-arm64",
+        "interface": {"minimumMacOS": "26.0"},
+        "features": {},
+        "sources": {"wine": {"commit": "7b3fff76fa5178f6ce0141b2c776afa2a822f101"}},
+    }
+
+    with pytest.raises(ProvenanceError, match="full commit hash"):
+        write_provenance(
+            lock,
+            "v0.9.0+arm",
+            runtime_archive,
+            source_archive,
+            tmp_path / "provenance.json",
+            source_commit="7b3fff76",
+            runtime_lock={
+                "path": "runtime.lock.json",
+                "sha256": "d" * 64,
+                "contents": lock,
+            },
+        )
+
+
+def test_runtime_lock_provenance_resolves_the_target_view():
+    runtime_lock = runtime_lock_provenance(ROOT, "native-arm64")
+    contents = runtime_lock["contents"]
+
+    assert runtime_lock["path"] == "runtime.lock.json"
+    assert len(runtime_lock["sha256"]) == 64
+    assert contents["target"] == "native-arm64"
+    assert {"wine", "dxmt"} <= contents["sources"].keys()
+    for name in ("wine", "dxmt"):
+        assert {"repository", "commit", "version"} <= contents["sources"][name].keys()

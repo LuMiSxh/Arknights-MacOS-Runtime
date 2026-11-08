@@ -19,22 +19,32 @@ from typing import Any
 if __package__:
     from ..build_common import (
         NATIVE_ARM64_TARGET,
+        ROOT,
         WINE_BUILD_NEW_REPOSITORY,
         sha256,
     )
     from ..lib.console import error, success
-    from ..runtime import LockError
-    from .fetch_external import require_external_lock
+    from ..release.provenance import (
+        COMMIT_PATTERN,
+        ProvenanceInputError,
+        runtime_lock_provenance,
+        validation_provenance,
+    )
 else:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from scripts.arm64.fetch_external import require_external_lock
     from scripts.build_common import (
         NATIVE_ARM64_TARGET,
+        ROOT,
         WINE_BUILD_NEW_REPOSITORY,
         sha256,
     )
     from scripts.lib.console import error, success
-    from scripts.runtime import LockError
+    from scripts.release.provenance import (
+        COMMIT_PATTERN,
+        ProvenanceInputError,
+        runtime_lock_provenance,
+        validation_provenance,
+    )
 
 
 class ProvenanceError(RuntimeError):
@@ -47,12 +57,18 @@ def write_provenance(
     runtime_archive: Path,
     source_archive: Path,
     output: Path,
+    *,
+    source_commit: str,
+    runtime_lock: dict[str, Any],
+    validation: dict[str, Any] | None = None,
     external_artifact: Path | None = None,
 ) -> dict[str, Any]:
     """Write `provenance.json` for the external target and return its contents."""
 
     if lock.get("buildMode") != "external":
         raise ProvenanceError("provenance requires an external target")
+    if COMMIT_PATTERN.fullmatch(source_commit) is None:
+        raise ProvenanceError("release commit must be a full commit hash")
 
     interface = lock.get("interface") or {}
     minimum_macos = interface.get("minimumMacOS")
@@ -63,6 +79,8 @@ def write_provenance(
     provenance = {
         "schemaVersion": 1,
         "releaseTag": tag,
+        "sourceCommit": source_commit,
+        "runtimeLock": runtime_lock,
         "target": lock["target"],
         "minimumMacOS": minimum_macos,
         "features": lock["features"],
@@ -79,6 +97,8 @@ def write_provenance(
             "sha256": sha256(source_archive),
         },
     }
+    if validation is not None:
+        provenance["validation"] = validation
     if external_artifact is not None:
         try:
             artifact = json.loads(external_artifact.read_text(encoding="utf-8"))
@@ -110,22 +130,33 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target", default=NATIVE_ARM64_TARGET)
     parser.add_argument("--tag", required=True)
+    parser.add_argument("--commit", required=True)
     parser.add_argument("--runtime-archive", type=Path, required=True)
     parser.add_argument("--source-archive", type=Path, required=True)
     parser.add_argument("--external-artifact", type=Path)
+    parser.add_argument("--validation-report", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
     try:
-        lock = require_external_lock(arguments.target)
+        runtime_lock = runtime_lock_provenance(ROOT, arguments.target)
+        lock = runtime_lock["contents"]
+        validation = validation_provenance(
+            arguments.validation_report,
+            lock["deploymentTarget"],
+            external=True,
+        )
         write_provenance(
             lock,
             arguments.tag,
             arguments.runtime_archive,
             arguments.source_archive,
             arguments.output,
+            source_commit=arguments.commit,
+            runtime_lock=runtime_lock,
+            validation=validation,
             external_artifact=arguments.external_artifact,
         )
-    except (ProvenanceError, LockError, OSError) as caught_error:
+    except (ProvenanceError, ProvenanceInputError, OSError) as caught_error:
         error(str(caught_error))
         return 1
     success(f"wrote {arguments.output}")
