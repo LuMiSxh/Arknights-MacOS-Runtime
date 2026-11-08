@@ -51,4 +51,4 @@ The `publish` job creates a build provenance attestation for every release asset
 3. Run `gh attestation verify Arknights-MacOS-Runtime-v0.7.0+x86.tar.gz --repo LuMiSxh/Arknights-MacOS-Runtime`.
 4. Trust the asset only if the command succeeds.
 
-The x86_64 `provenance.json` asset records the versions of the Homebrew packages, Xcode, and macOS SDK of the build host. The build does not pin these tools. The ARM64 `provenance.json` asset records the external Wine revision, the archive hashes, and the repository credit.
+The x86_64 `provenance.json` asset records the versions of the Homebrew packages, Xcode, and macOS SDK of the build host. The build does not pin these tools. The ARM64 `provenance.json` asset records the build commit, the resolved runtime lock, and the validation report. It also records the Wine and DXMT versions, the archive hashes, and the repository credit.

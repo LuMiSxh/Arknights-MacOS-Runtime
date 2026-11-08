@@ -38,7 +38,7 @@ wine/                       # lowercase
   share/licenses/           # Wine ARM64EC, FEX, Mesa
 ```
 
-`provenance.json` records the selected catalog id, SHA-256, and size under `externalArtifact`.
+`provenance.json` records the build commit, the resolved `runtimeLock`, and the validation report. It also records the selected catalog id, SHA-256, and size under `externalArtifact`.
 
 The archive has no DXMT, no `winemetal.so`, no `wine64`, no `Arknights` link, and no `WINEPRELOADERAPPNAME`. `scripts/arm64/assemble.py` adds `Wine/bin/wine64`, `Wine/bin/Arknights`, the DXMT payload, and the WineMetal modules outside the signed `wine.app`.
 

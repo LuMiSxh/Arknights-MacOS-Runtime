@@ -16,13 +16,18 @@ from typing import Any
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 if __package__:
     from ..build_common import NATIVE_ARM64_TARGET, sha256
-    from ..runtime import LockError, load_lock
     from .licenses import (
         ARCHIVE_LICENSES_DIRECTORY,
         ARCHIVE_NOTICE,
         EXTERNAL_NOTICE_FILES,
         INDEX_NAME,
         TARGET_COMPONENTS,
+    )
+    from .provenance import (
+        COMMIT_PATTERN,
+        ProvenanceInputError,
+        runtime_lock_provenance,
+        validation_provenance,
     )
 else:
     if str(REPOSITORY_ROOT) not in sys.path:
@@ -35,13 +40,17 @@ else:
         INDEX_NAME,
         TARGET_COMPONENTS,
     )
-    from scripts.runtime import LockError, load_lock
+    from scripts.release.provenance import (
+        COMMIT_PATTERN,
+        ProvenanceInputError,
+        runtime_lock_provenance,
+        validation_provenance,
+    )
 
 
 SEMVER_CORE_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 IDENTIFIER_PATTERN = re.compile(r"^[0-9A-Za-z-]+$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
-COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 NOTICE_FILES = (
     "LICENSE",
     "LICENSES/Wine-LGPL-2.1.txt",
@@ -318,41 +327,6 @@ def _validate_required_patches(
         )
 
 
-def _validation_report(
-    path: Path, deployment_target: str, *, external: bool = False
-) -> dict[str, Any]:
-    try:
-        report = json.loads(
-            _regular_file(path, "validation report").read_text(encoding="utf-8")
-        )
-    except (json.JSONDecodeError, OSError) as error:
-        raise ReleaseValidationError(
-            f"cannot read validation report: {path}"
-        ) from error
-    if not isinstance(report, dict):
-        raise ReleaseValidationError("validation report must be an object")
-    if not external and (
-        report.get("releaseEligible") is not True or report.get("status") != "valid"
-    ):
-        raise ReleaseValidationError(
-            "candidate is not release eligible; a clean source build is required "
-            f"(status={report.get('status')!r}, releaseEligible={report.get('releaseEligible')!r})"
-        )
-    if report.get("deploymentTarget") != deployment_target:
-        raise ReleaseValidationError(
-            "validation report deployment target does not match lock"
-        )
-    if report.get("inheritedMachOAboveTarget") != 0:
-        raise ReleaseValidationError(
-            "validation report contains inherited Mach-O targets"
-        )
-    result = {key: value for key, value in report.items() if key != "runtime"}
-    if external:
-        result["releaseEligible"] = False
-        result["builtExternally"] = True
-    return result
-
-
 def _read_build_toolchain(path: Path | None) -> dict[str, Any] | None:
     if path is None:
         return None
@@ -432,13 +406,11 @@ def verify_release(
     if COMMIT_PATTERN.fullmatch(commit) is None:
         raise ReleaseValidationError("release commit must be a full commit hash")
 
-    lock_path = _regular_file(repository_root / "runtime.lock.json", "runtime lock")
     try:
-        lock = load_lock(lock_path, repository_root=repository_root, target=target)
-    except (LockError, OSError) as error:
-        raise ReleaseValidationError(
-            f"runtime lock validation failed: {error}"
-        ) from error
+        runtime_lock = runtime_lock_provenance(repository_root, target)
+    except ProvenanceInputError as error:
+        raise ReleaseValidationError(str(error)) from error
+    lock = runtime_lock["contents"]
     if not external:
         _validate_required_patches(lock, TARGET_REQUIRED_PATCHES[target])
     _validate_notices(repository_root, lock)
@@ -455,9 +427,12 @@ def verify_release(
             raise ReleaseValidationError(
                 "runtime component inventory has invalid syntax"
             )
-    report = _validation_report(
-        validation_report, lock["deploymentTarget"], external=external
-    )
+    try:
+        report = validation_provenance(
+            validation_report, lock["deploymentTarget"], external=external
+        )
+    except ProvenanceInputError as error:
+        raise ReleaseValidationError(str(error)) from error
     _validate_source_directories(source_root, TARGET_SOURCE_DIRECTORIES[target])
     archive_digest = _verify_checksum(archive, checksum, "runtime archive")
     source_digest = _validate_source_archive(
@@ -473,11 +448,7 @@ def verify_release(
         "schemaVersion": 1,
         "releaseTag": tag,
         "sourceCommit": commit,
-        "runtimeLock": {
-            "path": "runtime.lock.json",
-            "sha256": _sha256(lock_path),
-            "contents": lock,
-        },
+        "runtimeLock": runtime_lock,
         "runtimeArchive": {"name": archive.name, "sha256": archive_digest},
         "correspondingSourceArchive": {
             "name": source_archive.name,
