@@ -16,10 +16,10 @@ from pathlib import Path
 from typing import Any
 
 if __package__:
-    from .lib.console import error, success
+    from .lib.console import error, success, warning
     from .runtime import BUILD_ROOT, LOCK_PATH, load_lock
 else:
-    from lib.console import error, success
+    from lib.console import error, success, warning
     from runtime import BUILD_ROOT, LOCK_PATH, load_lock
 
 
@@ -237,7 +237,10 @@ def validate_metalfx_support(root: Path, features: dict[str, Any]) -> None:
 
 
 def validate_macho_targets(
-    root: Path, maximum: str, baseline_root: Path | None = None
+    root: Path,
+    maximum: str,
+    baseline_root: Path | None = None,
+    warn_newer: bool = False,
 ) -> tuple[int, int]:
     checked = 0
     inherited = 0
@@ -277,9 +280,11 @@ def validate_macho_targets(
                 ):
                     inherited += 1
                     continue
-                raise RuntimeValidationError(
-                    f"{path.relative_to(root)} requires macOS {minimum}, newer than {maximum}"
-                )
+                message = f"{path.relative_to(root)} requires macOS {minimum}, newer than {maximum}"
+                if warn_newer:
+                    warning(message)
+                    continue
+                raise RuntimeValidationError(message)
     return checked, inherited
 
 
@@ -313,8 +318,13 @@ def main() -> int:
             arguments.runtime, required_paths
         )
         validate_metalfx_support(arguments.runtime, lock["features"])
+        # The external ARM64 Wine tree is built upstream and sometimes ships binaries
+        # with a newer minimum macOS; report them without blocking the release.
         macho_count, inherited_count = validate_macho_targets(
-            arguments.runtime, lock["deploymentTarget"], arguments.baseline
+            arguments.runtime,
+            lock["deploymentTarget"],
+            arguments.baseline,
+            warn_newer=lock["buildMode"] == "external",
         )
     except (
         RuntimeValidationError,

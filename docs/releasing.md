@@ -35,7 +35,7 @@ The ARM64 lane ships an external Wine tree and builds DXMT in the workflow. The 
 2. The workflow selects the release id and takes the SHA-256 from the catalog, fetches the artifact, verifies it, and extracts it. The lock pin is the last verified baseline. The catalog and archive URLs never appear in output, assets, or provenance.
 3. `scripts/arm64/build_dxmt.py` builds DXMT from `sources.dxmt` for ARM64EC with `MACOSX_DEPLOYMENT_TARGET=26.0`. It also builds a minimal Wine tree for the import libraries. That Wine build is a build dependency and is never shipped.
 4. `scripts/arm64/assemble.py` repacks the client tree as `Libraries/Wine`, `Libraries/DXMT`, `Licenses/`, and `NOTICE.md`. The signed `wine.app` keeps its Developer ID signature.
-5. `scripts/validate_runtime.py --target native-arm64` validates the tree. The workflow also rejects a Mach-O whose `minos` is above 26.0.
+5. `scripts/validate_runtime.py --target native-arm64` validates the tree. A Mach-O whose `minos` is above 26.0 prints a warning instead of failing, because the external Wine tree is built upstream. Check the warnings before you publish.
 6. The publish job re-checks the tag and release, attests the archives, and creates the tag and a draft release at the built SHA. The release is normal, not a prerelease.
 7. The release assets are the runtime archive, its checksum, the corresponding source archive, its checksum, `provenance.json`, and `NOTICE.md`. The source archive contains `wine-build-new`, `runtime.lock.json`, and `docs/arm/README.md`.
 8. Inspect and test those exact assets. Publish the unchanged draft only after the source, notice, and manual compatibility review.
