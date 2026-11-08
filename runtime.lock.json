@@ -3,6 +3,12 @@
   "archiveSchemaVersion": 2,
   "defaultTarget": "rosetta-x86_64",
   "deploymentTarget": "15.0",
+  "toolchain": {
+    "llvmMingw": {
+      "url": "https://github.com/mstorsjo/llvm-mingw/releases/download/20261104/llvm-mingw-20261104-ucrt-macos-universal.tar.xz",
+      "sha256": "66cbd5178c4a71b0d473e68ede172f8eb7d15d023e67f39201d0a69e21f6bf3c"
+    }
+  },
   "sources": {
     "wine": {
       "repository": "https://github.com/dappermint/winecx.git",

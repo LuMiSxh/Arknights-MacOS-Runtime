@@ -29,7 +29,7 @@ The client pins the release archive URL and SHA-256 in its `runtime.json`. There
 
 The ARM64 lane ships an external Wine tree and builds DXMT in the workflow. The catalog URL is the only secret. Store it as the repository secret `ARM64_RUNTIME_CATALOG_URL`. The `release-arm64` environment scopes the release job; restrict it to `main`, `release/*`, and `version-*`.
 
-The repository variables `LLVM_MINGW_URL` and `LLVM_MINGW_SHA256` pin the llvm-mingw release. They are public build inputs, not secrets.
+`toolchain.llvmMingw` in `runtime.lock.json` pins the llvm-mingw release URL and SHA-256. The repository variables `LLVM_MINGW_URL` and `LLVM_MINGW_SHA256` apply only when the lock has no pin. They are public build inputs, not secrets.
 
 1. Dispatch **Draft ARM64 Release** with a version such as `0.9.0`. The workflow appends `+arm`. Optionally enter a catalog release id; leave it empty to use the newest ARM64 release.
 2. The workflow selects the release id and takes the SHA-256 from the catalog, fetches the artifact, verifies it, and extracts it. The lock pin is the last verified baseline. The catalog and archive URLs never appear in output, assets, or provenance.
