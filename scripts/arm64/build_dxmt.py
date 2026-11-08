@@ -65,11 +65,15 @@ DXMT_BUILD_DIRECTORY = "dxmt-build"
 DXMT_INSTALL_DIRECTORY = "dxmt"
 EXTERNAL_WINE_DIRECTORY = Path("incoming") / "wine"
 
+# Wine's generated Makefile has no target named after a source directory, so
+# request the exact files DXMT's Meson build looks for. `aarch64-windows` is the
+# PE arch that `--enable-archs=arm64ec,aarch64` emits for the host.
 MINIMAL_WINE_TARGETS = (
-    "tools/winebuild",
-    "libs/winecrt0",
-    "dlls/ntdll",
-    "dlls/dbghelp",
+    "tools/winebuild/winebuild",
+    "libs/winecrt0/aarch64-windows/libwinecrt0.a",
+    "dlls/ntdll/aarch64-windows/libntdll.a",
+    "dlls/dbghelp/aarch64-windows/libdbghelp.a",
+    "dlls/ntdll/ntdll.so",
 )
 
 REQUIRED_DXMT_FILES = (
@@ -195,6 +199,14 @@ def verify_dxmt_install(install: Path) -> None:
     for relative in REQUIRED_DXMT_FILES:
         if not (install / relative).is_file():
             raise BuildError(f"the DXMT install is missing {relative}")
+
+
+def verify_minimal_wine_outputs(build: Path) -> None:
+    """Require every Wine file that the DXMT build links against."""
+
+    for relative in MINIMAL_WINE_TARGETS:
+        if not (build / relative).is_file():
+            raise BuildError(f"the minimal Wine build is missing {relative}")
 
 
 def _brew_prefix(builder: Builder, formula: str) -> str:
@@ -353,6 +365,7 @@ def _build_minimal_wine(
         cwd=build,
         environment=environment,
     )
+    verify_minimal_wine_outputs(build)
     stage_winemac_so(build, root / EXTERNAL_WINE_DIRECTORY)
     return build
 
