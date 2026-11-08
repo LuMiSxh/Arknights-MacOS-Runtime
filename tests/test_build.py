@@ -36,6 +36,26 @@ class BuildHelperTests(unittest.TestCase):
         checksum = path.with_name(f"{path.name}.sha256").read_text(encoding="utf-8")
         self.assertEqual(checksum, f"{sha256(path)}  runtime.tar.gz\n")
 
+    def test_nix_outputs_skip_outputs_a_package_does_not_provide(self) -> None:
+        class StubBuilder:
+            def __init__(self) -> None:
+                self.built: list[str] = []
+
+            def capture(self, *command: object, **_: object) -> str:
+                attribute = str(command[-1])
+                if command[3] == "eval":
+                    return '["out", "dev"]'
+                self.built.append(attribute)
+                return f"/nix/store/{attribute.rsplit('.', 1)[-1]}\n"
+
+        builder = StubBuilder()
+        outputs = build_helpers.nix_package_outputs(
+            builder, "github:NixOS/nixpkgs/rev", "x86_64-darwin", ("freetype",)
+        )
+
+        self.assertEqual(outputs, [Path("/nix/store/dev"), Path("/nix/store/out")])
+        self.assertFalse(any(attribute.endswith(".lib") for attribute in builder.built))
+
     def test_archive_round_trips_nested_files(self) -> None:
         member = self.root / "Libraries" / "Wine" / "bin"
         member.mkdir(parents=True)
