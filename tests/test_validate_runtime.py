@@ -268,6 +268,14 @@ class RuntimeStructureTests(unittest.TestCase):
         ):
             validate_macho_targets(candidate, "15.0", baseline)
 
+        with patch(
+            "scripts.validate_runtime.subprocess.run", side_effect=command_result
+        ):
+            self.assertEqual(
+                validate_macho_targets(candidate, "15.0", baseline, warn_newer=True),
+                (1, 0),
+            )
+
     def test_rejects_non_system_absolute_macho_dependencies(self) -> None:
         with self.assertRaisesRegex(RuntimeValidationError, "/nix/store"):
             validate_link_references(
