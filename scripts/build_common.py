@@ -458,7 +458,9 @@ def bundle_nix_libraries(
         seen.add(reference)
         name = reference.name
         if name in copied:
-            if copied[name] != reference:
+            # GNU and Apple libiconv share a name; fix_release_macho sends _iconv
+            # users to the system copy, so the first bundled one stays.
+            if copied[name] != reference and not name.startswith("libiconv"):
                 raise BuildError(
                     f"library name collision: {name} from "
                     f"{copied[name]} and {reference}"
