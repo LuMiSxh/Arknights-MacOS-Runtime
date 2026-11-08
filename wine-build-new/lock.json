@@ -66,7 +66,7 @@
       {
         "order": 79,
         "path": "wine-build-new/patches/0007-win32u-winemac-bilibili-layered-child.patch",
-        "sha256": "9abc952c23ccb2231f513c409b40a7866bbbb57d46f0a11a5c0692a1484c8f8d",
+        "sha256": "1235ba8f22e0c1f8d6f7c0f444ecfb16daf35b5f8769d0a779fb1af2556e9250",
         "modifier": "LMISXH_AKMOCL_CN",
         "default": "off"
       },
@@ -81,7 +81,7 @@
       {
         "order": 81,
         "path": "wine-build-new/patches/0009-winemac-native-fullscreen-space.patch",
-        "sha256": "b8da480a2f0174dcb80622c5f716488005e8dbca882bf258d462206e319d9651",
+        "sha256": "63649e7caf650aeca78632d98af7e0d76ebd721a177f120655f9b06334e5fc43",
         "default": "on",
         "optional": true,
         "opt_out": "LMISXH_AKMOCL_FULLSCREEN"
@@ -89,7 +89,7 @@
       {
         "order": 82,
         "path": "wine-build-new/patches/0010-ntdll-hide-software-cursor-asset.patch",
-        "sha256": "f76d6feaa0f1274d930f3b7501f99cfa4cc9e514453b325ba417c45b0bcd43b1",
+        "sha256": "38906c22221391219ce88f5e446b25e3d3cf7b05e119c351b04d8f0b6fd7b0e5",
         "modifier": "LMISXH_AKMOCL_CURSOR",
         "default": "off",
         "optional": true

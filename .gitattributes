@@ -1,2 +1,3 @@
 patches/** -whitespace
+wine-build-new/patches/** -whitespace
 LICENSES/** -whitespace
