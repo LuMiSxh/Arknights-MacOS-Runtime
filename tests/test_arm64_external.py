@@ -427,44 +427,13 @@ def test_fetch_target_rejects_a_non_wine_catalog(tmp_path):
         )
 
 
-def test_fetch_target_rejects_a_sha_mismatch_for_the_locked_release(
-    tmp_path, monkeypatch
-):
-    def fake_fetch(env_name, release_id, output):
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_bytes(b"archive")
-        return (
-            {
-                "id": RELEASE_ID,
-                "arch": "arm64",
-                "sha256": "c" * 64,
-                "size": 7,
-            },
-            output,
-        )
-
-    def fake_extract(archive, destination):
-        (destination / "wine").mkdir()
-
-    monkeypatch.setattr(fetch_external, "fetch_selected_release", fake_fetch)
-    monkeypatch.setattr(fetch_external, "_extract_archive", fake_extract)
-
-    with pytest.raises(FetchError, match="lock pin"):
-        fetch_external._fetch_target(
-            {
-                "artifact": {
-                    "catalog": "wine",
-                    "release": RELEASE_ID,
-                    "sha256": "a" * 64,
-                }
-            },
-            tmp_path / "incoming",
-            "",
-        )
-
-
-def test_fetch_target_updates_the_lock_when_the_release_id_differs(
-    tmp_path, monkeypatch
+@pytest.mark.parametrize(
+    ("catalog_id", "sha256"),
+    [("wine-11-18-arm64-v6", "b" * 64), (RELEASE_ID, "c" * 64)],
+    ids=["newer-release", "rebuilt-archive"],
+)
+def test_fetch_target_updates_the_lock_when_the_catalog_release_differs(
+    tmp_path, monkeypatch, catalog_id, sha256
 ):
     pin_writes = []
 
@@ -473,9 +442,9 @@ def test_fetch_target_updates_the_lock_when_the_release_id_differs(
         output.write_bytes(b"archive")
         return (
             {
-                "id": "wine-11-18-arm64-v6",
+                "id": catalog_id,
                 "arch": "arm64",
-                "sha256": "b" * 64,
+                "sha256": sha256,
                 "size": 7,
             },
             output,
@@ -484,8 +453,8 @@ def test_fetch_target_updates_the_lock_when_the_release_id_differs(
     def fake_extract(archive, destination):
         (destination / "wine").mkdir()
 
-    def fake_write_artifact_pin(root, target, release, sha256):
-        pin_writes.append((target, release, sha256))
+    def fake_write_artifact_pin(root, target, release, pinned_sha256):
+        pin_writes.append((target, release, pinned_sha256))
         return True
 
     monkeypatch.setattr(fetch_external, "fetch_selected_release", fake_fetch)
@@ -505,7 +474,7 @@ def test_fetch_target_updates_the_lock_when_the_release_id_differs(
         "",
     )
 
-    assert pin_writes == [("native-arm64", "wine-11-18-arm64-v6", "b" * 64)]
+    assert pin_writes == [("native-arm64", catalog_id, sha256)]
 
 
 def test_fetch_target_keeps_the_lock_when_extraction_fails(tmp_path, monkeypatch):

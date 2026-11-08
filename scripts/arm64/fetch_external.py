@@ -226,8 +226,6 @@ def _fetch_target(lock: dict[str, Any], output: Path, release_id: str) -> None:
     release, archive = fetch_selected_release(
         WINE_CATALOG_ENV, release_id, output / "wine.tar.xz"
     )
-    if release["id"] == artifact["release"] and release["sha256"] != artifact["sha256"]:
-        raise FetchError("catalog SHA-256 does not match the lock pin for that release")
     metadata = {
         key: release[key]
         for key in ("id", "arch", "sha256", "size", "published_at")
@@ -241,9 +239,16 @@ def _fetch_target(lock: dict[str, Any], output: Path, release_id: str) -> None:
     _extract_archive(archive, output)
     if not (output / "wine").is_dir():
         raise FetchError("extracted archive has no wine directory")
-    if release["id"] != artifact["release"] and write_artifact_pin(
-        ROOT, lock["target"], release["id"], release["sha256"]
-    ):
+    # The upstream catalog sometimes replaces a release's archive under the same id, so a
+    # new SHA-256 for the pinned id is re-pinned with a warning instead of failing.
+    if release["id"] == artifact["release"] and release["sha256"] != artifact["sha256"]:
+        warning(
+            f"The catalog archive for {release['id']} changed since it was pinned "
+            f"({artifact['sha256']} -> {release['sha256']})"
+        )
+    if (
+        release["id"] != artifact["release"] or release["sha256"] != artifact["sha256"]
+    ) and write_artifact_pin(ROOT, lock["target"], release["id"], release["sha256"]):
         warning(
             f"Updated the {lock['target']} artifact pin to {release['id']} "
             f"({release['sha256']})"
