@@ -1,17 +1,18 @@
 # SPDX-License-Identifier: MPL-2.0
 
+import copy
 import hashlib
 import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
+from scripts.build_common import sha256
 from scripts.runtime import (
     LockError,
-    _sha256_file,
     load_lock,
     monitored_sources,
-    patches_for_stage,
     prepare,
     source_directory,
 )
@@ -21,7 +22,7 @@ class RuntimeLockTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary_directory.name)
-        patch = self.root / "patches" / "wine" / "audio" / "0001.patch"
+        patch = self.root / "patches" / "wine" / "0001.patch"
         patch.parent.mkdir(parents=True)
         patch.write_text("example patch\n", encoding="utf-8")
         self.lock = {
@@ -77,9 +78,11 @@ class RuntimeLockTests(unittest.TestCase):
                 {
                     "id": "wine-audio-default-output",
                     "component": "wine",
-                    "family": "audio",
+                    "number": 12,
+                    "gate": "LMISXH_AKMOCL_AUDIO",
+                    "default": True,
                     "targets": ["rosetta-x86_64"],
-                    "path": "patches/wine/audio/0001.patch",
+                    "path": "patches/wine/0001.patch",
                     "sha256": hashlib.sha256(b"example patch\n").hexdigest(),
                 }
             ],
@@ -136,66 +139,48 @@ class RuntimeLockTests(unittest.TestCase):
         with self.assertRaisesRegex(LockError, "hash mismatch"):
             load_lock(self.write_lock(), repository_root=self.root)
 
-    def test_combined_stage_preserves_declared_patch_order(self) -> None:
-        loaded = load_lock(self.write_lock(), repository_root=self.root)
+    def test_prepare_applies_the_whole_patch_list_in_lock_order(self) -> None:
+        def entry(patch_id: str, component: str, path: str) -> dict[str, str]:
+            return {"id": patch_id, "component": component, "path": path}
+
+        view = {
+            "target": "rosetta-x86_64",
+            "defaultTarget": "rosetta-x86_64",
+            "buildMode": "build",
+            "sources": {
+                "wine": {"repository": "https://example.invalid/wine", "commit": "1"},
+                "dxmt": {"repository": "https://example.invalid/dxmt", "commit": "2"},
+            },
+            "patches": [
+                entry("a", "wine", "patches/wine/0003-first.patch"),
+                entry("b", "dxmt", "patches/dxmt/0001-third.patch"),
+                entry("c", "wine", "patches/wine/0004-second.patch"),
+            ],
+        }
+        applied: list[str] = []
+
+        def record(*command: str, cwd: Path | None = None) -> None:
+            if command[:2] == ("git", "apply") and command[2] != "--check":
+                applied.append(Path(command[2]).name)
+
+        with (
+            mock.patch("scripts.runtime.load_lock", return_value=view),
+            mock.patch("scripts.runtime._run", side_effect=record),
+        ):
+            prepare(self.root / "sources")
+
         self.assertEqual(
-            [p["id"] for p in patches_for_stage(loaded, "combined")],
-            ["wine-audio-default-output"],
+            applied,
+            ["0001-third.patch", "0003-first.patch", "0004-second.patch"],
         )
-
-    def test_family_stage_selects_only_that_family(self) -> None:
-        hardware_cursor = dict(self.lock["patches"][0])
-        hardware_cursor.update(
-            id="wine-hardware-cursor-suppression",
-            family="hardware-cursor",
-        )
-        self.lock["patches"].append(hardware_cursor)
-        loaded = load_lock(self.write_lock(), repository_root=self.root)
-
-        self.assertEqual(len(patches_for_stage(loaded, "audio")), 1)
-        self.assertEqual(
-            patches_for_stage(loaded, "hardware-cursor"), [hardware_cursor]
-        )
-        self.assertEqual(patches_for_stage(loaded, "ace"), [])
-
-    def test_cef_family_stage_is_separate_from_cn_windowing(self) -> None:
-        cef = dict(self.lock["patches"][0])
-        cef.update(
-            id="wine-cef-bilibili-stackbase",
-            family="cef",
-        )
-        cn = dict(self.lock["patches"][0])
-        cn.update(
-            id="wine-cn-bilibili-layered-child",
-            family="cn",
-        )
-        self.lock["patches"] = [cef, cn]
-        loaded = load_lock(self.write_lock(), repository_root=self.root)
-
-        self.assertEqual(patches_for_stage(loaded, "cef"), [cef])
-        self.assertEqual(patches_for_stage(loaded, "cn"), [cn])
 
     def test_hashes_files_incrementally(self) -> None:
         path = self.root / "payload"
         path.write_bytes(b"abc")
         self.assertEqual(
-            _sha256_file(path),
+            sha256(path),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
         )
-
-    def test_performance_stage_is_isolated_and_included_in_combined(self) -> None:
-        performance = dict(self.lock["patches"][0])
-        performance.update(
-            id="example-performance",
-            component="dxmt",
-            family="performance",
-        )
-        self.lock["patches"].append(performance)
-        loaded = load_lock(self.write_lock(), repository_root=self.root)
-
-        self.assertEqual(patches_for_stage(loaded, "performance"), [performance])
-        self.assertEqual(len(patches_for_stage(loaded, "audio")), 1)
-        self.assertEqual(patches_for_stage(loaded, "combined"), self.lock["patches"])
 
     def test_repository_lock_requires_the_launcher_alias(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -262,7 +247,6 @@ class RuntimeLockTests(unittest.TestCase):
             ["wine-audio-default-output"],
         )
         self.assertEqual(arm64_view["patches"], [])
-        self.assertEqual(patches_for_stage(arm64_view, "combined"), [])
 
     def test_rejects_an_undeclared_target(self) -> None:
         with self.assertRaisesRegex(LockError, "unknown target"):
@@ -301,6 +285,22 @@ class RuntimeLockTests(unittest.TestCase):
         with self.assertRaisesRegex(LockError, "does not build"):
             load_lock(self.write_lock(), repository_root=self.root)
 
+    def test_rejects_a_malformed_patch_schema_field(self) -> None:
+        cases = {
+            "number": (0, "number must be a positive integer"),
+            "gate": (7, "gate must be a string or null"),
+            "default": ("yes", "default must be a boolean"),
+        }
+        for field, (value, message) in cases.items():
+            with self.subTest(field=field):
+                lock = copy.deepcopy(self.lock)
+                lock["patches"][0][field] = value
+                path = self.root / f"{field}.lock.json"
+                path.write_text(json.dumps(lock), encoding="utf-8")
+
+                with self.assertRaisesRegex(LockError, message):
+                    load_lock(path, repository_root=self.root)
+
     def test_rejects_unknown_target_keys(self) -> None:
         self.lock["targets"]["rosetta-x86_64"] = {"sorce": {}}
 
@@ -320,17 +320,12 @@ class RuntimeLockTests(unittest.TestCase):
             self.write_lock(), repository_root=self.root, target="native-arm64"
         )
 
-        self.assertEqual(
-            source_directory("wine", "combined", default_view), "wine-combined"
-        )
-        self.assertEqual(
-            source_directory("wine", "combined", arm64_view),
-            "wine-native-arm64-combined",
-        )
+        self.assertEqual(source_directory("wine", default_view), "wine")
+        self.assertEqual(source_directory("wine", arm64_view), "wine-native-arm64")
 
     def test_rejects_an_unknown_patch_to_skip(self) -> None:
         with self.assertRaisesRegex(LockError, "unknown patch to skip"):
-            prepare("audio", self.root / "sources", skip_patches=("missing",))
+            prepare(self.root / "sources", skip_patches=("missing",))
 
     def test_repository_lock_declares_the_native_arm64_target(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -374,7 +369,7 @@ class RuntimeLockTests(unittest.TestCase):
 
     def test_prepare_refuses_an_external_target(self) -> None:
         with self.assertRaisesRegex(LockError, "external"):
-            prepare("combined", target="native-arm64")
+            prepare(target="native-arm64")
 
 
 if __name__ == "__main__":

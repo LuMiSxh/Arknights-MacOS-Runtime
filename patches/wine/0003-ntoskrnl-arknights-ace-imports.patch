@@ -21,7 +21,7 @@ index ffa409a7..18ab5c93 100644
      NtQueryInformationProcess( handle, ProcessBasicInformation, &process->info, sizeof(process->info), NULL );
 -    NtQueryInformationProcess( handle, ProcessSessionInformation, &process->session_id, sizeof(process->session_id), NULL );
 -    NtQueryInformationProcess( handle, ProcessTimes, &process->times, sizeof(process->times), NULL );
-+    if (lmisxh_akmocl_ace_enabled())
++    if (lmisxh_akmocl_ace_imports_enabled())
 +    {
 +        /* get full image name */
 +        len = 0;
@@ -76,7 +76,7 @@ index ffa409a7..18ab5c93 100644
 +{
 +    PEPROCESS process = obj;
 +
-+    if (lmisxh_akmocl_ace_enabled() && process->token)
++    if (lmisxh_akmocl_ace_imports_enabled() && process->token)
 +        ObDereferenceObject(process->token);
 +
 +    process->token = NULL;
@@ -128,7 +128,7 @@ index ffa409a7..18ab5c93 100644
 + */
 +PACCESS_TOKEN WINAPI PsReferencePrimaryToken( PEPROCESS process )
 +{
-+    if (!lmisxh_akmocl_ace_enabled()) return NULL;
++    if (!lmisxh_akmocl_ace_imports_enabled()) return NULL;
 +    TRACE("%p -> %p\n", process, process->token);
 +    if (process->token) ObReferenceObject(process->token);
 +    return process->token;
@@ -146,7 +146,7 @@ index ffa409a7..18ab5c93 100644
 + */
 +PEPROCESS WINAPI PsGetThreadProcess(PETHREAD thread)
 +{
-+    if (!lmisxh_akmocl_ace_enabled()) return NULL;
++    if (!lmisxh_akmocl_ace_imports_enabled()) return NULL;
 +    TRACE("%p -> %p\n", thread, thread->kthread.process);
 +    return thread->kthread.process;
 +}
@@ -166,7 +166,7 @@ index ffa409a7..18ab5c93 100644
 +    NTSTATUS status;
 +    HANDLE handle, id;
 +
-+    if (!lmisxh_akmocl_ace_enabled()) return STATUS_NOT_IMPLEMENTED;
++    if (!lmisxh_akmocl_ace_imports_enabled()) return STATUS_NOT_IMPLEMENTED;
 +
 +    id = PsGetThreadId(thread);
 +    if (!(handle = OpenThread(THREAD_ALL_ACCESS, FALSE, HandleToUlong(id))))
@@ -190,7 +190,7 @@ index ffa409a7..18ab5c93 100644
 +    static PHYSICAL_MEMORY_RANGE range;
 +    SYSTEM_BASIC_INFORMATION info = {0};
 +
-+    if (!lmisxh_akmocl_ace_enabled()) return NULL;
++    if (!lmisxh_akmocl_ace_imports_enabled()) return NULL;
 +    TRACE("\n");
 +
 +    if (!InterlockedCompareExchange(&once, 1, 0))
@@ -212,7 +212,7 @@ index ffa409a7..18ab5c93 100644
 + */
 +void *WINAPI MmGetVirtualForPhysical(PHYSICAL_ADDRESS addr)
 +{
-+    if (!lmisxh_akmocl_ace_enabled()) return NULL;
++    if (!lmisxh_akmocl_ace_imports_enabled()) return NULL;
 +    ULONG_PTR ret = addr.QuadPart;
 +    FIXME("(%p): semi-stub!\n", (void *)ret);
 +    return (void *)ret;
@@ -254,7 +254,7 @@ index ffa409a7..18ab5c93 100644
 +NTSTATUS WINAPI SeSetAuditParameter(void *audit_parameters, LONG type, ULONG index, void *data)
 +{
 +    FIXME("%p %ld %lu %p\n", audit_parameters, type, index, data);
-+    if (!lmisxh_akmocl_ace_enabled()) return STATUS_NOT_IMPLEMENTED;
++    if (!lmisxh_akmocl_ace_imports_enabled()) return STATUS_NOT_IMPLEMENTED;
 +    return STATUS_SUCCESS;
 +}
 +
@@ -273,7 +273,7 @@ index ffa409a7..18ab5c93 100644
 +    TRACE("%p %p\n", process, image_name);
 +
 +    if (!image_name) return STATUS_INVALID_PARAMETER;
-+    if (!lmisxh_akmocl_ace_enabled())
++    if (!lmisxh_akmocl_ace_imports_enabled())
 +    {
 +        *image_name = NULL;
 +        return STATUS_NOT_IMPLEMENTED;
@@ -340,7 +340,7 @@ diff --git a/dlls/ntoskrnl.exe/ntoskrnl.exe.spec b/dlls/ntoskrnl.exe/ntoskrnl.ex
 index 21305dea..d7cd98b7 100644
 --- a/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
 +++ b/dlls/ntoskrnl.exe/ntoskrnl.exe.spec
-@@ -550,7 +550,7 @@
+@@ -550,7 +794,7 @@
  @ stdcall KeBugCheck(long)
  @ stdcall KeBugCheckEx(long long long long long)
  @ stdcall KeCancelTimer(ptr)
@@ -349,7 +349,7 @@ index 21305dea..d7cd98b7 100644
  @ stdcall KeClearEvent(ptr)
  @ stub KeConnectInterrupt
  @ stub KeDcacheFlushCount
-@@ -729,9 +729,9 @@
+@@ -729,9 +973,9 @@
  @ stdcall MmFreeNonCachedMemory(ptr long)
  @ stub MmFreePagesFromMdl
  @ stdcall MmGetPhysicalAddress(ptr)
@@ -361,7 +361,7 @@ index 21305dea..d7cd98b7 100644
  @ stub MmGrowKernelStack
  @ stub MmHighestUserAddress
  @ stdcall MmIsAddressValid(ptr)
-@@ -911,12 +911,14 @@
+@@ -911,12 +1155,14 @@
  @ stub PsDereferencePrimaryToken
  @ stub PsDisableImpersonation
  @ stub PsEstablishWin32Callouts
@@ -377,7 +377,7 @@ index 21305dea..d7cd98b7 100644
  @ stub PsGetCurrentThreadPreviousMode
  @ stub PsGetCurrentThreadStackBase
  @ stub PsGetCurrentThreadStackLimit
-@@ -926,10 +928,10 @@
+@@ -926,10 +1172,10 @@
  @ stdcall PsGetProcessCreateTimeQuadPart(ptr)
  @ stub PsGetProcessDebugPort
  @ stub PsGetProcessExitProcessCalled
@@ -390,7 +390,7 @@ index 21305dea..d7cd98b7 100644
  @ stdcall PsGetProcessInheritedFromUniqueProcessId(ptr)
  @ stub PsGetProcessJob
  @ stub PsGetProcessPeb
-@@ -943,7 +945,7 @@
+@@ -943,7 +1189,7 @@
  @ stub PsGetThreadFreezeCount
  @ stub PsGetThreadHardErrorsAreDisabled
  @ stdcall PsGetThreadId(ptr)
@@ -399,7 +399,7 @@ index 21305dea..d7cd98b7 100644
  @ stdcall PsGetThreadProcessId(ptr)
  @ stub PsGetThreadSessionId
  @ stub PsGetThreadTeb
-@@ -961,7 +963,7 @@
+@@ -961,7 +1207,7 @@
  @ stdcall PsLookupThreadByThreadId(ptr ptr)
  @ extern PsProcessType
  @ stub PsReferenceImpersonationToken
@@ -408,7 +408,7 @@ index 21305dea..d7cd98b7 100644
  @ stdcall PsReferenceProcessFilePointer(ptr ptr)
  @ stdcall PsReleaseProcessExitSynchronization(ptr)
  @ stdcall PsRemoveCreateThreadNotifyRoutine(ptr)
-@@ -1375,6 +1377,7 @@
+@@ -1375,6 +1621,7 @@
  @ stub SeReleaseSecurityDescriptor
  @ stub SeReleaseSubjectContext
  @ stub SeSetAccessStateGenericMapping
@@ -420,23 +420,45 @@ diff --git a/dlls/ntoskrnl.exe/ntoskrnl_private.h b/dlls/ntoskrnl.exe/ntoskrnl_p
 index feb5f0ad..98365595 100644
 --- a/dlls/ntoskrnl.exe/ntoskrnl_private.h
 +++ b/dlls/ntoskrnl.exe/ntoskrnl_private.h
-@@ -39,6 +39,23 @@
+@@ -39,6 +286,45 @@
  #include "wine/list.h"
  #include "wine/rbtree.h"
  
-+/* The ACE compatibility surface is opt-in. The Arknights master switch
-+ * enables it. */
-+static inline BOOL lmisxh_akmocl_ace_enabled(void)
++/* The ACE import surface is on by default. Unset or "1" enables it; any other
++ * value disables it. */
++static inline BOOL lmisxh_akmocl_flag( const char *name )
++{
++    WCHAR nameW[32];
++    WCHAR valueW[2];
++    UNICODE_STRING nameU, valueU;
++    NTSTATUS status;
++    unsigned int i;
++
++    for (i = 0; name[i] && i < sizeof(nameW) / sizeof(nameW[0]) - 1; i++)
++        nameW[i] = (unsigned char)name[i];
++    nameW[i] = 0;
++
++    nameU.Length = i * sizeof(WCHAR);
++    nameU.MaximumLength = (i + 1) * sizeof(WCHAR);
++    nameU.Buffer = nameW;
++    valueU.Length = 0;
++    valueU.MaximumLength = sizeof(valueW);
++    valueU.Buffer = valueW;
++
++    status = RtlQueryEnvironmentVariable_U( NULL, &nameU, &valueU );
++    if (status == STATUS_VARIABLE_NOT_FOUND) return TRUE;
++    return status == STATUS_SUCCESS && valueU.Length == sizeof(WCHAR) && valueW[0] == '1';
++}
++
++static inline BOOL lmisxh_akmocl_ace_imports_enabled(void)
 +{
 +    static LONG state = -1;
 +    LONG value = state;
-+    char flag[2];
 +
 +    if (value == -1)
 +    {
-+        value = GetEnvironmentVariableA("LMISXH_AKMOCL", flag, sizeof(flag)) == 1 && flag[0] == '1';
-+        /* ACE compatibility follows the Arknights master switch. */
-+        InterlockedCompareExchange(&state, value, -1);
++        value = lmisxh_akmocl_flag( "LMISXH_AKMOCL_ACE_IMPORTS" );
++        InterlockedCompareExchange( &state, value, -1 );
 +    }
 +    return value;
 +}
@@ -444,7 +466,7 @@ index feb5f0ad..98365595 100644
  static inline LPCSTR debugstr_us( const UNICODE_STRING *us )
  {
      if (!us) return "<null>";
-@@ -59,6 +75,8 @@ struct _EPROCESS
+@@ -59,6 +345,8 @@ struct _EPROCESS
      KERNEL_USER_TIMES times;
      BOOL wow64;
      ULONG session_id;
@@ -453,7 +475,7 @@ index feb5f0ad..98365595 100644
  };
  
  struct _KTHREAD
-@@ -75,6 +93,12 @@ struct _ETHREAD
+@@ -75,6 +363,12 @@ struct _ETHREAD
      struct _KTHREAD kthread;
  };
  

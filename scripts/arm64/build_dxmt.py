@@ -25,28 +25,38 @@ from typing import Any
 
 if __package__:
     from ..build_common import (
+        NATIVE_ARM64_TARGET,
+        WINE_CONFIGURE_FLAGS,
+        WINE_PREFIX,
         Builder,
         BuildError,
+        adhoc_sign,
         is_macho,
         logical_cpu_count,
+        write_compiler_launcher_cross_file,
         write_dxmt_native_file,
     )
     from ..lib.console import error, success
-    from ..runtime import LockError, load_lock
+    from ..runtime import LockError
+    from .fetch_external import require_external_lock
 else:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from scripts.arm64.fetch_external import require_external_lock
     from scripts.build_common import (
+        NATIVE_ARM64_TARGET,
+        WINE_CONFIGURE_FLAGS,
+        WINE_PREFIX,
         Builder,
         BuildError,
+        adhoc_sign,
         is_macho,
         logical_cpu_count,
+        write_compiler_launcher_cross_file,
         write_dxmt_native_file,
     )
     from scripts.lib.console import error, success
-    from scripts.runtime import LockError, load_lock
+    from scripts.runtime import LockError
 
-
-ARM64_TARGET = "native-arm64"
 
 WINE_SOURCE_DIRECTORY = "wine-build-source"
 DXMT_SOURCE_DIRECTORY = "dxmt-source"
@@ -82,7 +92,7 @@ def parse_version(value: str) -> tuple[int, int]:
     parts = value.split(".")
     try:
         return int(parts[0]), int(parts[1]) if len(parts) > 1 else 0
-    except (IndexError, ValueError) as problem:
+    except ValueError as problem:
         raise BuildError(f"invalid deployment target: {value}") from problem
 
 
@@ -189,16 +199,20 @@ def verify_dxmt_install(install: Path) -> None:
 
 def _brew_prefix(builder: Builder, formula: str) -> str:
     try:
-        return builder.capture("brew", "--prefix", formula, allow_failure=True).strip()
-    except OSError:
-        return ""
+        prefix = builder.capture(
+            "brew", "--prefix", formula, allow_failure=True
+        ).strip()
+    except OSError as problem:
+        raise BuildError(f"cannot resolve the {formula} prefix") from problem
+    if not prefix:
+        raise BuildError(f"Homebrew reported no prefix for {formula}")
+    return prefix
 
 
 def _prepend_homebrew_bin(builder: Builder, formula: str) -> None:
     prefix = _brew_prefix(builder, formula)
-    if prefix:
-        path = builder.environment.get("PATH", "")
-        builder.environment["PATH"] = f"{Path(prefix) / 'bin'}:{path}"
+    path = builder.environment.get("PATH", "")
+    builder.environment["PATH"] = f"{Path(prefix) / 'bin'}:{path}"
 
 
 def _resolve_llvm(builder: Builder, candidate: Path | None) -> Path:
@@ -273,16 +287,20 @@ def _clone_pinned(
     builder.run("git", "checkout", "--detach", commit, cwd=destination)
 
 
+def _sdk_path(builder: Builder) -> str:
+    sdk = builder.capture("xcrun", "--show-sdk-path").strip()
+    if not sdk:
+        raise BuildError("xcrun did not report a macOS SDK path")
+    return sdk
+
+
 def _configure_wine(
-    builder: Builder, source: Path, build: Path, deployment: str
+    builder: Builder, source: Path, build: Path, deployment: str, sdk: str
 ) -> None:
     build.mkdir(parents=True, exist_ok=True)
     if (build / "Makefile").is_file():
         return
     environment = dict(builder.environment)
-    sdk = builder.capture("xcrun", "--show-sdk-path").strip()
-    if not sdk:
-        raise BuildError("xcrun did not report a macOS SDK path")
     environment["SDKROOT"] = sdk
     environment["MACOSX_DEPLOYMENT_TARGET"] = deployment
     builder.run(
@@ -290,21 +308,8 @@ def _configure_wine(
         "--host=aarch64-apple-darwin",
         "--enable-archs=arm64ec,aarch64",
         "--disable-tests",
-        "--without-x",
-        "--without-wayland",
-        "--without-oss",
-        "--without-alsa",
-        "--without-pulse",
-        "--without-sane",
-        "--without-usb",
-        "--without-v4l2",
-        "--without-pcap",
-        "--without-capi",
-        "--without-opencl",
-        "--without-cups",
-        "--without-ffmpeg",
-        "--without-gstreamer",
-        "--prefix=/opt/whiskywine",
+        *WINE_CONFIGURE_FLAGS,
+        f"--prefix={WINE_PREFIX}",
         cwd=build,
         environment=environment,
     )
@@ -336,9 +341,10 @@ def _build_minimal_wine(
     wine = lock["sources"]["wine"]
     _clone_pinned(builder, wine["repository"], wine["commit"], source)
     build = root / WINE_BUILD_DIRECTORY
-    _configure_wine(builder, source, build, deployment)
+    sdk = _sdk_path(builder)
+    _configure_wine(builder, source, build, deployment, sdk)
     environment = dict(builder.environment)
-    environment["SDKROOT"] = builder.capture("xcrun", "--show-sdk-path").strip()
+    environment["SDKROOT"] = sdk
     environment["MACOSX_DEPLOYMENT_TARGET"] = deployment
     builder.run(
         "make",
@@ -379,6 +385,13 @@ def _build_dxmt(
         install,
         reconfigure=(build / "build.ninja").is_file(),
     )
+    launcher_file = write_compiler_launcher_cross_file(
+        root,
+        {"c": "arm64ec-w64-mingw32-gcc", "cpp": "arm64ec-w64-mingw32-g++"},
+        builder.environment,
+    )
+    if launcher_file is not None:
+        command += ["--cross-file", str(launcher_file)]
     builder.run(*command, environment=environment)
     builder.run("meson", "compile", "-C", build, environment=environment)
     builder.run("meson", "install", "-C", build, environment=environment)
@@ -387,16 +400,13 @@ def _build_dxmt(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target", default=ARM64_TARGET)
+    parser.add_argument("--target", default=NATIVE_ARM64_TARGET)
     parser.add_argument("--root", type=Path, default=Path(".build/arm64"))
     parser.add_argument("--llvm", type=Path)
     parser.add_argument("--llvm-mingw", type=Path)
     arguments = parser.parse_args()
     try:
-        lock = load_lock(target=arguments.target)
-        if lock["buildMode"] != "external":
-            error(f"the {lock['target']} target is not an external target")
-            return 1
+        lock = require_external_lock(arguments.target)
         root = arguments.root.resolve()
         root.mkdir(parents=True, exist_ok=True)
         builder = Builder()
@@ -409,13 +419,7 @@ def main() -> int:
         verify_dxmt_install(install)
         # DXMT is unsigned at install time. Ad-hoc sign only the Mach-O payload;
         # the PE files must keep their Wine builtin marker handling to assembly.
-        builder.run(
-            "codesign",
-            "--force",
-            "--sign",
-            "-",
-            install / "aarch64-unix" / "winemetal.so",
-        )
+        adhoc_sign(builder, install / "aarch64-unix" / "winemetal.so")
         reject_macho_above(install, parse_version(deployment))
     except (BuildError, LockError, OSError, subprocess.CalledProcessError) as caught:
         error(str(caught))

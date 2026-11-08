@@ -2,32 +2,30 @@ diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
 index 2b1338c5..5d5ddc6d 100644
 --- a/dlls/ntdll/unix/signal_x86_64.c
 +++ b/dlls/ntdll/unix/signal_x86_64.c
-@@ -1826,6 +1826,24 @@ NTSTATUS WINAPI NtCallbackReturn( void *ret_ptr, ULONG ret_len, NTSTATUS status
+@@ -1826,6 +1826,22 @@ NTSTATUS WINAPI NtCallbackReturn( void *ret_ptr, ULONG ret_len, NTSTATUS status
  }
  
  #ifdef __APPLE__
-+/* The additional Rosetta workarounds below are controlled ACE compatibility
-+ * behavior. Existing CrossOver CET/XGETBV handling remains unchanged. */
-+static volatile LONG lmisxh_akmocl_ace;
++/* The additional Rosetta workarounds below are on by default. Unset or "1"
++ * keeps them; any other value restores existing CrossOver CET/XGETBV handling. */
++static volatile LONG lmisxh_akmocl_ace_rosetta;
 +
-+static BOOL lmisxh_akmocl_ace_enabled(void)
++static BOOL lmisxh_akmocl_ace_rosetta_enabled(void)
 +{
-+    return lmisxh_akmocl_ace != 0;
++    return lmisxh_akmocl_ace_rosetta != 0;
 +}
 +
-+static void lmisxh_akmocl_ace_init(void)
++static void lmisxh_akmocl_ace_rosetta_init(void)
 +{
-+    const char *master = getenv("LMISXH_AKMOCL");
-+    const char *flag = master;
-+    InterlockedExchange(&lmisxh_akmocl_ace,
-+                        master && master[0] == '1' && master[1] == 0 &&
-+                        flag && flag[0] == '1' && flag[1] == 0);
++    const char *flag = getenv("LMISXH_AKMOCL_ACE_ROSETTA");
++    InterlockedExchange(&lmisxh_akmocl_ace_rosetta,
++                        !flag || (flag[0] == '1' && flag[1] == 0));
 +}
 +
  /***********************************************************************
   *           handle_cet_nop
   *
-@@ -1876,6 +1891,34 @@ static inline BOOL handle_cet_nop( ucontext_t *sigcontext, CONTEXT *context )
+@@ -1876,6 +1892,34 @@ static inline BOOL handle_cet_nop( ucontext_t *sigcontext, CONTEXT *context )
          if (i == len - 1) return 0;
          switch (instr[i + 1])
          {
@@ -39,7 +37,7 @@ index 2b1338c5..5d5ddc6d 100644
 +            BOOL has_sib = FALSE;
 +            BYTE modrm, sib;
 +
-+            if (!lmisxh_akmocl_ace_enabled() || p >= len) return FALSE;
++            if (!lmisxh_akmocl_ace_rosetta_enabled() || p >= len) return FALSE;
 +            modrm = instr[p++];
 +            if (modrm & 0x38) return FALSE; /* /0 is the NOP encoding */
 +            mod = modrm >> 6;
@@ -62,23 +60,23 @@ index 2b1338c5..5d5ddc6d 100644
          case 0x1E:
              /* RDSSPD/RDSSPQ: (prefixes) 0F 1E (modrm) */
              RIP_sig(sigcontext) += prefix_count + 3;
-@@ -2414,6 +2457,11 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *_sigcontext )
+@@ -2414,6 +2458,11 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *_sigcontext )
          if (handle_cet_nop( sigcontext, &context.c )) return;
          /* CW HACK 23427 */
          if (emulate_xgetbv( sigcontext, &context.c )) return;
 +        /* Rosetta can report ACE's privileged CR3 read as an invalid opcode
 +         * rather than a general-protection fault. Preserve Wine's normal
 +         * classification unless the ACE compact compatibility route is enabled. */
-+        if (lmisxh_akmocl_ace_enabled() &&
++        if (lmisxh_akmocl_ace_rosetta_enabled() &&
 +            (rec.ExceptionCode = is_privileged_instr( &context.c ))) break;
  #endif
          rec.ExceptionCode = EXCEPTION_ILLEGAL_INSTRUCTION;
          break;
-@@ -2987,6 +3035,7 @@ void signal_init_process( TEB *teb )
+@@ -2987,6 +3036,7 @@ void signal_init_process( TEB *teb )
      signal_alloc_thread( teb );
  
  #ifdef __APPLE__
-+    lmisxh_akmocl_ace_init();
++    lmisxh_akmocl_ace_rosetta_init();
      /* CW Hack 24256: We need the value of sysctl.proc_translated in signal
         handlers but sysctl[byname] is not signal-safe. */
      {

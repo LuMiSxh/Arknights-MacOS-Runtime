@@ -1,0 +1,76 @@
+diff --git a/dlls/kernel32/module.c b/dlls/kernel32/module.c
+index ac880100..e19cb202 100644
+--- a/dlls/kernel32/module.c
++++ b/dlls/kernel32/module.c
+@@ -261,6 +261,55 @@ BOOL WINAPI GetBinaryTypeA( LPCSTR lpApplicationName, LPDWORD lpBinaryType )
+     return GetBinaryTypeW(NtCurrentTeb()->StaticUnicodeString.Buffer, lpBinaryType);
+ }
+ 
++#ifdef __x86_64__
++/* The dispatcher spoof is on by default. Unset or "1" enables it; any other
++ * value preserves Wine's normal dispatcher path. */
++static inline BOOL lmisxh_akmocl_flag( const char *name )
++{
++    WCHAR nameW[32];
++    WCHAR valueW[2];
++    UNICODE_STRING nameU, valueU;
++    NTSTATUS status;
++    unsigned int i;
++
++    for (i = 0; name[i] && i < sizeof(nameW) / sizeof(nameW[0]) - 1; i++)
++        nameW[i] = (unsigned char)name[i];
++    nameW[i] = 0;
++
++    nameU.Length = i * sizeof(WCHAR);
++    nameU.MaximumLength = (i + 1) * sizeof(WCHAR);
++    nameU.Buffer = nameW;
++    valueU.Length = 0;
++    valueU.MaximumLength = sizeof(valueW);
++    valueU.Buffer = valueW;
++
++    status = RtlQueryEnvironmentVariable_U( NULL, &nameU, &valueU );
++    if (status == STATUS_VARIABLE_NOT_FOUND) return TRUE;
++    return status == STATUS_SUCCESS && valueU.Length == sizeof(WCHAR) && valueW[0] == '1';
++}
++
++static inline BOOL lmisxh_akmocl_ace_dispatcher_enabled(void)
++{
++    static LONG state = -1;
++    LONG value = state;
++
++    if (value == -1)
++    {
++        value = lmisxh_akmocl_flag( "LMISXH_AKMOCL_ACE_DISPATCHER" );
++        InterlockedCompareExchange( &state, value, -1 );
++    }
++    return value;
++}
++
++static void __attribute__((naked)) int3_stub( void )
++{
++    asm("int3\t\n"
++        "int3\t\n"
++        "int3\t\n"
++        "int3\t\n");
++}
++#endif
++
+ /***********************************************************************
+  *           GetProcAddress   		(KERNEL32.@)
+  *
+@@ -284,6 +333,15 @@ FARPROC get_proc_address( HMODULE hModule, LPCSTR function )
+     {
+         ANSI_STRING     str;
+ 
++#ifdef __x86_64__
++        if (lmisxh_akmocl_ace_dispatcher_enabled() &&
++            (strcmp( function, "KiUserApcDispatcher" ) == 0 || strcmp( function, "KiUserCallbackDispatcher" ) == 0))
++        {
++            FIXME( "HACK: returning int3 stub instead of %s\n", function );
++            return (FARPROC)&int3_stub;
++        }
++#endif
++
+         RtlInitAnsiString( &str, function );
+         if (!set_ntstatus( LdrGetProcedureAddress( hModule, &str, 0, (void**)&fp ))) return NULL;
+     }

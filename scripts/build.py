@@ -19,36 +19,27 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.build_common import Builder, BuildError
-from scripts.build_x86 import StageError, build_canary
+from scripts.build_x86 import build_canary
+from scripts.lib.console import error, success
 from scripts.runtime import LockError
 
 
 def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    canary = commands.add_parser("canary", help="build one patch family overlay")
-    canary.add_argument("stage", nargs="?", default="combined")
+    canary = commands.add_parser("canary", help="build the all-patches overlay canary")
     canary.add_argument("--clean-release", action="store_true")
     commands.add_parser("release", help="build the clean release artifact")
     parsed = parser.parse_args(arguments)
     builder = Builder()
     try:
         if parsed.command == "canary":
-            artifact = build_canary(
-                builder, parsed.stage, clean_release=parsed.clean_release
-            )
+            artifact = build_canary(builder, clean_release=parsed.clean_release)
         else:
-            artifact = build_canary(builder, "combined", clean_release=True)
-    except StageError as failure:
-        print(f"error: {failure}", file=sys.stderr)
-        return 2
+            artifact = build_canary(builder, clean_release=True)
     except (BuildError, LockError, OSError, subprocess.CalledProcessError) as failure:
-        from scripts.lib.console import error
-
         error(str(failure))
         return 1
-    from scripts.lib.console import success
-
     success(f"artifact: {artifact}")
     return 0
 

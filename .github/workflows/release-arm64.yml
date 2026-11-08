@@ -20,6 +20,11 @@ concurrency:
 
 env:
     PYTHONDONTWRITEBYTECODE: "1"
+    CCACHE_DIR: ${{ github.workspace }}/.ccache
+    CCACHE_BASEDIR: ${{ github.workspace }}
+    CCACHE_COMPILERCHECK: content
+    CCACHE_MAXSIZE: 2G
+    LMISXH_AKMOCL_CCACHE: ccache
 
 jobs:
     validate:
@@ -57,6 +62,32 @@ jobs:
 
             - run: just check
 
+            - name: Restore compiler cache
+              uses: actions/cache@v4.3.0
+              with:
+                  path: ${{ github.workspace }}/.ccache
+                  key: ${{ runner.os }}-${{ runner.arch }}-ccache-arm64-${{ hashFiles('runtime.lock.json') }}-${{ github.sha }}
+                  restore-keys: |
+                      ${{ runner.os }}-${{ runner.arch }}-ccache-arm64-${{ hashFiles('runtime.lock.json') }}-
+                      ${{ runner.os }}-${{ runner.arch }}-ccache-arm64-
+
+            - name: Restore pinned sources
+              uses: actions/cache@v4.3.0
+              with:
+                  path: |
+                      ${{ github.workspace }}/.build/arm64/wine-build-source
+                      ${{ github.workspace }}/.build/arm64/dxmt-source
+                  key: ${{ runner.os }}-${{ runner.arch }}-arm64-sources-${{ hashFiles('runtime.lock.json') }}
+
+            - name: Restore the llvm-mingw archive
+              uses: actions/cache@v4.3.0
+              with:
+                  path: ${{ github.workspace }}/.build/toolchains/llvm-mingw.tar.xz
+                  key: ${{ runner.os }}-${{ runner.arch }}-arm64-toolchain-${{ hashFiles('runtime.lock.json') }}-${{ vars.LLVM_MINGW_SHA256 }}
+                  restore-keys: |
+                      ${{ runner.os }}-${{ runner.arch }}-arm64-toolchain-${{ hashFiles('runtime.lock.json') }}-
+                      ${{ runner.os }}-${{ runner.arch }}-arm64-toolchain-
+
             - name: Fetch the external Wine artifact
               env:
                   ARM64_RUNTIME_CATALOG_URL: ${{ secrets.ARM64_RUNTIME_CATALOG_URL }}
@@ -73,25 +104,56 @@ jobs:
                   LLVM_MINGW_SHA256: ${{ vars.LLVM_MINGW_SHA256 }}
               run: |
                   set -euo pipefail
-                  test -n "$LLVM_MINGW_URL"
-                  test -n "$LLVM_MINGW_SHA256"
+                  pin="$(uv run --locked --no-dev scripts/arm64/llvm_mingw.py)"
+                  url="${pin%%$'\n'*}"
+                  sha="${pin#*$'\n'}"
+                  if [ -z "$url" ]; then
+                    url="$LLVM_MINGW_URL"
+                    sha="$LLVM_MINGW_SHA256"
+                  fi
+                  test -n "$url"
+                  test -n "$sha"
+                  archive=.build/toolchains/llvm-mingw.tar.xz
+                  toolchain=.build/toolchains/llvm-mingw
                   mkdir -p .build/toolchains
-                  curl -fsSL "$LLVM_MINGW_URL" -o .build/toolchains/llvm-mingw.tar.xz
-                  echo "$LLVM_MINGW_SHA256  .build/toolchains/llvm-mingw.tar.xz" | shasum -a 256 -c -
-                  mkdir -p .build/toolchains/llvm-mingw
-                  tar -xf .build/toolchains/llvm-mingw.tar.xz -C .build/toolchains/llvm-mingw --strip-components=1
+                  fetch_archive() {
+                    curl -fsSL "$url" -o "$archive.part"
+                    echo "$sha  $archive.part" | shasum -a 256 -c -
+                    mv "$archive.part" "$archive"
+                  }
+                  if [ ! -f "$archive" ]; then
+                    fetch_archive
+                  fi
+                  if ! echo "$sha  $archive" | shasum -a 256 -c -; then
+                    rm -f "$archive"
+                    fetch_archive
+                  fi
+                  mkdir -p "$toolchain"
+                  tar -xf "$archive" -C "$toolchain" --strip-components=1
+
+            - name: Read the macOS deployment target from the lock
+              run: |
+                  set -euo pipefail
+                  floor="$(uv run --locked --no-dev python -c \
+                    'from scripts.runtime import load_lock; print(load_lock(target="native-arm64")["deploymentTarget"])')"
+                  echo "MACOSX_DEPLOYMENT_TARGET=$floor" >> "$GITHUB_ENV"
 
             - name: Build DXMT for ARM64EC
               env:
-                  MACOSX_DEPLOYMENT_TARGET: "26.0"
                   LLVM_MINGW_ROOT: ${{ github.workspace }}/.build/toolchains/llvm-mingw
+                  CC: ccache clang
+                  CXX: ccache clang++
               run: |
-                  brew install llvm@15 meson ninja bison flex pkg-config
+                  brew install ccache llvm@15 meson ninja bison flex pkg-config
                   uv run --locked --no-dev scripts/arm64/build_dxmt.py \
                     --target native-arm64 \
                     --root .build/arm64 \
                     --llvm "$(brew --prefix llvm@15)" \
                     --llvm-mingw "$LLVM_MINGW_ROOT"
+
+            - name: Report compiler cache statistics
+              if: ${{ always() }}
+              run: ccache -s
 
             - name: Repack the client runtime tree
               run: |
@@ -106,38 +168,34 @@ jobs:
                     .build/arm64/Libraries \
                     --target native-arm64
 
-            - name: Reject a Mach-O above the macOS 26 floor
-              run: |
-                  set -euo pipefail
-                  while IFS= read -r -d '' binary; do
-                    minos="$(vtool -show-build "$binary" | awk '/minos/ {print $2; exit}')"
-                    test -n "$minos"
-                    awk -v value="$minos" -v floor=26.0 'BEGIN { split(value, v, "."); split(floor, f, "."); if (v[1] > f[1] || (v[1] == f[1] && v[2] > f[2])) exit 1 }' \
-                      || { echo "error: $binary records minos $minos" >&2; exit 1; }
-                  done < <(find .build/arm64/Libraries -type f -perm -111 -print0)
-
             - name: Package the runtime archive
+              env:
+                  TAG: ${{ steps.version.outputs.tag }}
               run: |
                   set -euo pipefail
-                  tag="${{ steps.version.outputs.tag }}"
+                  tag="$TAG"
                   mkdir -p .build/arm64/release
                   archive=".build/arm64/release/Arknights-MacOS-Runtime-$tag.tar.gz"
                   tar -czf "$archive" -C .build/arm64 Libraries Licenses NOTICE.md
                   shasum -a 256 "$archive" > "$archive.sha256"
 
             - name: Package the corresponding source archive
+              env:
+                  TAG: ${{ steps.version.outputs.tag }}
               run: |
                   set -euo pipefail
-                  tag="${{ steps.version.outputs.tag }}"
+                  tag="$TAG"
                   source_archive=".build/arm64/release/Arknights-MacOS-Runtime-$tag-source.tar.gz"
                   tar -czf "$source_archive" \
                     wine-build-new runtime.lock.json docs/arm/provenance.md
                   shasum -a 256 "$source_archive" > "$source_archive.sha256"
 
             - name: Write provenance
+              env:
+                  TAG: ${{ steps.version.outputs.tag }}
               run: |
                   set -euo pipefail
-                  tag="${{ steps.version.outputs.tag }}"
+                  tag="$TAG"
                   uv run --locked --no-dev scripts/arm64/provenance.py \
                     --target native-arm64 \
                     --tag "$tag" \
@@ -176,6 +234,8 @@ jobs:
             attestations: write
         steps:
             - uses: actions/checkout@v7.0.1
+              with:
+                  persist-credentials: false
 
             - uses: actions/download-artifact@v8.0.2
               with:
@@ -189,11 +249,26 @@ jobs:
               run: |
                   set -euo pipefail
                   if git ls-remote --exit-code --refs origin "refs/tags/$TAG" >/dev/null 2>&1; then
-                    echo "error: tag $TAG already exists" >&2
+                    echo "error: tag $TAG already exists; corrections require a new version" >&2
+                    exit 1
+                  else
+                    tag_status=$?
+                    if [[ "$tag_status" -ne 2 ]]; then
+                      echo "error: could not verify whether tag $TAG exists" >&2
+                      exit 1
+                    fi
+                  fi
+
+                  release_probe="$RUNNER_TEMP/runtime-release-probe"
+                  if gh api --method GET --include \
+                    "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" \
+                    > "$release_probe" 2>/dev/null; then
+                    echo "error: release $TAG already exists; corrections require a new version" >&2
                     exit 1
                   fi
-                  if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-                    echo "error: release $TAG already exists" >&2
+                  http_status="$(awk '$1 ~ /^HTTP\// { status=$2 } END { print status }' "$release_probe")"
+                  if [[ "$http_status" != 404 ]]; then
+                    echo "error: could not prove that release $TAG does not exist" >&2
                     exit 1
                   fi
 

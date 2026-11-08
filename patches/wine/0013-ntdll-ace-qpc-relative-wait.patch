@@ -2,24 +2,21 @@ diff --git a/dlls/ntdll/unix/sync.c b/dlls/ntdll/unix/sync.c
 index cdea7b21..fe914cdb 100644
 --- a/dlls/ntdll/unix/sync.c
 +++ b/dlls/ntdll/unix/sync.c
-@@ -75,6 +75,25 @@
+@@ -75,6 +75,22 @@
  
  WINE_DEFAULT_DEBUG_CHANNEL(sync);
  
-+/* The QPC relative-wait variant is enabled by the ACE compatibility control.
-+ * Keep the upstream wall-clock implementation selected unless the launcher
-+ * enables the master switch and this modifier. */
-+static BOOL lmisxh_akmocl_ace_enabled(void)
++/* The QPC relative-wait variant is on by default. Unset or "1" keeps it; any
++ * other value falls back to the upstream wall-clock implementation. */
++static BOOL lmisxh_akmocl_ace_timing_enabled(void)
 +{
 +    static LONG state = -1;
 +    LONG value = state;
-+    const char *master, *flag;
 +
 +    if (value == -1)
 +    {
-+        master = getenv("LMISXH_AKMOCL");
-+        flag = master;
-+        value = master && !strcmp(master, "1") && flag && !strcmp(flag, "1");
++        const char *flag = getenv("LMISXH_AKMOCL_ACE_TIMING");
++        value = !flag || (flag[0] == '1' && flag[1] == '\0');
 +        InterlockedCompareExchange(&state, value, -1);
 +    }
 +    return value;
@@ -28,12 +25,12 @@ index cdea7b21..fe914cdb 100644
  HANDLE keyed_event = 0;
  int inproc_device_fd = -1;
  
-@@ -2585,10 +2603,31 @@ NTSTATUS WINAPI NtDelayExecution( BOOLEAN alertable, const LARGE_INTEGER *timeou
+@@ -2585,10 +2601,31 @@ NTSTATUS WINAPI NtDelayExecution( BOOLEAN alertable, const LARGE_INTEGER *timeou
      {
          for (;;) select( 0, NULL, NULL, NULL, NULL );
      }
 -    else
-+    else if (lmisxh_akmocl_ace_enabled() && timeout->QuadPart < 0)
++    else if (lmisxh_akmocl_ace_timing_enabled() && timeout->QuadPart < 0)
      {
 +        timeout_t when = -timeout->QuadPart, diff;
          LARGE_INTEGER now;

@@ -25,7 +25,13 @@ jobs:
             build_commit: ${{ steps.version.outputs.build_commit }}
         env:
             RELEASE_VERSION_INPUT: ${{ inputs.version }}
+            BUILD_DIRECTORY: ${{ github.workspace }}/.build/runtime
             PYTHONDONTWRITEBYTECODE: "1"
+            CCACHE_DIR: ${{ github.workspace }}/.ccache
+            CCACHE_BASEDIR: ${{ github.workspace }}
+            CCACHE_COMPILERCHECK: content
+            CCACHE_MAXSIZE: 1G
+            LMISXH_AKMOCL_CCACHE: ccache
         steps:
             - name: Check out the default branch
               uses: actions/checkout@v7.0.1
@@ -56,7 +62,6 @@ jobs:
                   build_commit="$(git rev-parse --verify HEAD)"
                   {
                     echo "RELEASE_TAG=$release_tag"
-                    echo "RELEASE_ARCHITECTURE=$architecture"
                     echo "BUILD_COMMIT=$build_commit"
                   } >> "$GITHUB_ENV"
                   {
@@ -111,11 +116,32 @@ jobs:
             - name: Install build tools
               run: brew install ccache just mingw-w64 meson ninja
 
+            - name: Restore compiler cache
+              uses: actions/cache@v4.3.0
+              with:
+                  path: ${{ github.workspace }}/.ccache
+                  key: ${{ runner.os }}-${{ runner.arch }}-ccache-release-${{ hashFiles('runtime.lock.json') }}-${{ github.sha }}
+                  restore-keys: |
+                      ${{ runner.os }}-${{ runner.arch }}-ccache-release-${{ hashFiles('runtime.lock.json') }}-
+                      ${{ runner.os }}-${{ runner.arch }}-ccache-release-
+
+            - name: Restore downloaded sources
+              uses: actions/cache@v4.3.0
+              with:
+                  path: ${{ github.workspace }}/.build/downloads
+                  key: ${{ runner.os }}-${{ runner.arch }}-downloads-${{ hashFiles('runtime.lock.json') }}
+                  restore-keys: |
+                      ${{ runner.os }}-${{ runner.arch }}-downloads-
+
             - name: Run repository checks
               run: just check
 
             - name: Build release-gated runtime from pinned sources
               run: just build-release
+
+            - name: Report compiler cache statistics
+              if: ${{ always() }}
+              run: ccache -s
 
             - name: Assemble immutable release inputs
               shell: bash
@@ -127,21 +153,20 @@ jobs:
                     echo "error: build modified tracked repository files" >&2
                     exit 1
                   fi
-                  stage_directory="$GITHUB_WORKSPACE/.build/stages/combined"
-                  archive="$stage_directory/Arknights-MacOS-Runtime-combined.tar.gz"
-                  source_root="$stage_directory/sources"
+                  archive="$BUILD_DIRECTORY/Arknights-MacOS-Runtime.tar.gz"
+                  source_root="$BUILD_DIRECTORY/sources"
                   mkdir -p "$RELEASE_DIRECTORY"
                   release_archive="$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG.tar.gz"
                   source_archive="$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG-source.tar.gz"
                   cp "$archive" "$release_archive"
-                  cp "$stage_directory/runtime-component-inventory.tsv" "$RELEASE_DIRECTORY/"
+                  cp "$BUILD_DIRECTORY/runtime-component-inventory.tsv" "$RELEASE_DIRECTORY/"
                   (
                     cd "$RELEASE_DIRECTORY"
                     shasum -a 256 "$(basename "$release_archive")" > "$(basename "$release_archive").sha256"
                   )
                   tar -czf "$source_archive" --exclude='.git' --exclude='__pycache__' \
-                    -C "$source_root" wine-combined dxmt-combined \
-                    -C "$stage_directory" runtime-component-inventory.tsv \
+                    -C "$source_root" wine dxmt \
+                    -C "$BUILD_DIRECTORY" runtime-component-inventory.tsv \
                     -C "$GITHUB_WORKSPACE" patches runtime.lock.json docs/patch-registry.md \
                     docs/legal LICENSE LICENSES scripts Justfile pyproject.toml uv.lock
                   (
@@ -157,12 +182,12 @@ jobs:
                     --commit "$BUILD_COMMIT" \
                     --archive "$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG.tar.gz" \
                     --checksum "$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG.tar.gz.sha256" \
-                    --source-root .build/stages/combined/sources \
+                    --source-root "$BUILD_DIRECTORY/sources" \
                     --source-archive "$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG-source.tar.gz" \
                     --source-checksum "$RELEASE_DIRECTORY/Arknights-MacOS-Runtime-$RELEASE_TAG-source.tar.gz.sha256" \
                     --validation-report .build/reports/candidate-validation.json \
-                    --component-inventory .build/stages/combined/runtime-component-inventory.tsv \
-                    --build-toolchain .build/stages/combined/build-toolchain.json \
+                    --component-inventory "$BUILD_DIRECTORY/runtime-component-inventory.tsv" \
+                    --build-toolchain "$BUILD_DIRECTORY/build-toolchain.json" \
                     --output-directory "$RELEASE_DIRECTORY"
 
             - name: Upload release assets

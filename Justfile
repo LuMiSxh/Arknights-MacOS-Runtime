@@ -28,19 +28,19 @@ monitor:
 frametime-record case seconds:
     {{ uv }} scripts/frametime.py record "{{ case }}" --seconds "{{ seconds }}"
 
-prepare stage="combined":
-    {{ uv }} scripts/runtime.py prepare "{{ stage }}"
+prepare:
+    {{ uv }} scripts/runtime.py prepare
 
 fetch-base:
     {{ uv }} scripts/runtime.py fetch-base
 
-build stage="combined":
-    {{ uv }} scripts/build.py canary "{{ stage }}"
+build:
+    {{ uv }} scripts/build.py canary
 
 build-release:
     {{ uv }} scripts/build.py release
 
-verify path=".build/stages/combined/candidate/Libraries":
+verify path=".build/runtime/candidate/Libraries":
     {{ uv }} scripts/validate_runtime.py "{{ path }}"
 
 arm64-fetch:
@@ -53,7 +53,7 @@ arm64-assemble:
     {{ uv }} scripts/arm64/assemble.py --wine .build/arm64/incoming/wine --dxmt .build/arm64/dxmt --output .build/arm64/Libraries
 
 arm64-provenance tag:
-    {{ uv }} scripts/arm64/provenance.py --target native-arm64 --tag "{{ tag }}" --runtime-archive ".build/arm64/release/Arknights-MacOS-Runtime-{{ tag }}.tar.gz" --source-archive ".build/arm64/release/Arknights-MacOS-Runtime-{{ tag }}-source.tar.gz" --output .build/arm64/release/provenance.json
+    {{ uv }} scripts/arm64/provenance.py --target native-arm64 --tag "{{ tag }}" --runtime-archive ".build/arm64/release/Arknights-MacOS-Runtime-{{ tag }}.tar.gz" --source-archive ".build/arm64/release/Arknights-MacOS-Runtime-{{ tag }}-source.tar.gz" --external-artifact .build/arm64/incoming/external.json --output .build/arm64/release/provenance.json
 
 arm64-verify:
     {{ uv }} scripts/validate_runtime.py .build/arm64/Libraries --target native-arm64

@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
 
-import io
 import tarfile
 import tempfile
 import unittest
@@ -9,7 +8,6 @@ from unittest import mock
 
 from scripts import build_common as build_helpers
 from scripts.build_common import (
-    CLEARED_DOS_STUB,
     Builder,
     is_macho,
     sha256,
@@ -74,10 +72,6 @@ class BuildHelperTests(unittest.TestCase):
         self.assertFalse(is_macho(script))
         self.assertFalse(is_macho(self.root / "missing"))
 
-    def test_dos_stub_marker_has_the_documented_length(self) -> None:
-        self.assertEqual(len(CLEARED_DOS_STUB), 16)
-        self.assertEqual(CLEARED_DOS_STUB[:2], b"\x0e\x1f")
-
     def test_pe_cross_builds_drop_host_compiler_variables(self) -> None:
         builder = Builder(
             environment={
@@ -121,14 +115,15 @@ class BuildHelperTests(unittest.TestCase):
         member = self.root / "Libraries"
         member.mkdir()
         (member / "marker").write_bytes(b"x")
-        path = write_archive(
-            self.root,
-            "Arknights-MacOS-Runtime-arm64-canary.tar.gz",
-            ("Libraries",),
-        )
+        name = "Arknights-MacOS-Runtime-arm64-canary.tar.gz"
 
-        with io.BytesIO(path.read_bytes()) as buffer, tarfile.open(fileobj=buffer):
-            pass
+        path = write_archive(self.root, name, ("Libraries",))
+
+        self.assertEqual(path.name, name)
+        self.assertEqual(
+            path.with_name(f"{name}.sha256").read_text(encoding="utf-8"),
+            f"{sha256(path)}  {name}\n",
+        )
 
 
 if __name__ == "__main__":

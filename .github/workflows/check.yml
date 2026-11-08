@@ -27,32 +27,15 @@ jobs:
             - name: Install uv
               uses: astral-sh/setup-uv@v10.0.1
 
-            - name: Run unit and lock checks
-              run: |
-                  uv run --locked pytest
-                  uv run --locked ruff check scripts tests
-                  uv run --locked ruff format --check scripts tests
-                  uv run --locked --no-dev scripts/runtime.py validate-lock
-                  uv run --locked --no-dev scripts/release/licenses.py generate --check
-                  uv run --locked --no-dev scripts/release/pins.py check
-                  uv run --locked actionlint
-                  git diff --check
+            - name: Install just
+              uses: extractions/setup-just@v4.0.0
+
+            - name: Run repository checks
+              run: just check
 
     patches:
         runs-on: ubuntu-24.04
         timeout-minutes: 20
-        strategy:
-            fail-fast: false
-            matrix:
-                stage:
-                    - audio
-                    - hardware-cursor
-                    - performance
-                    - ace
-                    - cef
-                    - cn
-                    - fullscreen
-                    - combined
         steps:
             - name: Check out source
               uses: actions/checkout@v7.0.1
@@ -60,7 +43,5 @@ jobs:
             - name: Install uv
               uses: astral-sh/setup-uv@v10.0.1
 
-            - name: Apply ${{ matrix.stage }} patches
-              env:
-                  STAGE: ${{ matrix.stage }}
-              run: uv run --locked --no-dev scripts/runtime.py prepare "$STAGE"
+            - name: Apply patches
+              run: uv run --locked --no-dev scripts/runtime.py prepare

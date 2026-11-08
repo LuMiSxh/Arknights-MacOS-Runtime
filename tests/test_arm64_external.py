@@ -14,11 +14,10 @@ from scripts.arm64.assemble import AssemblyError, assemble
 from scripts.arm64.fetch_external import (
     FetchError,
     _extract_archive,
-    fetch_release,
     fetch_selected_release,
     select_release,
 )
-from scripts.arm64.provenance import write_provenance
+from scripts.arm64.provenance import ProvenanceError, write_provenance
 from scripts.build_common import CLEARED_DOS_STUB
 
 RELEASE_ID = "wine-11-18-arm64-v5"
@@ -28,7 +27,7 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _catalog(release: dict, archive: bytes = b"archive") -> bytes:
+def _catalog(release: dict) -> bytes:
     return json.dumps({"releases": [release]}).encode()
 
 
@@ -42,6 +41,28 @@ def _release(archive: bytes, *, arch: str = "arm64", size: int | None = None) ->
     if size is not None:
         release["size"] = size
     return release
+
+
+def _interface() -> dict:
+    return {
+        "dxmtDirectory": "DXMT",
+        "requiredFiles": [
+            "DXMT/x64/d3d10core.dll",
+            "DXMT/x64/d3d11.dll",
+            "DXMT/x64/dxgi.dll",
+        ],
+    }
+
+
+def _text_values(value):
+    if isinstance(value, dict):
+        for child in value.values():
+            yield from _text_values(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _text_values(child)
+    elif isinstance(value, str):
+        yield value
 
 
 def test_selects_the_newest_arm64_release():
@@ -86,6 +107,33 @@ def test_uses_the_highest_build_when_publish_dates_match():
 def test_rejects_a_catalog_without_arm64_releases():
     with pytest.raises(FetchError, match="arm64"):
         select_release([{"id": "wine-11-18-x86_64-v1", "arch": "x86_64"}], "")
+
+
+def test_select_release_rejects_a_missing_published_at():
+    releases = [
+        {"id": "wine-11-18-arm64-v4", "arch": "arm64"},
+        {
+            "id": "wine-11-18-arm64-v5",
+            "arch": "arm64",
+            "published_at": "2026-11-07T12:14:35Z",
+        },
+    ]
+
+    with pytest.raises(FetchError, match="published_at"):
+        select_release(releases, "")
+
+
+def test_select_release_rejects_an_invalid_published_at():
+    releases = [
+        {
+            "id": "wine-11-18-arm64-v5",
+            "arch": "arm64",
+            "published_at": "not-a-date",
+        }
+    ]
+
+    with pytest.raises(FetchError, match="published_at"):
+        select_release(releases, "")
 
 
 def test_explicit_release_id_wins_over_the_newest():
@@ -196,11 +244,11 @@ def test_fetch_never_prints_the_catalog_url(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ARM64_RUNTIME_CATALOG_URL", catalog_url)
     responses = {catalog_url: catalog, archive_url: archive}
 
-    fetch_release(
-        env_name="ARM64_RUNTIME_CATALOG_URL",
-        release_id=RELEASE_ID,
+    fetch_selected_release(
+        "ARM64_RUNTIME_CATALOG_URL",
+        RELEASE_ID,
+        tmp_path / "wine.tar.xz",
         expected_sha256=_sha256(archive),
-        output=tmp_path / "wine.tar.xz",
         fetch=responses.__getitem__,
     )
 
@@ -220,11 +268,11 @@ def test_fetch_rejects_a_non_arm64_release(tmp_path, monkeypatch):
     catalog = _catalog(_release(archive, arch="x86_64"))
 
     with pytest.raises(FetchError, match="arm64"):
-        fetch_release(
-            env_name="ARM64_RUNTIME_CATALOG_URL",
-            release_id=RELEASE_ID,
+        fetch_selected_release(
+            "ARM64_RUNTIME_CATALOG_URL",
+            RELEASE_ID,
+            tmp_path / "wine.tar.xz",
             expected_sha256=_sha256(archive),
-            output=tmp_path / "wine.tar.xz",
             fetch=lambda url: catalog,
         )
 
@@ -244,11 +292,11 @@ def test_fetch_rejects_a_catalog_sha_mismatch(tmp_path, monkeypatch):
     )
 
     with pytest.raises(FetchError, match="SHA-256"):
-        fetch_release(
-            env_name="ARM64_RUNTIME_CATALOG_URL",
-            release_id=RELEASE_ID,
+        fetch_selected_release(
+            "ARM64_RUNTIME_CATALOG_URL",
+            RELEASE_ID,
+            tmp_path / "wine.tar.xz",
             expected_sha256=_sha256(archive),
-            output=tmp_path / "wine.tar.xz",
             fetch=lambda url: catalog,
         )
 
@@ -270,11 +318,11 @@ def test_fetch_rejects_a_size_mismatch(tmp_path, monkeypatch):
     responses = {catalog_url: catalog, archive_url: archive}
 
     with pytest.raises(FetchError, match="size"):
-        fetch_release(
-            env_name="ARM64_RUNTIME_CATALOG_URL",
-            release_id=RELEASE_ID,
+        fetch_selected_release(
+            "ARM64_RUNTIME_CATALOG_URL",
+            RELEASE_ID,
+            tmp_path / "wine.tar.xz",
             expected_sha256=_sha256(archive),
-            output=tmp_path / "wine.tar.xz",
             fetch=responses.__getitem__,
         )
 
@@ -294,11 +342,11 @@ def test_fetch_rejects_an_archive_sha_mismatch(tmp_path, monkeypatch):
     responses = {catalog_url: catalog, archive_url: b"wrong payload"}
 
     with pytest.raises(FetchError, match="SHA-256"):
-        fetch_release(
-            env_name="ARM64_RUNTIME_CATALOG_URL",
-            release_id=RELEASE_ID,
+        fetch_selected_release(
+            "ARM64_RUNTIME_CATALOG_URL",
+            RELEASE_ID,
+            tmp_path / "wine.tar.xz",
             expected_sha256="0" * 64,
-            output=tmp_path / "wine.tar.xz",
             fetch=responses.__getitem__,
         )
 
@@ -379,10 +427,141 @@ def test_fetch_target_rejects_a_non_wine_catalog(tmp_path):
         )
 
 
+def test_fetch_target_rejects_a_sha_mismatch_for_the_locked_release(
+    tmp_path, monkeypatch
+):
+    def fake_fetch(env_name, release_id, output):
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"archive")
+        return (
+            {
+                "id": RELEASE_ID,
+                "arch": "arm64",
+                "sha256": "c" * 64,
+                "size": 7,
+            },
+            output,
+        )
+
+    def fake_extract(archive, destination):
+        (destination / "wine").mkdir()
+
+    monkeypatch.setattr(fetch_external, "fetch_selected_release", fake_fetch)
+    monkeypatch.setattr(fetch_external, "_extract_archive", fake_extract)
+
+    with pytest.raises(FetchError, match="lock pin"):
+        fetch_external._fetch_target(
+            {
+                "artifact": {
+                    "catalog": "wine",
+                    "release": RELEASE_ID,
+                    "sha256": "a" * 64,
+                }
+            },
+            tmp_path / "incoming",
+            "",
+        )
+
+
+def test_fetch_target_updates_the_lock_when_the_release_id_differs(
+    tmp_path, monkeypatch
+):
+    pin_writes = []
+
+    def fake_fetch(env_name, release_id, output, expected_sha256=None, fetch=None):
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"archive")
+        return (
+            {
+                "id": "wine-11-18-arm64-v6",
+                "arch": "arm64",
+                "sha256": "b" * 64,
+                "size": 7,
+            },
+            output,
+        )
+
+    def fake_extract(archive, destination):
+        (destination / "wine").mkdir()
+
+    def fake_write_artifact_pin(root, target, release, sha256):
+        pin_writes.append((target, release, sha256))
+        return True
+
+    monkeypatch.setattr(fetch_external, "fetch_selected_release", fake_fetch)
+    monkeypatch.setattr(fetch_external, "_extract_archive", fake_extract)
+    monkeypatch.setattr(fetch_external, "write_artifact_pin", fake_write_artifact_pin)
+
+    fetch_external._fetch_target(
+        {
+            "target": "native-arm64",
+            "artifact": {
+                "catalog": "wine",
+                "release": RELEASE_ID,
+                "sha256": "a" * 64,
+            },
+        },
+        tmp_path / "incoming",
+        "",
+    )
+
+    assert pin_writes == [("native-arm64", "wine-11-18-arm64-v6", "b" * 64)]
+
+
+def test_fetch_target_keeps_the_lock_when_extraction_fails(tmp_path, monkeypatch):
+    pin_writes = []
+
+    def fake_fetch(env_name, release_id, output, expected_sha256=None, fetch=None):
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"archive")
+        return (
+            {
+                "id": "wine-11-18-arm64-v6",
+                "arch": "arm64",
+                "sha256": "b" * 64,
+                "size": 7,
+            },
+            output,
+        )
+
+    def failing_extract(archive, destination):
+        raise FetchError("cannot extract the wine archive: broken")
+
+    def fake_write_artifact_pin(root, target, release, sha256):
+        pin_writes.append((target, release, sha256))
+        return True
+
+    monkeypatch.setattr(fetch_external, "fetch_selected_release", fake_fetch)
+    monkeypatch.setattr(fetch_external, "_extract_archive", failing_extract)
+    monkeypatch.setattr(fetch_external, "write_artifact_pin", fake_write_artifact_pin)
+
+    with pytest.raises(FetchError, match="cannot extract"):
+        fetch_external._fetch_target(
+            {
+                "target": "native-arm64",
+                "artifact": {
+                    "catalog": "wine",
+                    "release": RELEASE_ID,
+                    "sha256": "a" * 64,
+                },
+            },
+            tmp_path / "incoming",
+            "",
+        )
+
+    assert pin_writes == []
+
+
 def test_assemble_moves_the_wine_tree_and_adds_links(tmp_path):
     wine_root, dxmt_root = _build_external_trees(tmp_path)
 
-    layout = assemble(wine_root, dxmt_root, tmp_path / "Libraries")
+    layout = assemble(
+        wine_root,
+        dxmt_root,
+        tmp_path / "Libraries",
+        archive_root=tmp_path,
+        interface=_interface(),
+    )
 
     assert (layout / "Wine/bin/wine64").is_symlink()
     assert (layout / "Wine/bin/Arknights").is_symlink()
@@ -398,7 +577,13 @@ def test_assemble_moves_the_wine_tree_and_adds_links(tmp_path):
 def test_assemble_clears_the_wine_dos_stub(tmp_path):
     wine_root, dxmt_root = _build_external_trees(tmp_path)
 
-    layout = assemble(wine_root, dxmt_root, tmp_path / "Libraries")
+    layout = assemble(
+        wine_root,
+        dxmt_root,
+        tmp_path / "Libraries",
+        archive_root=tmp_path,
+        interface=_interface(),
+    )
 
     with (layout / "DXMT/x64/d3d11.dll").open("rb") as file:
         file.seek(64)
@@ -412,7 +597,13 @@ def test_assemble_rejects_a_symlink_escape(tmp_path):
     (wine_root / "bin" / "escape").symlink_to("../../outside")
 
     with pytest.raises(AssemblyError, match="escape"):
-        assemble(wine_root, dxmt_root, tmp_path / "Libraries")
+        assemble(
+            wine_root,
+            dxmt_root,
+            tmp_path / "Libraries",
+            archive_root=tmp_path,
+            interface=_interface(),
+        )
 
 
 def test_provenance_records_the_external_build_without_urls(tmp_path):
@@ -461,9 +652,10 @@ def test_provenance_records_the_external_build_without_urls(tmp_path):
     assert data["runtimeArchive"]["sha256"] == _sha256(b"runtime payload")
     assert data["correspondingSourceArchive"]["sha256"] == _sha256(b"source payload")
 
-    raw = (tmp_path / "provenance.json").read_text()
-    assert "catalog" not in raw
-    assert "pull/4" not in raw
+    data = json.loads((tmp_path / "provenance.json").read_text())
+    assert "catalog" not in data
+    assert "externalArtifact" not in data
+    assert not any("pull/4" in text for text in _text_values(data))
 
 
 def test_provenance_records_the_selected_catalog_artifact(tmp_path):
@@ -488,6 +680,7 @@ def test_provenance_records_the_selected_catalog_artifact(tmp_path):
         "target": "native-arm64",
         "deploymentTarget": "26.0",
         "interface": {"minimumMacOS": "26.0"},
+        "artifact": {"catalog": "wine", "release": RELEASE_ID, "sha256": "a" * 64},
         "features": {},
         "sources": {"wine": {"commit": "7b3fff76fa5178f6ce0141b2c776afa2a822f101"}},
     }
@@ -507,3 +700,34 @@ def test_provenance_records_the_selected_catalog_artifact(tmp_path):
         "sha256": "a" * 64,
         "size": 7,
     }
+
+
+def test_provenance_rejects_artifact_metadata_that_differs_from_the_lock(tmp_path):
+    runtime_archive = tmp_path / "runtime.tar.gz"
+    runtime_archive.write_bytes(b"runtime")
+    source_archive = tmp_path / "source.tar.gz"
+    source_archive.write_bytes(b"source")
+    external = tmp_path / "external.json"
+    external.write_text(
+        json.dumps({"id": "wine-11-18-arm64-v6", "sha256": "b" * 64, "size": 7}),
+        encoding="utf-8",
+    )
+    lock = {
+        "buildMode": "external",
+        "target": "native-arm64",
+        "deploymentTarget": "26.0",
+        "interface": {"minimumMacOS": "26.0"},
+        "artifact": {"catalog": "wine", "release": RELEASE_ID, "sha256": "a" * 64},
+        "features": {},
+        "sources": {"wine": {"commit": "7b3fff76fa5178f6ce0141b2c776afa2a822f101"}},
+    }
+
+    with pytest.raises(ProvenanceError, match="lock pin"):
+        write_provenance(
+            lock,
+            "v0.9.0+arm",
+            runtime_archive,
+            source_archive,
+            tmp_path / "provenance.json",
+            external_artifact=external,
+        )

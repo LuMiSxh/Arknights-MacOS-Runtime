@@ -2,7 +2,7 @@ diff --git a/dlls/ntdll/loader.c b/dlls/ntdll/loader.c
 index b0b2392..15dc475 100644
 --- a/dlls/ntdll/loader.c
 +++ b/dlls/ntdll/loader.c
-@@ -2264,6 +2264,166 @@ done:
+@@ -2264,6 +2264,168 @@ done:
   *
   * Build the module data for a mapped dll.
   */
@@ -33,7 +33,7 @@ index b0b2392..15dc475 100644
 +           (status == STATUS_SUCCESS && valueU.Length == sizeof(WCHAR) && valueW[0] == '1');
 +}
 +
-+static BOOL arknights_runtime_cef_compat_enabled(void)
++static BOOL lmisxh_akmocl_cef_enabled(void)
 +{
 +    static LONG state = -1;
 +    LONG value = state;
@@ -61,12 +61,12 @@ index b0b2392..15dc475 100644
 +    unsigned int patch_count;
 +};
 +
-+static BOOL arknights_apply_cef_descriptor( WINE_MODREF *wm,
-+                                            const struct arknights_cef_descriptor *descriptor )
++static BOOL lmisxh_akmocl_apply_cef_descriptor( WINE_MODREF *wm,
++                                                const struct arknights_cef_descriptor *descriptor )
 +{
 +    unsigned int i;
 +
-+    if (wcscmp( wm->ldr.BaseDllName.Buffer, descriptor->module_name ))
++    if (wcsicmp( wm->ldr.BaseDllName.Buffer, descriptor->module_name ))
 +        return FALSE;
 +
 +    /* Preflight all expected bytes before writing any patch bytes. */
@@ -85,20 +85,22 @@ index b0b2392..15dc475 100644
 +    for (i = 0; i < descriptor->patch_count; i++)
 +    {
 +        DWORD old_prot;
-+        SIZE_T pagesize = page_size;
-+        void *target = (char *)wm->ldr.DllBase + descriptor->patches[i].offset;
++        char *target = (char *)wm->ldr.DllBase + descriptor->patches[i].offset;
 +        void *target_page = (void *)((ULONG_PTR)target & ~(page_size - 1));
++        SIZE_T pagesize = target + descriptor->patches[i].size - (char *)target_page;
++        pagesize = (pagesize + page_size - 1) & ~(page_size - 1);
 +
 +        if (NtProtectVirtualMemory( NtCurrentProcess(), &target_page, &pagesize,
 +                                    PAGE_EXECUTE_READWRITE, &old_prot ))
 +            return FALSE;
 +        memcpy( target, descriptor->patches[i].after, descriptor->patches[i].size );
-+        NtProtectVirtualMemory( NtCurrentProcess(), &target_page, &pagesize, old_prot, &old_prot );
++        if (NtProtectVirtualMemory( NtCurrentProcess(), &target_page, &pagesize, old_prot, &old_prot ))
++            return FALSE;
 +    }
 +    return TRUE;
 +}
 +
-+/* Bilibili's CEF 80.1.15 descriptor. Keep these hash/RVA/byte-specific
++/* Bilibili's CEF 80.1.15 descriptor. Keep these RVA/byte-specific
 + * preflights isolated so future regional descriptors cannot broaden this route. */
 +static void apply_bilibili_cef80_stackbase_patch( WINE_MODREF *wm )
 +{
@@ -161,15 +163,15 @@ index b0b2392..15dc475 100644
 +    static const struct arknights_cef_descriptor descriptor =
 +        {cef_name, patches, ARRAY_SIZE(patches)};
 +
-+    if (!arknights_runtime_cef_compat_enabled()) return;
-+    arknights_apply_cef_descriptor( wm, &descriptor );
++    if (!lmisxh_akmocl_cef_enabled()) return;
++    lmisxh_akmocl_apply_cef_descriptor( wm, &descriptor );
 +}
 +#endif
 +
  static NTSTATUS build_module( LPCWSTR load_path, const UNICODE_STRING *nt_name, void **module,
                                const SECTION_IMAGE_INFORMATION *image_info, const struct file_id *id,
                                DWORD flags, BOOL system, BOOL redirected, WINE_MODREF **pwm )
-@@ -2340,6 +2519,10 @@ static NTSTATUS build_module( LPCWSTR load_path, const UNICODE_STRING *nt_name,
+@@ -2340,6 +2502,10 @@ static NTSTATUS build_module( LPCWSTR load_path, const UNICODE_STRING *nt_name,
      TRACE_(loaddll)( "Loaded %s at %p: %s\n", debugstr_w(wm->ldr.FullDllName.Buffer), *module,
                       is_builtin ? "builtin" : "native" );
 

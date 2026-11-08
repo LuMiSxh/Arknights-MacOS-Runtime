@@ -22,7 +22,7 @@ index 9a57c00..0eef6fb 100644
 +    return value && value[0] == '1' && !value[1];
 +}
 +
-+static BOOL arknights_runtime_cn_compat_enabled(void)
++static BOOL lmisxh_akmocl_cn_enabled(void)
 +{
 +    static LONG state = -1;
 +    LONG value = state;
@@ -86,7 +86,7 @@ index 9a57c00..0eef6fb 100644
 +    const WCHAR *path = NtCurrentTeb()->Peb->ProcessParameters->ImagePathName.Buffer;
 +    const WCHAR *name, *separator;
 +
-+    if (!arknights_runtime_cn_compat_enabled() || !path || !class_name || !class_name->Buffer ||
++    if (!lmisxh_akmocl_cn_enabled() || !path || !class_name || !class_name->Buffer ||
 +        class_name->Length != sizeof(chrome_widgetW) - sizeof(WCHAR) ||
 +        wcsncmp( class_name->Buffer, chrome_widgetW, ARRAY_SIZE(chrome_widgetW) - 1 ))
 +        return FALSE;
@@ -492,7 +492,7 @@ index dd1aca0..3dfe197 100644
 +    return !wcsicmp(start, expected);
 +}
 +
-+static BOOL arknights_runtime_cn_compat_enabled(void)
++static BOOL lmisxh_akmocl_cn_enabled(void)
 +{
 +    const char *master = getenv("LMISXH_AKMOCL"), *flag = getenv("LMISXH_AKMOCL_CN");
 +
@@ -521,7 +521,7 @@ index dd1aca0..3dfe197 100644
 +
 +    if (state != -1) return state;
 +
-+    if (arknights_runtime_cn_compat_enabled() && running_image_is("PCGamePlatform.exe") &&
++    if (lmisxh_akmocl_cn_enabled() && running_image_is("PCGamePlatform.exe") &&
 +        !command_line_has_cef_type())
 +        enabled = true;
 +
@@ -583,7 +583,7 @@ index dd1aca0..3dfe197 100644
 +    WCHAR class[MAX_ATOM_LEN] = {0};
 +    UNICODE_STRING name = {.Buffer = class, .MaximumLength = sizeof(class)};
 +
-+    if (!arknights_runtime_cn_compat_enabled() || !running_image_is("PCGamePlatform.exe") ||
++    if (!lmisxh_akmocl_cn_enabled() || !running_image_is("PCGamePlatform.exe") ||
 +        !NtUserGetProp(hwnd, translucentW) || !NtUserGetClassName(hwnd, FALSE, &name) ||
 +        wcscmp(class, chrome_widgetW))
 +        return FALSE;

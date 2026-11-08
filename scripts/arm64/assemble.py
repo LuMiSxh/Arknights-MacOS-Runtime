@@ -16,25 +16,31 @@ import os
 import re
 import shutil
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 if __package__:
-    from ..build_common import CLEARED_DOS_STUB, ROOT
+    from ..build_common import (
+        NATIVE_ARM64_TARGET,
+        ROOT,
+        WINE_BUILD_NEW_REPOSITORY,
+        clear_dos_stub,
+    )
     from ..lib.console import error, success
     from ..release.licenses import EXTERNAL_NOTICE_FILES
     from ..runtime import LockError, load_lock
 else:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from scripts.build_common import CLEARED_DOS_STUB, ROOT
+    from scripts.build_common import (
+        NATIVE_ARM64_TARGET,
+        ROOT,
+        WINE_BUILD_NEW_REPOSITORY,
+        clear_dos_stub,
+    )
     from scripts.lib.console import error, success
     from scripts.release.licenses import EXTERNAL_NOTICE_FILES
     from scripts.runtime import LockError, load_lock
 
-
-ARM64_TARGET = "native-arm64"
-
-DXMT_D3D_DLLS = ("d3d10core.dll", "d3d11.dll", "dxgi.dll")
 
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:")
 
@@ -95,12 +101,6 @@ def _copy_file(source: Path, destination: Path) -> None:
     shutil.copy2(source, destination)
 
 
-def _clear_dos_stub(path: Path) -> None:
-    with path.open("r+b") as file:
-        file.seek(64)
-        file.write(CLEARED_DOS_STUB)
-
-
 def _add_launcher_links(wine: Path) -> None:
     bin_directory = wine / "bin"
     wine64 = bin_directory / "wine64"
@@ -113,25 +113,38 @@ def _add_launcher_links(wine: Path) -> None:
     launcher.symlink_to("wine64")
 
 
+_NOTICE_DESCRIPTIONS = {
+    "Wine-LGPL-2.1.txt": "Wine, LGPL-2.1-or-later.",
+    "DXMT-LGPL-2.1.txt": "DXMT, LGPL-2.1-or-later.",
+    "runtime/MIT.txt": "FEX, MIT.",
+    "runtime/Apache-2.0.txt": "MoltenVK, Apache-2.0.",
+}
+
+
 def _render_notice() -> str:
-    return """# Third-party notices
-
-This archive repackages the external native-arm64 Wine runtime from
-[wine-build-new](https://github.com/riverfog7/wine-build-new).
-
-The `Licenses/external/` directory preserves the upstream `wine/share/licenses`
-tree, which records the Wine, FEX, and Mesa notices shipped by the external build.
-
-The runtime adds these notices:
-
-- `Licenses/Wine-LGPL-2.1.txt` — Wine, LGPL-2.1-or-later.
-- `Licenses/DXMT-LGPL-2.1.txt` — DXMT, LGPL-2.1-or-later.
-- `Licenses/runtime/MIT.txt` — FEX, MIT.
-- `Licenses/runtime/Apache-2.0.txt` — MoltenVK, Apache-2.0.
-
-The corresponding-source archive of the same release contains the modified source
-and the build scripts.
-"""
+    lines = [
+        "# Third-party notices",
+        "",
+        "This archive repackages the external native-arm64 Wine runtime from",
+        f"[wine-build-new]({WINE_BUILD_NEW_REPOSITORY}).",
+        "",
+        "The `Licenses/external/` directory preserves the upstream `wine/share/licenses`",
+        "tree, which records the Wine, FEX, and Mesa notices shipped by the external build.",
+        "",
+        "The runtime adds these notices:",
+        "",
+    ]
+    lines += [
+        f"- `Licenses/{filename}` — {_NOTICE_DESCRIPTIONS[filename]}"
+        for filename in EXTERNAL_NOTICE_FILES
+    ]
+    lines += [
+        "",
+        "The corresponding-source archive of the same release contains the modified source",
+        "and the build scripts.",
+        "",
+    ]
+    return "\n".join(lines)
 
 
 def _write_notices(archive_root: Path, wine_root: Path) -> None:
@@ -153,10 +166,23 @@ def _write_notices(archive_root: Path, wine_root: Path) -> None:
     (archive_root / "NOTICE.md").write_text(_render_notice(), encoding="utf-8")
 
 
+def _dxmt_payload_dlls(interface: dict[str, Any]) -> tuple[str, ...]:
+    """Return the DXMT PE payload names from the lock interface."""
+
+    prefix = f"{interface['dxmtDirectory']}/x64/"
+    return tuple(
+        PurePosixPath(relative).name
+        for relative in interface["requiredFiles"]
+        if relative.startswith(prefix)
+    )
+
+
 def assemble(
     wine_root: Path,
     dxmt_root: Path,
     output: Path,
+    archive_root: Path,
+    interface: dict[str, Any],
 ) -> Path:
     """Build the `Libraries/` tree. Returns that directory."""
 
@@ -169,7 +195,6 @@ def assemble(
     _validate_tree(dxmt_root)
 
     output.mkdir(parents=True)
-    archive_root = output.parent
 
     wine = output / "Wine"
     shutil.copytree(wine_root, wine, symlinks=True)
@@ -186,12 +211,12 @@ def assemble(
         dxmt_root / "aarch64-windows" / "winemetal.dll", windows / "winemetal.dll"
     )
 
-    payload = output / "DXMT" / "x64"
+    payload = output / interface["dxmtDirectory"] / "x64"
     payload.mkdir(parents=True)
-    for name in DXMT_D3D_DLLS:
+    for name in _dxmt_payload_dlls(interface):
         destination = payload / name
         _copy_file(dxmt_root / "aarch64-windows" / name, destination)
-        _clear_dos_stub(destination)
+        clear_dos_stub(destination)
 
     _write_notices(archive_root, wine_root)
     return output
@@ -209,10 +234,22 @@ def main() -> int:
     parser.add_argument("--wine", type=Path, required=True)
     parser.add_argument("--dxmt", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--archive-root",
+        type=Path,
+        help="directory for Licenses/ and NOTICE.md; defaults to the output parent",
+    )
     arguments = parser.parse_args()
     try:
-        lock = load_lock(target=ARM64_TARGET)
-        libraries = assemble(arguments.wine, arguments.dxmt, arguments.output)
+        lock = load_lock(target=NATIVE_ARM64_TARGET)
+        archive_root = arguments.archive_root or arguments.output.parent
+        libraries = assemble(
+            arguments.wine,
+            arguments.dxmt,
+            arguments.output,
+            archive_root,
+            lock["interface"],
+        )
         _verify_interface(libraries, lock["interface"])
     except (AssemblyError, LockError, OSError) as caught_error:
         error(str(caught_error))
