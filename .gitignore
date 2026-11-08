@@ -1,4 +1,5 @@
 .build/
+.ccache/
 .tmp/
 .venv/
 __pycache__/
