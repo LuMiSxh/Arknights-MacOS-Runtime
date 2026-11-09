@@ -18,7 +18,7 @@ A default-off gate is on only for exactly `1`.
 | 0006 | `0006-ntdll-bilibili-cef80-stack-base.patch` | Descriptor-driven CEF 80.1.15 loader patch | `LMISXH_AKMOCL_CEF` | on | x86, ARM |
 | 0007 | `0007-win32u-winemac-bilibili-layered-child.patch` | Bilibili layered child window route | `LMISXH_AKMOCL_CN` | off | x86, ARM |
 | 0008 | `0008-winemac-bilibili-join-all-spaces.patch` | Bilibili platform window joins all Spaces | `LMISXH_AKMOCL_CN` | off | x86, ARM |
-| 0009 | `0009-winemac-native-fullscreen-space.patch` | Native fullscreen Space for the game window | `LMISXH_AKMOCL_FULLSCREEN` | on | x86, ARM |
+| 0009 | `0009-winemac-native-fullscreen-space.patch` | Native fullscreen Space for the game window | `LMISXH_AKMOCL_FULLSCREEN` | off | x86, ARM |
 | 0010 | `0010-ntdll-hide-software-cursor-asset.patch` | Hide the software cursor asset | `LMISXH_AKMOCL_CURSOR` | off | x86, ARM |
 | 0011 | `0011-winemac-command-q-quit.patch` | Command-Q for the application menu Quit item | `LMISXH_AKMOCL_MENU` | on | x86, ARM |
 | 0012 | `0012-winecoreaudio-default-output.patch` | CoreAudio default-output follow | `LMISXH_AKMOCL_AUDIO` | on | x86 only |

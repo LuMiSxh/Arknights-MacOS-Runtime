@@ -33,11 +33,11 @@ behavior at runtime; they do not select patches at build time.
 | `0006-ntdll-bilibili-cef80-stack-base.patch`       | opt-out `_CEF`           | required for Bilibili | Bilibili CEF 80.1.15 stack-base descriptors.             |
 | `0007-win32u-winemac-bilibili-layered-child.patch` | `_CN` (default off)      | required for Bilibili | Bilibili layered child window.                           |
 | `0008-winemac-bilibili-join-all-spaces.patch`      | `_CN` (default off)      | required for Bilibili | Bilibili payment window on every Space. Requires `0007`. |
-| `0009-winemac-native-fullscreen-space.patch`       | opt-out `_FULLSCREEN`    | ours, user-visible    | Puts fullscreen games in a native macOS Space.           |
+| `0009-winemac-native-fullscreen-space.patch`       | `_FULLSCREEN` (default off) | ours, user-visible | Puts fullscreen games in a native macOS Space.           |
 | `0010-ntdll-hide-software-cursor-asset.patch`      | `_CURSOR` (default off)  | ours, user-visible    | Hides the two game software-cursor assets.               |
 | `0011-winemac-command-q-quit.patch`               | opt-out `_MENU`          | ours, user-visible    | Makes Command+Q quit from the app menu.                  |
 
-`0001` to `0006`, `0009`, and `0011` default on: unset or exactly `1` keeps the patch on. `0007`, `0008`, and `0010` default off: only exactly `1` enables them. Any other value turns the patch off.
+`0001` to `0006` and `0011` default on: unset or exactly `1` keeps the patch on. `0007`, `0008`, `0009`, and `0010` default off: only exactly `1` enables them. Any other value turns the patch off.
 
 ### Why the ACE patches stay
 
@@ -63,8 +63,7 @@ shim. Both are general Chromium correctness fixes.
 The workspace queue has no equivalent. Fullscreen needs winemac because a Windows DLL
 cannot reach the `NSWindow` that owns the Space and the fullscreen handshake. The cursor
 filter could be approximated by a proxy DLL, but that only covers wrapped APIs and is
-less durable than the shared NT name resolver. `0009` is on by default with an opt-out;
-`0010` stays opt-in.
+less durable than the shared NT name resolver. `0009` and `0010` both stay opt-in.
 
 ## Paired FEX context patch
 
@@ -101,7 +100,7 @@ path for both separate and in-place buffers.
 
 ## Gates and opt-outs
 
-`0001` to `0006`, `0009`, and `0011` default on: unset or exactly `1` keeps the patch on.
+`0001` to `0006` and `0011` default on: unset or exactly `1` keeps the patch on.
 Any other value turns it off.
 
 ```sh
@@ -111,15 +110,15 @@ LMISXH_AKMOCL_ACE_IMPORTS=0     # Do not export the ACE kernel imports
 LMISXH_AKMOCL_APPCONTAINER=0    # Do not implement the AppContainer names
 LMISXH_AKMOCL_WINSOCK=0         # Do not implement SIO_ADDRESS_LIST_SORT
 LMISXH_AKMOCL_CEF=0             # Do not apply the Bilibili CEF descriptor
-LMISXH_AKMOCL_FULLSCREEN=0      # Do not use a native fullscreen Space
 LMISXH_AKMOCL_MENU=0            # Do not make Command+Q quit from the app menu
 ```
 
-`0007`, `0008`, and `0010` default off. Only exactly `1` enables them:
+`0007`, `0008`, `0009`, and `0010` default off. Only exactly `1` enables them:
 
 ```sh
-LMISXH_AKMOCL_CN=1      # Bilibili window behavior (0007 and 0008)
-LMISXH_AKMOCL_CURSOR=1  # Hide the software cursor asset (0010)
+LMISXH_AKMOCL_CN=1          # Bilibili window behavior (0007 and 0008)
+LMISXH_AKMOCL_CURSOR=1      # Hide the software cursor asset (0010)
+LMISXH_AKMOCL_FULLSCREEN=1  # Use a native fullscreen Space
 ```
 
 `0008` uses the process check that `0007` adds, so the two are always applied together.
@@ -134,8 +133,8 @@ The Global client does not need `LMISXH_AKMOCL_CN`. It does not load the Bilibil
   `LMISXH_AKMOCL_CEF=0` to disable it.
 - `0007` adds a property and class lookup to every layered window update before the gate
   check. The behavior is opt-in, but the code is compiled in for every user.
-- `0009` selects windows by shape, not by application name. Set
-  `LMISXH_AKMOCL_FULLSCREEN=0` if a non-game borderless window should stay on its Space.
+- `0009` selects windows by shape, not by application name. Leave
+  `LMISXH_AKMOCL_FULLSCREEN` unset if a non-game borderless window should stay on its Space.
 - The CN payment window check is fixture-backed, not verified against the live client.
 
 ## Workspace integration

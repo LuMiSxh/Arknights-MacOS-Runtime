@@ -749,11 +749,11 @@ index 05aaa57..f7db723 100644
      if (!get_config_key(hkey, appkey, "CaptureDisplaysForFullscreen", buffer, sizeof(buffer)))
          capture_displays_for_fullscreen = IS_OPTION_TRUE(buffer[0]);
 
-+    /* Runtime gate: unset or "1" enables native fullscreen Spaces; any other
-+       value disables them. */
++    /* Runtime gate: only "1" enables native fullscreen Spaces; unset or any
++       other value disables them. */
 +    {
 +        const char *value = getenv("LMISXH_AKMOCL_FULLSCREEN");
-+        native_fullscreen_space = !value || (value[0] == '1' && !value[1]);
++        native_fullscreen_space = value && value[0] == '1' && !value[1];
 +
 +        /* The client's platform notice helper inherits the variable. Its windows
 +           stay above every Space and must never get a native fullscreen Space,
