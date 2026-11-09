@@ -40,7 +40,7 @@ wine/                       # lowercase
 
 `provenance.json` records the build commit, the resolved `runtimeLock`, and the validation report. It also records the selected catalog id, SHA-256, and size under `externalArtifact`.
 
-The archive has no DXMT, no `winemetal.so`, no `wine64`, no `Arknights` link, and no `WINEPRELOADERAPPNAME`. `scripts/arm64/assemble.py` adds `Wine/bin/wine64`, `Wine/bin/Arknights`, the DXMT payload, and the WineMetal modules outside the signed `wine.app`.
+The archive has no DXMT, no `winemetal.so`, no `wine64`, no `Arknights` link, and no `WINEPRELOADERAPPNAME`. Patches `0012` and `0013` provide `WINEPRELOADERAPPNAME` once the external build picks them up. `scripts/arm64/assemble.py` adds `Wine/bin/wine64`, `Wine/bin/Arknights`, the DXMT payload, and the WineMetal modules outside the signed `wine.app`.
 
 ## DXMT
 
@@ -62,7 +62,7 @@ The window server selects the window design from the main executable's `LC_BUILD
 
 ## Patch export
 
-The Arknights patches for the signed runtime live in [`wine-build-new/`](../../wine-build-new/). That export has its own layout, gate table, canonical copies, and workspace audit. Its [README](../../wine-build-new/README.md) and [provenance](../../wine-build-new/provenance.md) are the only copies. The export applies eleven Wine patches and one paired FEX patch after the workspace's 72-patch queue.
+The Arknights patches for the signed runtime live in [`wine-build-new/`](../../wine-build-new/). That export has its own layout, gate table, canonical copies, and workspace audit. Its [README](../../wine-build-new/README.md) and [provenance](../../wine-build-new/provenance.md) are the only copies. The export applies fourteen Wine patches and one paired FEX patch after the workspace's 72-patch queue.
 
 ## Consumer contract
 

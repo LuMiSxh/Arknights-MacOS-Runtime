@@ -1,0 +1,42 @@
+diff --git a/dlls/ntdll/unix/process.c b/dlls/ntdll/unix/process.c
+--- a/dlls/ntdll/unix/process.c
++++ b/dlls/ntdll/unix/process.c
+@@ -406,6 +406,7 @@ static NTSTATUS spawn_process( const RTL_USER_PROCESS_PARAMETERS *params, int so
+     int stdin_fd = -1, stdout_fd = -1;
+     pid_t pid;
+     char **argv, *image_path;
++    const WCHAR *ptr;
+     DWORD image_len;
+ 
+     if (wine_server_handle_to_fd( params->hStdInput, FILE_READ_DATA, &stdin_fd, NULL ) &&
+@@ -435,6 +436,30 @@ static NTSTATUS spawn_process( const RTL_USER_PROCESS_PARAMETERS *params, int so
+             if (stdout_fd != -1 && stdout_fd != 1) close( stdout_fd );
+ 
+             if (winedebug) putenv( winedebug );
++
++            /* CW HACK 24717: promote __CX_UNIX_<name>=<value> to <name>=<value> in the Unix
++             * environment of the new process; an empty value removes <name>. */
++            for (ptr = params->Environment; ptr && *ptr; ptr += wcslen( ptr ) + 1)
++            {
++                static const WCHAR cx_unixW[] = {'_','_','C','X','_','U','N','I','X','_',0};
++                const WCHAR *name = ptr + ARRAY_SIZE( cx_unixW ) - 1;
++                char *str, *equals;
++                DWORD len;
++
++                if (wcsncmp( ptr, cx_unixW, ARRAY_SIZE( cx_unixW ) - 1 ) || !*name || *name == '=') continue;
++                len = wcslen( name ) * 3 + 1;
++                if (!(str = malloc( len ))) continue;
++                ntdll_wcstoumbs( name, wcslen( name ) + 1, str, len, FALSE );
++                if (!(equals = strchr( str, '=' ))) free( str );
++                else if (!equals[1])
++                {
++                    *equals = 0;
++                    unsetenv( str );
++                    free( str );
++                }
++                else putenv( str );  /* the environment owns the string */
++            }
++
+             if (unixdir != -1)
+             {
+                 fchdir( unixdir );

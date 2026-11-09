@@ -37,6 +37,18 @@ The canonical copy of each patch is in [README.md](README.md#canonical-copies).
 - `0011-winemac-command-q-quit.patch` is an original change for this repository. It ports the
   x86 Command-Q change in `patches/wine/0011-winemac-command-q-quit.patch` to Wine 11.18.
   See [Command-Q provenance](../patches/wine/provenance.md#0011-command-q).
+- `0012-ntdll-name-the-macos-loader-link-after-the-application.patch` ports WineCX CW HACK
+  22144 from WineCX `a54b8240683e92bf4c15cb1ba6bf92a9539bd768`. It differs from WineCX
+  in that it creates only a symlink, omits the preloader branch, and names the link
+  after the program argument. Source files in Wine: `dlls/ntdll/unix/loader.c`,
+  `dlls/ntdll/unix/process.c`, `dlls/ntdll/unix/unix_private.h`.
+- `0013-winemac-name-the-application-menu-after-the-program.patch` is adapted from WineCX
+  CW HACK 13438 from the same WineCX commit. WineCX rewrites the loader Info.plist,
+  which fails on arm64, so winemac reads `WINEPRELOADERAPPNAME` instead. Source file
+  in Wine: `dlls/winemac.drv/cocoa_app.m`.
+- `0014-ntdll-promote-cx-unix-environment-variables.patch` ports WineCX CW HACK 24717
+  from the same WineCX commit. It differs from WineCX in the empty-name check and
+  ignores entries without `=`. Source file in Wine: `dlls/ntdll/unix/process.c`.
 - `fex/0001-arm64ec-restore-carried-eflags.patch` applies to FEX commit
   `14c92681f4d62cf84d901460e0358de09c8847a7` (`FEX-Emu/FEX`). The upstream author is not
   recorded in this repository. The FEX license is MIT; see

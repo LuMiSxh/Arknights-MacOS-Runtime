@@ -14,13 +14,13 @@ The canonical copy of each patch is listed under [Canonical copies](#canonical-c
 
 | Path        | Content                                                   |
 | ----------- | --------------------------------------------------------- |
-| `patches/`  | Eleven Wine patches, applied after the 72-patch queue     |
+| `patches/`  | Fourteen Wine patches, applied after the 72-patch queue   |
 | `fex/`      | The paired FEX context patch for Wine patch `0001`        |
 | `lock.json` | Machine-readable list of paths, hashes, and runtime gates |
 
 ## What is in the export
 
-The workspace applies all eleven patches at build time. The `LMISXH_AKMOCL_*` variables gate
+The workspace applies all fourteen patches at build time. The `LMISXH_AKMOCL_*` variables gate
 behavior at runtime; they do not select patches at build time.
 
 | Patch                                              | Runtime gate             | Need                  | Purpose                                                  |
@@ -36,6 +36,9 @@ behavior at runtime; they do not select patches at build time.
 | `0009-winemac-native-fullscreen-space.patch`       | `_FULLSCREEN` (default off) | ours, user-visible | Puts fullscreen games in a native macOS Space.           |
 | `0010-ntdll-hide-software-cursor-asset.patch`      | `_CURSOR` (default off)  | ours, user-visible    | Hides the two game software-cursor assets.               |
 | `0011-winemac-command-q-quit.patch`               | opt-out `_MENU`          | ours, user-visible    | Makes Command+Q quit from the app menu.                  |
+| `0012-ntdll-name-the-macos-loader-link-after-the-application.patch` | none (always on) | ours, user-visible | Names the loader link and `WINEPRELOADERAPPNAME` after the program. |
+| `0013-winemac-name-the-application-menu-after-the-program.patch` | none (always on) | ours, user-visible | Shows `WINEPRELOADERAPPNAME` in the Hide and Quit menu items. |
+| `0014-ntdll-promote-cx-unix-environment-variables.patch` | none (always on) | launcher helper injection | Promotes `__CX_UNIX_<name>` to the child's Unix environment. |
 
 `0001` to `0006` and `0011` default on: unset or exactly `1` keeps the patch on. `0007`, `0008`, `0009`, and `0010` default off: only exactly `1` enables them. Any other value turns the patch off.
 
@@ -95,13 +98,17 @@ path for both separate and in-place buffers.
   Mono download dialog appears.
 - **Address space, W^X, ID registers, EC bitmap, and FEX JIT patches.** The Hadron queue
   already provides them.
-- **Loader name, audio, and DXMT.** Not required for login or ACE. The DXMT patch also
-  targets a different DXMT pin.
+- **Audio and DXMT.** Not required for login or ACE. The DXMT patch also targets a
+  different DXMT pin. The loader-name patches `0012` and `0013` are in the export.
 
 ## Gates and opt-outs
 
 `0001` to `0006` and `0011` default on: unset or exactly `1` keeps the patch on.
 Any other value turns it off.
+
+`0012` to `0014` have no runtime gate and are always applied. `0012` names the loader
+link after the program and sets `WINEPRELOADERAPPNAME`; `0013` reads that variable;
+`0014` does nothing unless the program sets a `__CX_UNIX_<name>` variable.
 
 ```sh
 LMISXH_AKMOCL_EFLAGS=0          # Do not carry PF, AF and DF
@@ -175,6 +182,7 @@ Edit the canonical copy, then rebase it into `wine-build-new/patches/`. Where th
 | `0007`, `0008`         | `patches/wine/0007-win32u-winemac-bilibili-layered-child.patch`, `patches/wine/0008-winemac-bilibili-join-all-spaces.patch` (rebased) |
 | `0009`                 | `patches/wine/0009-winemac-native-fullscreen-space.patch` (rebased) |
 | `0010`                 | `patches/wine/0010-ntdll-hide-software-cursor-asset.patch` |
+| `0012`, `0013`, `0014` | `wine-build-new/patches/` (this directory)  |
 | `fex/0001`             | `wine-build-new/fex/` (this directory)      |
 
 ## Workspace queue audit
@@ -234,6 +242,6 @@ Arknights client sets the opt-outs it needs. The CN and cursor patches still nee
 
 ## Validation
 
-- All eleven Wine patches apply with `patch -p1 -F0` after the workspace's 72-patch queue.
+- All fourteen Wine patches apply with `patch -p1 -F0` after the workspace's 72-patch queue.
 - No Wine build, prefix, game launch, or ACE run was performed for this export.
 - ACE remains unverified. Complete the China update before judging an ACE result.
