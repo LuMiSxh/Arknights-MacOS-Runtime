@@ -1,0 +1,211 @@
+diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
+--- a/dlls/ntdll/unix/loader.c
++++ b/dlls/ntdll/unix/loader.c
+@@ -439,7 +439,93 @@ char *get_alternate_wineloader( WORD machine )
+ }
+ 
+ 
+-static void preloader_exec( char **argv )
++#ifdef __APPLE__
++
++/* Port of CW HACK 22144: the Dock and the application menu name a process after
++ * its executable, so start the loader through a link named after the program. */
++
++/* Same image path to display name rule as the loader uses for the application menu. */
++static char *extract_exe_name( const char *exe_path )
++{
++    char *copy, *name, *p, *ret;
++    size_t len;
++
++    if (!(copy = strdup( exe_path ))) return NULL;
++    name = copy;
++    if ((p = strrchr( name, '\\' ))) name = p + 1;
++    if ((p = strrchr( name, '/' ))) name = p + 1;
++    if (strspn( name, "0123456789abcdefABCDEF" ) == 32 && name[32] == '.') name += 33;
++    if ((p = strrchr( name, '.' )) && p != name) len = p - name;
++    else len = strlen( name );
++
++    /* the name becomes a file name, so refuse hidden names such as "." and ".." */
++    ret = (len && name[0] != '.') ? strndup( name, len ) : NULL;
++    free( copy );
++    return ret;
++}
++
++/* Returns $TMPDIR/winetemp-<inode>-<size>-<mtime sec>-<mtime nsec>/ for the loader, so
++ * that all links to one loader share a directory and an updated loader gets a new one. */
++static char *create_tempdir( const char *loader_path )
++{
++    char *str, *tempdir;
++    struct stat st;
++    size_t n;
++
++    if (!(tempdir = malloc( MAX_PATH ))) return NULL;
++    if (!confstr( _CS_DARWIN_USER_TEMP_DIR, tempdir, MAX_PATH )) goto fail;
++    if (stat( loader_path, &st )) goto fail;
++    if (asprintf( &str, "/winetemp-%llu-%llu-%lu-%lu/", (unsigned long long)st.st_ino,
++                  (unsigned long long)st.st_size, (unsigned long)st.st_mtimespec.tv_sec,
++                  (unsigned long)st.st_mtimespec.tv_nsec ) < 0) goto fail;
++    n = strlcat( tempdir, str, MAX_PATH );
++    free( str );
++    if (n >= MAX_PATH) goto fail;
++
++    /* mkdir fails when the directory exists, which is fine */
++    mkdir( tempdir, 0700 );
++    return tempdir;
++
++fail:
++    free( tempdir );
++    return NULL;
++}
++
++/* Only a symlink works for the provisioned loader inside wine.app: the kernel resolves
++ * it, so the process keeps the bundle path that its provisioning profile and the
++ * ntdll.so lookup in the loader need. A hard link would lose both. */
++static char *create_loader_link( const char *loader_path, const char *name )
++{
++    char *linkpath;
++    struct stat st;
++
++    if (!(linkpath = create_tempdir( loader_path ))) return NULL;
++    if (strlcat( linkpath, name, MAX_PATH ) >= MAX_PATH) goto fail;
++    if (!stat( linkpath, &st ) && S_ISREG( st.st_mode )) return linkpath;
++    if (!symlink( loader_path, linkpath )) return linkpath;
++
++fail:
++    free( linkpath );
++    return NULL;
++}
++
++/* Returns a link to the loader named after the image, or NULL to keep the loader path.
++ * The loader reads the name again from WINEPRELOADERAPPNAME for the application menu. */
++static char *get_loader_link( const char *loader_path, const char *image_path )
++{
++    char *name, *link;
++
++    if (!image_path || !(name = extract_exe_name( image_path ))) return NULL;
++    link = create_loader_link( loader_path, name );
++    setenv( "WINEPRELOADERAPPNAME", name, 1 );
++    free( name );
++    return link;
++}
++
++#endif /* __APPLE__ */
++
++
++static void preloader_exec( char **argv, const char *image_path )
+ {
+ #ifdef HAVE_WINE_PRELOADER
+     asprintf( &argv[0], "%s-preloader", argv[1] );
+@@ -454,21 +540,35 @@ static void preloader_exec( char **argv )
+ #endif
+     execv( argv[0], argv );
+     free( argv[0] );
++#endif
++#if defined(__APPLE__) && !defined(HAVE_WINE_PRELOADER)
++    {
++        /* CW HACK 22144: exec a link named after the program; keep the loader if that fails */
++        char *loader = argv[1], *link = get_loader_link( loader, image_path );
++
++        if (link)
++        {
++            argv[1] = link;
++            execv( argv[1], argv + 1 );
++            argv[1] = loader;
++            free( link );
++        }
++    }
+ #endif
+     execv( argv[1], argv + 1 );
+ }
+ 
+ /* exec the appropriate wine loader for the specified machine */
+-static NTSTATUS loader_exec( char **argv, WORD machine )
++static NTSTATUS loader_exec( char **argv, WORD machine, const char *image_path )
+ {
+     static char noexec[] = "WINELOADERNOEXEC=1";
+ 
+     putenv( noexec );
+ 
+-    if (((argv[1] = get_alternate_wineloader( machine )))) preloader_exec( argv );
++    if (((argv[1] = get_alternate_wineloader( machine )))) preloader_exec( argv, image_path );
+ 
+     argv[1] = strdup( wineloader );
+-    preloader_exec( argv );
++    preloader_exec( argv, image_path );
+     return STATUS_INVALID_IMAGE_FORMAT;
+ }
+ 
+@@ -478,7 +578,8 @@ static NTSTATUS loader_exec( char **argv, WORD machine )
+  *
+  * argv[0] and argv[1] must be reserved for the preloader and loader respectively.
+  */
+-NTSTATUS exec_wineloader( char **argv, int socketfd, const struct pe_image_info *pe_info )
++NTSTATUS exec_wineloader( char **argv, int socketfd, const struct pe_image_info *pe_info,
++                          const char *image_path )
+ {
+     WORD machine = pe_info->machine;
+     ULONGLONG res_start = pe_info->base;
+@@ -498,7 +599,7 @@ NTSTATUS exec_wineloader( char **argv, int socketfd, const struct pe_image_info
+     putenv( preloader_reserve );
+     putenv( socket_env );
+ 
+-    return loader_exec( argv, machine );
++    return loader_exec( argv, machine, image_path );
+ }
+ 
+ 
+@@ -2078,7 +2179,8 @@ static void reexec_loader( int argc, char *argv[], char *extra_arg )
+     /* default to 32-bit loader to support 32-bit prefixes */
+     if (machine == IMAGE_FILE_MACHINE_AMD64) machine = IMAGE_FILE_MACHINE_I386;
+ 
+-    loader_exec( new_argv, machine );
++    /* the program is the builtin named by extra_arg, or the first argument */
++    loader_exec( new_argv, machine, extra_arg ? extra_arg : argv[1] );
+     fatal_error( "could not exec the wine loader\n" );
+ }
+ 
+diff --git a/dlls/ntdll/unix/process.c b/dlls/ntdll/unix/process.c
+--- a/dlls/ntdll/unix/process.c
++++ b/dlls/ntdll/unix/process.c
+@@ -405,7 +405,8 @@ static NTSTATUS spawn_process( const RTL_USER_PROCESS_PARAMETERS *params, int so
+     NTSTATUS status = STATUS_SUCCESS;
+     int stdin_fd = -1, stdout_fd = -1;
+     pid_t pid;
+-    char **argv;
++    char **argv, *image_path;
++    DWORD image_len;
+ 
+     if (wine_server_handle_to_fd( params->hStdInput, FILE_READ_DATA, &stdin_fd, NULL ) &&
+         isatty(0) && is_unix_console_handle( params->hStdInput ))
+@@ -441,7 +442,17 @@ static NTSTATUS spawn_process( const RTL_USER_PROCESS_PARAMETERS *params, int so
+             }
+             argv = build_argv( &params->CommandLine, 2 );
+ 
+-            exec_wineloader( argv, socketfd, pe_info );
++            /* CW HACK 22144: pass the image name so that the macOS loader can be named after it */
++            image_len = params->ImagePathName.Length / sizeof(WCHAR);
++            if ((image_path = malloc( image_len * 3 + 1 )))
++            {
++                image_len = ntdll_wcstoumbs( params->ImagePathName.Buffer, image_len,
++                                             image_path, image_len * 3, FALSE );
++                image_path[image_len] = 0;
++            }
++            else image_path = argv[2];
++
++            exec_wineloader( argv, socketfd, pe_info, image_path );
+             _exit(1);
+         }
+ 
+diff --git a/dlls/ntdll/unix/unix_private.h b/dlls/ntdll/unix/unix_private.h
+--- a/dlls/ntdll/unix/unix_private.h
++++ b/dlls/ntdll/unix/unix_private.h
+@@ -242,7 +242,8 @@ extern void *create_startup_info( const UNICODE_STRING *nt_image, ULONG process_
+                                   const RTL_USER_PROCESS_PARAMETERS *params,
+                                   const struct pe_image_info *pe_info, DWORD *info_size );
+ extern char *get_alternate_wineloader( WORD machine );
+-extern NTSTATUS exec_wineloader( char **argv, int socketfd, const struct pe_image_info *pe_info );
++extern NTSTATUS exec_wineloader( char **argv, int socketfd, const struct pe_image_info *pe_info,
++                                 const char *image_path );
+ extern NTSTATUS load_builtin( struct pe_mapping_info *pe_mapping, USHORT machine,
+                               SECTION_IMAGE_INFORMATION *info, void **module, SIZE_T *size,
+                               ULONG_PTR limit_low, ULONG_PTR limit_high, off_t offset );
