@@ -81,10 +81,10 @@
       {
         "order": 81,
         "path": "wine-build-new/patches/0009-winemac-native-fullscreen-space.patch",
-        "sha256": "63649e7caf650aeca78632d98af7e0d76ebd721a177f120655f9b06334e5fc43",
-        "default": "on",
-        "optional": true,
-        "opt_out": "LMISXH_AKMOCL_FULLSCREEN"
+        "sha256": "fa2a069d2c6606653aa97f8d19dd03d878ef70f7a4e6bacdeaba7b24b7e41dd6",
+        "modifier": "LMISXH_AKMOCL_FULLSCREEN",
+        "default": "off",
+        "optional": true
       },
       {
         "order": 82,
@@ -121,7 +121,6 @@
     "LMISXH_AKMOCL_APPCONTAINER": "Implement the AppContainer names Chromium resolves.",
     "LMISXH_AKMOCL_WINSOCK": "Implement SIO_ADDRESS_LIST_SORT.",
     "LMISXH_AKMOCL_CEF": "Apply the Bilibili CEF 80.1.15 descriptor.",
-    "LMISXH_AKMOCL_FULLSCREEN": "Put fullscreen games in a native macOS Space.",
     "LMISXH_AKMOCL_MENU": "Make Command+Q quit from the app menu."
   },
   "opt_out_semantics": "Unset or `1` keeps the patch on; any other value turns it off.",

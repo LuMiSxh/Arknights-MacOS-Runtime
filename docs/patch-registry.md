@@ -159,7 +159,7 @@ The patch changes one line in `dlls/winemac.drv/cocoa_app.m`. It sets the Quit i
 - Component/base: WineCX <!-- pin:wine.commit|code -->`a54b8240683e92bf4c15cb1ba6bf92a9539bd768`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Original runtime change, runtime maintainers
 - License: LGPL-2.1-or-later (Wine)
-- Gate: `LMISXH_AKMOCL_FULLSCREEN` (default on: unset or exactly `1`), read once in `setup_options`
+- Gate: `LMISXH_AKMOCL_FULLSCREEN` (default off: only exactly `1` enables it), read once in `setup_options`
 - Inactive behavior: Missing, `0`, or invalid values keep the screen-sized window at `NSStatusWindowLevel + 1`
 - Automated gate: Hash, clean `git apply --check` alone and after the `cn` family on both Wine branches, `cocoa_app.m` syntax check
 - Manual gate: A borderless fullscreen game window enters its own Space. Leaving the Space by the user stays left. A Wine resize below screen size leaves the Space. The cursor clip still holds after each change.
