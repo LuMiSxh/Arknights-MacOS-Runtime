@@ -105,7 +105,7 @@
       {
         "order": 84,
         "path": "wine-build-new/patches/0012-ntdll-name-the-macos-loader-link-after-the-application.patch",
-        "sha256": "f42979a02266f082bedcd2306d9b497b8d699ee923f27dead182328a0d3bcbd4",
+        "sha256": "1ea8fa4047311d89146ac30f7699e4de852b53a5eba0498a690a7e3cd2f71361",
         "default": "on"
       },
       {
