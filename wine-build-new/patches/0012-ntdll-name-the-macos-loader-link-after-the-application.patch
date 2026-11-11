@@ -1,7 +1,7 @@
 diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
 --- a/dlls/ntdll/unix/loader.c
 +++ b/dlls/ntdll/unix/loader.c
-@@ -439,7 +439,93 @@ char *get_alternate_wineloader( WORD machine )
+@@ -439,7 +439,126 @@ char *get_alternate_wineloader( WORD machine )
  }
  
  
@@ -32,7 +32,8 @@ diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
 +}
 +
 +/* Returns $TMPDIR/winetemp-<inode>-<size>-<mtime sec>-<mtime nsec>/ for the loader, so
-+ * that all links to one loader share a directory and an updated loader gets a new one. */
++ * that all links to one loader share a directory and an updated loader gets a new one.
++ * The directory must be a private one of the current user, as the links in it are executed. */
 +static char *create_tempdir( const char *loader_path )
 +{
 +    char *str, *tempdir;
@@ -51,6 +52,13 @@ diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
 +
 +    /* mkdir fails when the directory exists, which is fine */
 +    mkdir( tempdir, 0700 );
++
++    n = strlen( tempdir );
++    tempdir[n - 1] = 0;  /* a trailing slash would follow a symlink */
++    if (lstat( tempdir, &st ) || !S_ISDIR( st.st_mode ) || st.st_uid != geteuid() ||
++        (st.st_mode & (S_IWGRP | S_IWOTH)))
++        goto fail;
++    tempdir[n - 1] = '/';
 +    return tempdir;
 +
 +fail:
@@ -58,20 +66,45 @@ diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
 +    return NULL;
 +}
 +
++/* A cached link is only reusable when it points at exactly this loader, so that a loader
++ * that was moved away and replaced by another Wine at the old path is never started. */
++static BOOL is_loader_link( const char *linkpath, const char *loader_path )
++{
++    char target[MAX_PATH];
++    struct stat link_st, loader_st;
++    ssize_t len = readlink( linkpath, target, sizeof(target) - 1 );
++
++    if (len <= 0) return FALSE;
++    target[len] = 0;
++    if (strcmp( target, loader_path )) return FALSE;
++    if (stat( linkpath, &link_st ) || stat( loader_path, &loader_st )) return FALSE;
++    return S_ISREG( loader_st.st_mode ) && link_st.st_dev == loader_st.st_dev &&
++           link_st.st_ino == loader_st.st_ino;
++}
++
 +/* Only a symlink works for the provisioned loader inside wine.app: the kernel resolves
 + * it, so the process keeps the bundle path that its provisioning profile and the
 + * ntdll.so lookup in the loader need. A hard link would lose both. */
 +static char *create_loader_link( const char *loader_path, const char *name )
 +{
-+    char *linkpath;
-+    struct stat st;
++    char *linkpath, *temppath = NULL;
 +
 +    if (!(linkpath = create_tempdir( loader_path ))) return NULL;
 +    if (strlcat( linkpath, name, MAX_PATH ) >= MAX_PATH) goto fail;
-+    if (!stat( linkpath, &st ) && S_ISREG( st.st_mode )) return linkpath;
-+    if (!symlink( loader_path, linkpath )) return linkpath;
++    if (is_loader_link( linkpath, loader_path )) return linkpath;
++
++    /* replace a stale entry atomically, so that concurrent starts never see a missing link */
++    if (asprintf( &temppath, "%s.%d", linkpath, (int)getpid() ) < 0) goto fail;
++    if (symlink( loader_path, temppath )) goto fail;
++    if (!rename( temppath, linkpath ))
++    {
++        free( temppath );
++        return linkpath;
++    }
++    unlink( temppath );
 +
 +fail:
++    free( temppath );
 +    free( linkpath );
 +    return NULL;
 +}
@@ -96,7 +129,7 @@ diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
  {
  #ifdef HAVE_WINE_PRELOADER
      asprintf( &argv[0], "%s-preloader", argv[1] );
-@@ -454,21 +540,35 @@ static void preloader_exec( char **argv )
+@@ -454,21 +573,35 @@ static void preloader_exec( char **argv )
  #endif
      execv( argv[0], argv );
      free( argv[0] );
@@ -135,7 +168,7 @@ diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
      return STATUS_INVALID_IMAGE_FORMAT;
  }
  
-@@ -478,7 +578,8 @@ static NTSTATUS loader_exec( char **argv, WORD machine )
+@@ -478,7 +611,8 @@ static NTSTATUS loader_exec( char **argv, WORD machine )
   *
   * argv[0] and argv[1] must be reserved for the preloader and loader respectively.
   */
@@ -145,7 +178,7 @@ diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
  {
      WORD machine = pe_info->machine;
      ULONGLONG res_start = pe_info->base;
-@@ -498,7 +599,7 @@ NTSTATUS exec_wineloader( char **argv, int socketfd, const struct pe_image_info
+@@ -498,7 +632,7 @@ NTSTATUS exec_wineloader( char **argv, int socketfd, const struct pe_image_info
      putenv( preloader_reserve );
      putenv( socket_env );
  
@@ -154,7 +187,29 @@ diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
  }
  
  
-@@ -2078,7 +2179,8 @@ static void reexec_loader( int argc, char *argv[], char *extra_arg )
+@@ -2061,7 +2195,20 @@ static void reexec_loader( int argc, char *argv[], char *extra_arg )
+     char **new_argv;
+ 
+     /* have to exec if we have a preloader, or an argument, or if we are the initial wrapper */
+-    if (!pre_exec() && !extra_arg && dlsym( RTLD_DEFAULT, "wine_main_preload_info" )) return;
++    if (!pre_exec() && !extra_arg && dlsym( RTLD_DEFAULT, "wine_main_preload_info" ))
++    {
++#ifdef __APPLE__
++        /* The signed arm64 loader provides wine_main_preload_info itself, so it never needs the
++         * exec above. Still start the program through a link named after it, once: the child
++         * runs with WINELOADERNOEXEC set and does not get here again. */
++        char *name = argc > 1 ? extract_exe_name( argv[1] ) : NULL;
++
++        if (!name) return;
++        free( name );
++#else
++        return;
++#endif
++    }
+ 
+     if (extra_arg)
+     {
+@@ -2078,7 +2225,8 @@ static void reexec_loader( int argc, char *argv[], char *extra_arg )
      /* default to 32-bit loader to support 32-bit prefixes */
      if (machine == IMAGE_FILE_MACHINE_AMD64) machine = IMAGE_FILE_MACHINE_I386;
  

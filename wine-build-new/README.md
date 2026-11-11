@@ -107,7 +107,8 @@ path for both separate and in-place buffers.
 Any other value turns it off.
 
 `0012` to `0014` have no runtime gate and are always applied. `0012` names the loader
-link after the program and sets `WINEPRELOADERAPPNAME`; `0013` reads that variable;
+link after the program, for direct starts and spawned processes, and sets
+`WINEPRELOADERAPPNAME`; `0013` reads that variable;
 `0014` does nothing unless the program sets a `__CX_UNIX_<name>` variable.
 
 ```sh

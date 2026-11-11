@@ -40,7 +40,10 @@ The canonical copy of each patch is in [README.md](README.md#canonical-copies).
 - `0012-ntdll-name-the-macos-loader-link-after-the-application.patch` ports WineCX CW HACK
   22144 from WineCX `a54b8240683e92bf4c15cb1ba6bf92a9539bd768`. It differs from WineCX
   in that it creates only a symlink, omits the preloader branch, and names the link
-  after the program argument. Source files in Wine: `dlls/ntdll/unix/loader.c`,
+  after the program argument. It reuses a cached link only when the link targets exactly
+  the current loader and the directory is private to the user. It also re-execs a direct
+  start through the link, because the signed arm64 loader skips the generic re-exec in
+  `reexec_loader`. Source files in Wine: `dlls/ntdll/unix/loader.c`,
   `dlls/ntdll/unix/process.c`, `dlls/ntdll/unix/unix_private.h`.
 - `0013-winemac-name-the-application-menu-after-the-program.patch` is adapted from WineCX
   CW HACK 13438 from the same WineCX commit. WineCX rewrites the loader Info.plist,
