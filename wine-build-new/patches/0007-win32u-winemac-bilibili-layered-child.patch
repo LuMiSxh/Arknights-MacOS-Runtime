@@ -307,17 +307,18 @@ diff --git a/dlls/winemac.drv/macdrv.h b/dlls/winemac.drv/macdrv.h
 index e12fd42..2a683d0 100644
 --- a/dlls/winemac.drv/macdrv.h
 +++ b/dlls/winemac.drv/macdrv.h
-@@ -150,6 +150,9 @@ extern void macdrv_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alph
+@@ -150,6 +150,10 @@ extern void macdrv_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alph
  extern BOOL macdrv_GetWindowStyleMasks(HWND hwnd, UINT style, UINT ex_style, UINT *style_mask, UINT *ex_style_mask);
  extern struct client_surface *macdrv_CreateClientSurface(HWND hwnd, int pixel_format, BOOL raw);
  extern BOOL macdrv_CreateWindowSurface(HWND hwnd, BOOL layered, const RECT *surface_rect, struct window_surface **surface);
 +extern BOOL macdrv_is_bilibili_layered_child(HWND hwnd);
 +extern BOOL macdrv_attach_layered_child_view(HWND hwnd, WineContentView *view);
 +extern void macdrv_detach_layered_child_view(HWND hwnd, WineContentView *view);
++extern void macdrv_init_bilibili_platform_process(void);
  extern void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT swp_flags,
                                      const struct window_rects *new_rects, struct window_surface *surface);
  extern void macdrv_DestroyCursorIcon(HCURSOR cursor);
-@@ -185,6 +188,7 @@ extern BOOL macdrv_SystemParametersInfo(UINT action, UINT int_param, void *ptr_p
+@@ -185,6 +189,7 @@ extern BOOL macdrv_SystemParametersInfo(UINT action, UINT int_param, void *ptr_p
      HWND                hwnd;                   /* hwnd that this private data belongs to */
      WineWindow         *cocoa_window;
      WineContentView    *client_view;
@@ -354,6 +355,17 @@ index 31d4ebc..30e2aee 100644
  
  /* mouse.c */
  
+diff --git a/dlls/winemac.drv/macdrv_main.c b/dlls/winemac.drv/macdrv_main.c
+--- a/dlls/winemac.drv/macdrv_main.c
++++ b/dlls/winemac.drv/macdrv_main.c
+@@ -440,6 +440,7 @@ static NTSTATUS macdrv_init(void *arg)
+ 
+     init_win_context();
+     setup_options();
++    macdrv_init_bilibili_platform_process();
+     load_strings(params->strings);
+ 
+     macdrv_err_on = ERR_ON(macdrv);
 diff --git a/dlls/winemac.drv/surface.c b/dlls/winemac.drv/surface.c
 index 43653ee..1de7fe7 100644
 --- a/dlls/winemac.drv/surface.c
@@ -514,19 +526,19 @@ index dd1aca0..3dfe197 100644
 +    return FALSE;
 +}
 +
++static bool bilibili_platform_process;
++
++/* The Cocoa main thread is not a Wine thread, so NtCurrentTeb() returns NULL there on ARM64.
++ * macdrv_init() computes this once on a Wine thread; the Cocoa callers only read the cached value. */
++void macdrv_init_bilibili_platform_process(void)
++{
++    bilibili_platform_process = lmisxh_akmocl_cn_enabled() && running_image_is("PCGamePlatform.exe") &&
++                                !command_line_has_cef_type();
++}
++
 +bool macdrv_is_bilibili_platform_process(void)
 +{
-+    static LONG state = -1;
-+    bool enabled = false;
-+
-+    if (state != -1) return state;
-+
-+    if (lmisxh_akmocl_cn_enabled() && running_image_is("PCGamePlatform.exe") &&
-+        !command_line_has_cef_type())
-+        enabled = true;
-+
-+    InterlockedCompareExchange(&state, enabled, -1);
-+    return enabled;
++    return bilibili_platform_process;
 +}
 +
 +static BOOL has_bilibili_webview_ancestor(HWND hwnd)

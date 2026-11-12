@@ -87,6 +87,9 @@ Wine window. The route is limited to `PCGamePlatform.exe`, the Chromium
 `Chrome_WidgetWin_0` and `Chrome.WindowTranslucent` property contract, and a
 `CMyWebViewDlg` anywhere in the parent chain of the candidate.
 This supports nested Bilibili dialogs.
+`macdrv_init()` computes the Bilibili platform process test once on a Wine thread.
+`macdrv_is_bilibili_platform_process()` only reads the cached value, because the
+Cocoa main thread has no TEB on ARM64.
 
 ### 0008 Bilibili join all Spaces
 
