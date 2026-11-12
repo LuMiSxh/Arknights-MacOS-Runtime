@@ -36,11 +36,11 @@ behavior at runtime; they do not select patches at build time.
 | `0009-winemac-native-fullscreen-space.patch`       | `_FULLSCREEN` (default off) | ours, user-visible | Puts fullscreen games in a native macOS Space.           |
 | `0010-ntdll-hide-software-cursor-asset.patch`      | `_CURSOR` (default off)  | ours, user-visible    | Hides the two game software-cursor assets.               |
 | `0011-winemac-command-q-quit.patch`               | opt-out `_MENU`          | ours, user-visible    | Makes Command+Q quit from the app menu.                  |
-| `0012-ntdll-name-the-macos-loader-link-after-the-application.patch` | none (always on) | ours, user-visible | Names the loader link and `WINEPRELOADERAPPNAME` after the program. |
-| `0013-winemac-name-the-application-menu-after-the-program.patch` | none (always on) | ours, user-visible | Shows `WINEPRELOADERAPPNAME` in the Hide and Quit menu items. |
+| `0012-ntdll-name-the-macos-loader-link-after-the-application.patch` | opt-out `_LOADER_LINK` | ours, user-visible | Names the loader link and `WINEPRELOADERAPPNAME` after the program. |
+| `0013-winemac-name-the-application-menu-after-the-program.patch` | opt-out `_LOADER_LINK` | ours, user-visible | Shows `WINEPRELOADERAPPNAME` in the Hide and Quit menu items. |
 | `0014-ntdll-promote-cx-unix-environment-variables.patch` | none (always on) | launcher helper injection | Promotes `__CX_UNIX_<name>` to the child's Unix environment. |
 
-`0001` to `0006` and `0011` default on: unset or exactly `1` keeps the patch on. `0007`, `0008`, `0009`, and `0010` default off: only exactly `1` enables them. Any other value turns the patch off.
+`0001` to `0006` and `0011` to `0013` default on: unset or exactly `1` keeps the patch on. `0007`, `0008`, `0009`, and `0010` default off: only exactly `1` enables them. Any other value turns the patch off.
 
 ### Why the ACE patches stay
 
@@ -103,13 +103,14 @@ path for both separate and in-place buffers.
 
 ## Gates and opt-outs
 
-`0001` to `0006` and `0011` default on: unset or exactly `1` keeps the patch on.
+`0001` to `0006` and `0011` to `0013` default on: unset or exactly `1` keeps the patch on.
 Any other value turns it off.
 
-`0012` to `0014` have no runtime gate and are always applied. `0012` names the loader
+`0012` and `0013` share the gate `LMISXH_AKMOCL_LOADER_LINK`. `0012` names the loader
 link after the program, for direct starts and spawned processes, and sets
-`WINEPRELOADERAPPNAME`; `0013` reads that variable;
-`0014` does nothing unless the program sets a `__CX_UNIX_<name>` variable.
+`WINEPRELOADERAPPNAME`; `0013` reads that variable. With the gate off, `0012` starts no
+link and no extra re-exec, and `0013` keeps the upstream menu name.
+`0014` has no gate and does nothing unless the program sets a `__CX_UNIX_<name>` variable.
 
 ```sh
 LMISXH_AKMOCL_EFLAGS=0          # Do not carry PF, AF and DF
@@ -119,6 +120,7 @@ LMISXH_AKMOCL_APPCONTAINER=0    # Do not implement the AppContainer names
 LMISXH_AKMOCL_WINSOCK=0         # Do not implement SIO_ADDRESS_LIST_SORT
 LMISXH_AKMOCL_CEF=0             # Do not apply the Bilibili CEF descriptor
 LMISXH_AKMOCL_MENU=0            # Do not make Command+Q quit from the app menu
+LMISXH_AKMOCL_LOADER_LINK=0     # Do not name the loader link and app menu after the program
 ```
 
 `0007`, `0008`, `0009`, and `0010` default off. Only exactly `1` enables them:

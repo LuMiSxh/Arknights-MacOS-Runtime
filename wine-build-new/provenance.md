@@ -44,10 +44,12 @@ The canonical copy of each patch is in [README.md](README.md#canonical-copies).
   the current loader and the directory is private to the user. It also re-execs a direct
   start through the link, because the signed arm64 loader skips the generic re-exec in
   `reexec_loader`. Source files in Wine: `dlls/ntdll/unix/loader.c`,
-  `dlls/ntdll/unix/process.c`, `dlls/ntdll/unix/unix_private.h`.
+  `dlls/ntdll/unix/process.c`, `dlls/ntdll/unix/unix_private.h`. The default-on gate
+  `LMISXH_AKMOCL_LOADER_LINK` turns off the link and the extra re-exec.
 - `0013-winemac-name-the-application-menu-after-the-program.patch` is adapted from WineCX
   CW HACK 13438 from the same WineCX commit. WineCX rewrites the loader Info.plist,
-  which fails on arm64, so winemac reads `WINEPRELOADERAPPNAME` instead. Source file
+  which fails on arm64, so winemac reads `WINEPRELOADERAPPNAME` instead, unless
+  `LMISXH_AKMOCL_LOADER_LINK` is off. Source file
   in Wine: `dlls/winemac.drv/cocoa_app.m`.
 - `0014-ntdll-promote-cx-unix-environment-variables.patch` ports WineCX CW HACK 24717
   from the same WineCX commit. It differs from WineCX in the empty-name check and

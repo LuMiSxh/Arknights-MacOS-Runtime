@@ -1,7 +1,7 @@
 diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
 --- a/dlls/ntdll/unix/loader.c
 +++ b/dlls/ntdll/unix/loader.c
-@@ -439,7 +439,126 @@ char *get_alternate_wineloader( WORD machine )
+@@ -439,7 +439,134 @@ char *get_alternate_wineloader( WORD machine )
  }
  
  
@@ -10,6 +10,14 @@ diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
 +
 +/* Port of CW HACK 22144: the Dock and the application menu name a process after
 + * its executable, so start the loader through a link named after the program. */
++
++/* LMISXH_AKMOCL_LOADER_LINK=0 keeps the upstream loader path and process name. */
++static BOOL loader_link_enabled(void)
++{
++    const char *value = getenv( "LMISXH_AKMOCL_LOADER_LINK" );
++
++    return !value || (value[0] == '1' && !value[1]);
++}
 +
 +/* Same image path to display name rule as the loader uses for the application menu. */
 +static char *extract_exe_name( const char *exe_path )
@@ -115,7 +123,7 @@ diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
 +{
 +    char *name, *link;
 +
-+    if (!image_path || !(name = extract_exe_name( image_path ))) return NULL;
++    if (!loader_link_enabled() || !image_path || !(name = extract_exe_name( image_path ))) return NULL;
 +    link = create_loader_link( loader_path, name );
 +    setenv( "WINEPRELOADERAPPNAME", name, 1 );
 +    free( name );
@@ -129,7 +137,7 @@ diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
  {
  #ifdef HAVE_WINE_PRELOADER
      asprintf( &argv[0], "%s-preloader", argv[1] );
-@@ -454,21 +573,35 @@ static void preloader_exec( char **argv )
+@@ -454,21 +581,35 @@ static void preloader_exec( char **argv )
  #endif
      execv( argv[0], argv );
      free( argv[0] );
@@ -168,7 +176,7 @@ diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
      return STATUS_INVALID_IMAGE_FORMAT;
  }
  
-@@ -478,7 +611,8 @@ static NTSTATUS loader_exec( char **argv, WORD machine )
+@@ -478,7 +619,8 @@ static NTSTATUS loader_exec( char **argv, WORD machine )
   *
   * argv[0] and argv[1] must be reserved for the preloader and loader respectively.
   */
@@ -178,7 +186,7 @@ diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
  {
      WORD machine = pe_info->machine;
      ULONGLONG res_start = pe_info->base;
-@@ -498,7 +632,7 @@ NTSTATUS exec_wineloader( char **argv, int socketfd, const struct pe_image_info
+@@ -498,7 +640,7 @@ NTSTATUS exec_wineloader( char **argv, int socketfd, const struct pe_image_info
      putenv( preloader_reserve );
      putenv( socket_env );
  
@@ -187,7 +195,7 @@ diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
  }
  
  
-@@ -2061,7 +2195,20 @@ static void reexec_loader( int argc, char *argv[], char *extra_arg )
+@@ -2061,7 +2203,20 @@ static void reexec_loader( int argc, char *argv[], char *extra_arg )
      char **new_argv;
  
      /* have to exec if we have a preloader, or an argument, or if we are the initial wrapper */
@@ -198,7 +206,7 @@ diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
 +        /* The signed arm64 loader provides wine_main_preload_info itself, so it never needs the
 +         * exec above. Still start the program through a link named after it, once: the child
 +         * runs with WINELOADERNOEXEC set and does not get here again. */
-+        char *name = argc > 1 ? extract_exe_name( argv[1] ) : NULL;
++        char *name = loader_link_enabled() && argc > 1 ? extract_exe_name( argv[1] ) : NULL;
 +
 +        if (!name) return;
 +        free( name );
@@ -209,7 +217,7 @@ diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
  
      if (extra_arg)
      {
-@@ -2078,7 +2225,8 @@ static void reexec_loader( int argc, char *argv[], char *extra_arg )
+@@ -2078,7 +2233,8 @@ static void reexec_loader( int argc, char *argv[], char *extra_arg )
      /* default to 32-bit loader to support 32-bit prefixes */
      if (machine == IMAGE_FILE_MACHINE_AMD64) machine = IMAGE_FILE_MACHINE_I386;
  

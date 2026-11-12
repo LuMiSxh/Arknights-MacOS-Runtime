@@ -105,14 +105,16 @@
       {
         "order": 84,
         "path": "wine-build-new/patches/0012-ntdll-name-the-macos-loader-link-after-the-application.patch",
-        "sha256": "1ea8fa4047311d89146ac30f7699e4de852b53a5eba0498a690a7e3cd2f71361",
-        "default": "on"
+        "sha256": "50e992f4e11b652f57a41f8b212019f62aeffaa7facc61ab043ed8daddf3f8f3",
+        "default": "on",
+        "opt_out": "LMISXH_AKMOCL_LOADER_LINK"
       },
       {
         "order": 85,
         "path": "wine-build-new/patches/0013-winemac-name-the-application-menu-after-the-program.patch",
-        "sha256": "deea59abd31adcdc74973361e9cd872eaebc7d602f8d085b77e72d33a5a793f3",
-        "default": "on"
+        "sha256": "6fe4fe66ce5da8ca73bdd9363609200803f5546d65d8c0ee5912f9fefcef9819",
+        "default": "on",
+        "opt_out": "LMISXH_AKMOCL_LOADER_LINK"
       },
       {
         "order": 86,
@@ -139,7 +141,8 @@
     "LMISXH_AKMOCL_APPCONTAINER": "Implement the AppContainer names Chromium resolves.",
     "LMISXH_AKMOCL_WINSOCK": "Implement SIO_ADDRESS_LIST_SORT.",
     "LMISXH_AKMOCL_CEF": "Apply the Bilibili CEF 80.1.15 descriptor.",
-    "LMISXH_AKMOCL_MENU": "Make Command+Q quit from the app menu."
+    "LMISXH_AKMOCL_MENU": "Make Command+Q quit from the app menu.",
+    "LMISXH_AKMOCL_LOADER_LINK": "Name the loader link and the application menu after the program (0012 and 0013)."
   },
   "opt_out_semantics": "Unset or `1` keeps the patch on; any other value turns it off.",
   "patch_alias": "patches/wine/arknights-macos-runtime",
