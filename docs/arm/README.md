@@ -30,7 +30,7 @@ The artifact layout is:
 
 ```text
 wine/                       # lowercase
-  bin/wine -> wine.app/...
+  bin/wine -> ../lib/wine/aarch64-unix/Arknights.app/...
   bin/wineserver
   lib/wine/aarch64-unix/
   lib/wine/aarch64-windows/
@@ -40,7 +40,7 @@ wine/                       # lowercase
 
 `provenance.json` records the build commit, the resolved `runtimeLock`, and the validation report. It also records the selected catalog id, SHA-256, and size under `externalArtifact`.
 
-The archive has no DXMT, no `winemetal.so`, no `wine64`, no `Arknights` link, and no `WINEPRELOADERAPPNAME`. Patches `0012` and `0013` provide `WINEPRELOADERAPPNAME` once the external build picks them up. `scripts/arm64/assemble.py` adds `Wine/bin/wine64`, `Wine/bin/Arknights`, the DXMT payload, and the WineMetal modules outside the signed `wine.app`.
+The archive has no DXMT, no `winemetal.so`, no `wine64`, no `Arknights` link, and no `WINEPRELOADERAPPNAME`. Patches `0012` and `0013` provide `WINEPRELOADERAPPNAME` once the external build picks them up. `scripts/arm64/assemble.py` adds `Wine/bin/wine64`, `Wine/bin/Arknights`, the DXMT payload, and the WineMetal modules outside the signed `Arknights.app` bundle. The wrapper renames riverfog's `wine.app` to `Arknights.app`. macOS labels the game process in the Dock with the bundle folder name, so the rename shows the game name instead of `wine`. The wrapper also repoints every symlink that named the old bundle.
 
 ## DXMT
 
@@ -48,7 +48,7 @@ The release workflow builds DXMT from `sources.dxmt` at commit `647b0020ba5764e5
 
 ## Entitlements and window chrome
 
-The `wine.app` loader is Developer ID signed by team `QNY65H4MK6`, identifier `com.riverfog7.wine`, with `com.apple.developer.cross-architecture-support` and a distribution profile. Adding files outside the bundle does not invalidate that signature. The wrapper keeps the loader byte-identical. Do not re-sign, relink, or replace the loader. Ad-hoc sign only wrapper-added unsigned files; the release workflow signs the locally built `winemetal.so`.
+The `Arknights.app` loader, renamed from `wine.app`, is Developer ID signed by team `QNY65H4MK6`, identifier `com.riverfog7.wine`, with `com.apple.developer.cross-architecture-support` and a distribution profile. Adding files outside the bundle does not invalidate that signature. The wrapper keeps the loader byte-identical. The signature covers the bundle contents, not its folder name. Do not re-sign, relink, or replace the loader. Ad-hoc sign only wrapper-added unsigned files; the release workflow signs the locally built `winemetal.so`.
 
 | Entitlement                                                | Effect                                                                 |
 | ---------------------------------------------------------- | ---------------------------------------------------------------------- |

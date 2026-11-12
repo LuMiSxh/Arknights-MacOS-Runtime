@@ -210,12 +210,17 @@ def _single_member_tar(name: str, *, linkname: str | None = None) -> bytes:
 def _build_external_trees(root: Path) -> tuple[Path, Path]:
     wine = root / "wine"
     (wine / "bin").mkdir(parents=True)
-    (wine / "lib" / "wine" / "aarch64-unix").mkdir(parents=True)
+    aarch64_unix = wine / "lib" / "wine" / "aarch64-unix"
+    loader_macos = aarch64_unix / "wine.app" / "Contents" / "MacOS"
+    loader_macos.mkdir(parents=True)
     (wine / "lib" / "wine" / "aarch64-windows").mkdir(parents=True)
     (wine / "share" / "licenses" / "fex-wine").mkdir(parents=True)
     (wine / "share" / "licenses" / "fex-wine" / "LICENSE").write_text("FEX license")
-    (wine / "lib" / "wine" / "aarch64-unix" / "wine").write_bytes(b"wine loader")
-    (wine / "bin" / "wine").symlink_to("../lib/wine/aarch64-unix/wine")
+    (loader_macos / "wine").write_bytes(b"wine loader")
+    (aarch64_unix / "wine").symlink_to("wine.app/Contents/MacOS/wine")
+    (wine / "bin" / "wine").symlink_to(
+        "../lib/wine/aarch64-unix/wine.app/Contents/MacOS/wine"
+    )
 
     dxmt = root / "dxmt"
     (dxmt / "aarch64-unix").mkdir(parents=True)
@@ -542,6 +547,28 @@ def test_assemble_moves_the_wine_tree_and_adds_links(tmp_path):
     assert (layout / "Wine/lib/wine/aarch64-windows/winemetal.dll").is_file()
     assert (tmp_path / "Licenses/external/fex-wine/LICENSE").is_file()
     assert (tmp_path / "NOTICE.md").is_file()
+
+
+def test_assemble_renames_the_loader_bundle_and_repoints_its_links(tmp_path):
+    wine_root, dxmt_root = _build_external_trees(tmp_path)
+
+    layout = assemble(
+        wine_root,
+        dxmt_root,
+        tmp_path / "Libraries",
+        archive_root=tmp_path,
+        interface=_interface(),
+    )
+
+    wine = layout / "Wine"
+    loader = layout / "Wine/lib/wine/aarch64-unix/Arknights.app/Contents/MacOS/wine"
+    assert loader.read_bytes() == b"wine loader"
+    assert not (wine / "lib/wine/aarch64-unix/wine.app").exists()
+    assert (wine / "bin/wine").resolve() == loader.resolve()
+    assert (wine / "lib/wine/aarch64-unix/wine").resolve() == loader.resolve()
+    targets = [os.readlink(path) for path in wine.rglob("*") if path.is_symlink()]
+    assert targets
+    assert not any("wine.app" in target for target in targets)
 
 
 def test_assemble_clears_the_wine_dos_stub(tmp_path):

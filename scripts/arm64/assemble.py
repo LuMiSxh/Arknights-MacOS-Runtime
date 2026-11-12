@@ -6,7 +6,8 @@
 The external builder ships a signed `wine/` tree. DXMT is built locally for
 ARM64EC by `build_dxmt.py`. This wrapper moves both into the `Libraries/` layout,
 adds the launcher aliases, and clears the Wine DOS-stub marker from the native DXMT
-D3D payloads. It never rewrites bytes inside the signed `wine.app`.
+D3D payloads. It renames the signed `wine.app` loader bundle to `Arknights.app` and never
+rewrites bytes inside it.
 """
 
 from __future__ import annotations
@@ -43,6 +44,11 @@ else:
 
 
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:")
+
+# The signed loader keeps riverfog's bundle name. macOS labels the game process in the
+# Dock with the bundle folder name, so the rename makes the Dock show the game name.
+UPSTREAM_LOADER_BUNDLE = "wine.app"
+LOADER_BUNDLE = "Arknights.app"
 
 # The top-level notices the runtime archive carries in addition to the upstream
 # `Licenses/external/` directory copied from `wine/share/licenses`.
@@ -111,6 +117,34 @@ def _add_launcher_links(wine: Path) -> None:
     if launcher.exists() or launcher.is_symlink():
         raise AssemblyError("Wine/bin/Arknights already exists")
     launcher.symlink_to("wine64")
+
+
+def _rename_loader_bundle(wine: Path) -> None:
+    """Rename the signed loader bundle and repoint each symlink that named it."""
+
+    unix = wine / "lib" / "wine" / "aarch64-unix"
+    upstream = _require_directory(unix / UPSTREAM_LOADER_BUNDLE, "Wine loader bundle")
+    renamed = unix / LOADER_BUNDLE
+    if renamed.exists() or renamed.is_symlink():
+        raise AssemblyError(f"{LOADER_BUNDLE} already exists")
+    upstream.rename(renamed)
+
+    for directory, directory_names, file_names in os.walk(wine, followlinks=False):
+        for name in (*directory_names, *file_names):
+            path = Path(directory) / name
+            if not path.is_symlink():
+                continue
+            parts = PurePosixPath(os.readlink(path)).parts
+            if UPSTREAM_LOADER_BUNDLE not in parts:
+                continue
+            retargeted = PurePosixPath(
+                *(
+                    LOADER_BUNDLE if part == UPSTREAM_LOADER_BUNDLE else part
+                    for part in parts
+                )
+            )
+            path.unlink()
+            path.symlink_to(retargeted)
 
 
 _NOTICE_DESCRIPTIONS = {
@@ -198,6 +232,7 @@ def assemble(
 
     wine = output / "Wine"
     shutil.copytree(wine_root, wine, symlinks=True)
+    _rename_loader_bundle(wine)
     _add_launcher_links(wine)
 
     unix = _require_directory(
