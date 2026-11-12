@@ -1,21 +1,23 @@
 diff --git a/dlls/winemac.drv/cocoa_app.m b/dlls/winemac.drv/cocoa_app.m
 --- a/dlls/winemac.drv/cocoa_app.m
 +++ b/dlls/winemac.drv/cocoa_app.m
-@@ -236,6 +236,7 @@ - (void) transformProcessToForeground:(BOOL)activateIfTransformed
+@@ -236,6 +236,8 @@ - (void) transformProcessToForeground:(BOOL)activateIfTransformed
              NSString* bundleName;
              NSString* title;
              NSMenuItem* item;
 +            const char* appName;
++            const char* linkGate = getenv("LMISXH_AKMOCL_LOADER_LINK");
  
              if (macdrv_is_bilibili_platform_process())
              {
-@@ -264,6 +265,11 @@ - (void) transformProcessToForeground:(BOOL)activateIfTransformed
+@@ -264,6 +266,12 @@ - (void) transformProcessToForeground:(BOOL)activateIfTransformed
              submenu = [[[NSMenu alloc] initWithTitle:WineLocalizedString(STRING_MENU_WINE)] autorelease];
              bundleName = [[NSBundle mainBundle] objectForInfoDictionaryKey:(NSString*)kCFBundleNameKey];
  
 +            /* The loader link set by ntdll names the program in WINEPRELOADERAPPNAME. The embedded
 +             * Info.plist of the signed loader cannot be rewritten, so it still says "Wine". */
-+            if ((appName = getenv("WINEPRELOADERAPPNAME")) && appName[0])
++            if ((!linkGate || (linkGate[0] == '1' && !linkGate[1])) &&
++                (appName = getenv("WINEPRELOADERAPPNAME")) && appName[0])
 +                bundleName = [NSString stringWithUTF8String:appName];
 +
              if ([bundleName length])
