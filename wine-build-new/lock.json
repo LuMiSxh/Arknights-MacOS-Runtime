@@ -81,7 +81,7 @@
       {
         "order": 81,
         "path": "wine-build-new/patches/0009-winemac-native-fullscreen-space.patch",
-        "sha256": "7fed98b335d38ddb342297830c814d365a6d019d735c38de3cdc1d3f57579c5e",
+        "sha256": "9e9acce0d51a727c29caeab1bb9bde3770bed460a1b5b05bf7b9bc749a9bc8a3",
         "modifier": "LMISXH_AKMOCL_FULLSCREEN",
         "default": "off",
         "optional": true
