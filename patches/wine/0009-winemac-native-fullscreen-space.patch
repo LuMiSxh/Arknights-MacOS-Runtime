@@ -30,53 +30,110 @@ index ff7c2431..c5b74847 100644
  void LogErrorv(const char* func, NSString* format, va_list args);
 +void LogMessage(const char* cls, const char* func, NSString* format, ...);
 diff --git a/dlls/winemac.drv/cocoa_app.m b/dlls/winemac.drv/cocoa_app.m
-index e3ab4597..f7d2db7b 100644
+index e3ab4597..f8db0300 100644
 --- a/dlls/winemac.drv/cocoa_app.m
 +++ b/dlls/winemac.drv/cocoa_app.m
 @@ -24,6 +24,8 @@
  #import "cocoa_window.h"
  #import "cocoa_icon_utils.h"
  
-+#include <stdatomic.h>
++#include <os/lock.h>
 +
  #pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
  
  
-@@ -55,6 +57,33 @@
+@@ -55,6 +57,90 @@
  static NSString* const WineExternalQuitNotificationWinePrefixKey = @"WinePrefix";
  
  bool macdrv_err_on;
 +bool macdrv_warn_on;
 +bool macdrv_trace_on;
 +
-+/* The housing inset of the primary screen in whole points, or -1 before the
-+   first computation.  Only the main thread computes it, from NSScreen, because
-+   NSScreen is not safe off the main thread and can lag behind a display change.
-+   Every thread reads this value, so the monitor rectangles, the mode trim and the
-+   coordinate flip always use the same number.  A fractional inset rounds to the
-+   nearest point here and nowhere else. */
-+static atomic_int housing_inset_points = -1;
++#define HOUSING_MAX_SCREENS 16
 +
-+static int compute_housing_inset_points(void)
++/* The housing insets of all screens in whole points.  Only the main thread
++   computes them, from NSScreen, because NSScreen is not safe off the main
++   thread and can lag behind a display change.  Every thread reads the published
++   copy under a lock, so the monitor rectangles, the mode trim and the coordinate
++   flip use the same numbers.  A fractional inset rounds to the nearest point here
++   and nowhere else.  Only screens with a nonzero inset are listed. */
++struct housing_insets
++{
++    BOOL valid;                              /* FALSE before the first computation */
++    int primary;                             /* inset of the primary screen */
++    int count;
++    CGDirectDisplayID ids[HOUSING_MAX_SCREENS];
++    int insets[HOUSING_MAX_SCREENS];
++};
++
++static struct housing_insets published_housing;
++static os_unfair_lock housing_lock = OS_UNFAIR_LOCK_INIT;
++
++static void compute_housing_insets(struct housing_insets *out)
 +{
 +@autoreleasepool
 +{
 +    NSArray* screens;
-+    CGFloat inset = 0;
++    NSUInteger i;
 +
++    memset(out, 0, sizeof(*out));
++    out->valid = TRUE;
 +    if (!native_fullscreen_geometry)
-+        return 0;
++        return;
 +
 +    screens = [NSScreen screens];
-+    if ([screens count])
-+        inset = [screens[0] safeAreaInsets].top;
-+    return inset > 0 ? (int)lround(inset) : 0;
++    for (i = 0; i < [screens count]; i++)
++    {
++        CGFloat top = [screens[i] safeAreaInsets].top;
++        int inset = top > 0 ? (int)lround(top) : 0;
++
++        if (i == 0)
++            out->primary = inset;
++        if (inset > 0 && out->count < HOUSING_MAX_SCREENS)
++        {
++            out->ids[out->count] = [[screens[i] deviceDescription][@"NSScreenNumber"] unsignedIntValue];
++            out->insets[out->count++] = inset;
++        }
++    }
 +}
++}
++
++static BOOL housing_insets_equal(const struct housing_insets *a, const struct housing_insets *b)
++{
++    int i;
++
++    if (a->primary != b->primary || a->count != b->count)
++        return FALSE;
++    for (i = 0; i < a->count; i++)
++        if (a->ids[i] != b->ids[i] || a->insets[i] != b->insets[i])
++            return FALSE;
++    return TRUE;
++}
++
++static struct housing_insets get_housing_insets(void)
++{
++    struct housing_insets snapshot;
++
++    os_unfair_lock_lock(&housing_lock);
++    snapshot = published_housing;
++    os_unfair_lock_unlock(&housing_lock);
++
++    if (!snapshot.valid)
++    {
++        /* First query: compute before anything reads the monitors. */
++        OnMainThread(^{
++            [[WineApplicationController sharedController] refreshHousingInset];
++        });
++        os_unfair_lock_lock(&housing_lock);
++        snapshot = published_housing;
++        os_unfair_lock_unlock(&housing_lock);
++    }
++    return snapshot;
 +}
  
  
  #if !defined(MAC_OS_VERSION_14_0) || MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_VERSION_14_0
-@@ -643,7 +672,7 @@ - (CGFloat) primaryScreenHeight
+@@ -643,7 +729,7 @@ - (CGFloat) primaryScreenHeight
                  CGRect* rect;
                  NSScreen* screen;
  
@@ -85,7 +142,7 @@ index e3ab4597..f7d2db7b 100644
                  primaryScreenHeightValid = TRUE;
  
                  size = count * sizeof(CGRect);
-@@ -661,12 +690,69 @@ - (CGFloat) primaryScreenHeight
+@@ -661,12 +747,73 @@ - (CGFloat) primaryScreenHeight
                  }
              }
              else
@@ -107,19 +164,24 @@ index e3ab4597..f7d2db7b 100644
 +        return macdrv_housing_inset();
 +    }
 +
-+    /* Main thread only.  Publish the current inset and drop the cached screen
-+       geometry when it changed.  Returns YES when a published value changed, so the
-+       caller can tell win32u to read the monitors again.  The first computation
-+       publishes without reporting a change. */
++    /* Main thread only.  Publish the current insets and drop the cached screen
++       geometry when they changed.  Returns YES when a published value changed, so
++       the caller can tell win32u to read the monitors again.  The first
++       computation publishes without reporting a change. */
 +    - (BOOL) refreshHousingInset
 +    {
-+        int inset = compute_housing_inset_points();
-+        int previous = atomic_exchange(&housing_inset_points, inset);
++        struct housing_insets fresh, previous;
 +
-+        if (previous == inset)
++        compute_housing_insets(&fresh);
++        os_unfair_lock_lock(&housing_lock);
++        previous = published_housing;
++        published_housing = fresh;
++        os_unfair_lock_unlock(&housing_lock);
++
++        if (previous.valid && housing_insets_equal(&previous, &fresh))
 +            return NO;
 +        primaryScreenHeightValid = FALSE;
-+        return previous >= 0;
++        return previous.valid;
 +    }
 +
 +    - (CGPoint) wineLocationFromQuartz:(CGPoint)point
@@ -138,12 +200,11 @@ index e3ab4597..f7d2db7b 100644
 +    - (NSRect) wineFrameForScreen:(NSScreen*)screen
 +    {
 +        NSRect frame = [screen frame];
-+        NSArray* screens = [NSScreen screens];
 +
-+        /* Compare display numbers: NSScreen objects can be replaced when the
++        /* Every screen loses its own housing rows at the top.  Look the screen up
++           by display number: NSScreen objects can be replaced when the
 +           configuration changes. */
-+        if ([screens count] && [self displayIDOfScreen:screen] == [self displayIDOfScreen:screens[0]])
-+            frame.size.height -= [self housingInset];
++        frame.size.height -= macdrv_housing_inset_for_display([self displayIDOfScreen:screen]);
 +        return frame;
 +    }
 +
@@ -155,7 +216,7 @@ index e3ab4597..f7d2db7b 100644
      - (NSPoint) flippedMouseLocation:(NSPoint)point
      {
          /* This relies on the fact that Cocoa's mouse location points are
-@@ -681,7 +767,7 @@ - (void) flipRect:(NSRect*)rect
+@@ -681,7 +828,7 @@ - (void) flipRect:(NSRect*)rect
          // We don't use -primaryScreenHeight here so there's no chance of having
          // out-of-date cached info.  This method is called infrequently enough
          // that getting the screen height each time is not prohibitively expensive.
@@ -164,7 +225,7 @@ index e3ab4597..f7d2db7b 100644
      }
  
      - (WineWindow*) frontWineWindow
-@@ -1298,7 +1384,7 @@ - (BOOL) setCursorPosition:(CGPoint)pos
+@@ -1298,7 +1445,7 @@ - (BOOL) setCursorPosition:(CGPoint)pos
              // deprecated, but I'm not aware of any other way.  For good
              // measure, we do both.
              CGSetLocalEventsSuppressionInterval(0);
@@ -173,7 +234,7 @@ index e3ab4597..f7d2db7b 100644
              CGSetLocalEventsSuppressionInterval(0.25);
              if (ret)
              {
-@@ -1374,6 +1460,18 @@ - (BOOL) stopClippingCursor
+@@ -1374,6 +1521,18 @@ - (BOOL) stopClippingCursor
          return TRUE;
      }
  
@@ -192,7 +253,7 @@ index e3ab4597..f7d2db7b 100644
      - (BOOL) clippingCursor
      {
          return clipCursorHandler.clippingCursor;
-@@ -1469,7 +1567,7 @@ - (void) handleMouseMove:(NSEvent*)anEvent
+@@ -1469,7 +1628,7 @@ - (void) handleMouseMove:(NSEvent*)anEvent
                 event indicates its window is the main window, even if the cursor is
                 over a different window.  Find the actual WineWindow that is under the
                 cursor and post the event as being for that window. */
@@ -201,7 +262,7 @@ index e3ab4597..f7d2db7b 100644
              NSPoint point = [self flippedMouseLocation:NSPointFromCGPoint(cgpoint)];
              NSInteger windowUnderNumber;
  
-@@ -1482,7 +1580,7 @@ - (void) handleMouseMove:(NSEvent*)anEvent
+@@ -1482,7 +1641,7 @@ - (void) handleMouseMove:(NSEvent*)anEvent
  
          if ([targetWindow isKindOfClass:[WineWindow class]])
          {
@@ -210,7 +271,7 @@ index e3ab4597..f7d2db7b 100644
              macdrv_event* event;
              BOOL absolute;
  
-@@ -1643,7 +1741,7 @@ - (void) handleMouseButton:(NSEvent*)theEvent
+@@ -1643,7 +1802,7 @@ - (void) handleMouseButton:(NSEvent*)theEvent
              BOOL pressed = (type == NSEventTypeLeftMouseDown ||
                              type == NSEventTypeRightMouseDown ||
                              type == NSEventTypeOtherMouseDown);
@@ -219,7 +280,7 @@ index e3ab4597..f7d2db7b 100644
  
              if (self.clippingCursor)
                  [clipCursorHandler clipCursorLocation:&pt];
-@@ -1760,7 +1858,7 @@ - (void) handleScrollWheel:(NSEvent*)theEvent
+@@ -1760,7 +1919,7 @@ - (void) handleScrollWheel:(NSEvent*)theEvent
          if ([window isKindOfClass:[WineWindow class]])
          {
              CGEventRef cgevent = [theEvent CGEvent];
@@ -228,7 +289,7 @@ index e3ab4597..f7d2db7b 100644
              BOOL process;
  
              if (self.clippingCursor)
-@@ -2445,6 +2543,9 @@ - (void)cgDisplay:(CGDirectDisplayID)display wasReconfiguredWithFlags:(CGDisplay
+@@ -2445,6 +2604,9 @@ - (void)cgDisplay:(CGDirectDisplayID)display wasReconfiguredWithFlags:(CGDisplay
      {
          NSDictionary *userInfo;
  
@@ -238,7 +299,7 @@ index e3ab4597..f7d2db7b 100644
          primaryScreenHeightValid = FALSE;
          [self sendDisplaysChanged:FALSE];
          [self adjustWindowLevels];
-@@ -2478,9 +2579,21 @@ static void DisplayReconfigCallback(CGDirectDisplayID display, CGDisplayChangeSu
+@@ -2478,9 +2640,21 @@ static void DisplayReconfigCallback(CGDirectDisplayID display, CGDisplayChangeSu
          });
      }
  
@@ -260,7 +321,7 @@ index e3ab4597..f7d2db7b 100644
      }
  
      - (void)applicationDidBecomeActive:(NSNotification *)notification
-@@ -2714,6 +2827,51 @@ void LogErrorv(const char* func, NSString* format, va_list args)
+@@ -2714,6 +2888,61 @@ void LogErrorv(const char* func, NSString* format, va_list args)
  }
  }
  
@@ -292,27 +353,37 @@ index e3ab4597..f7d2db7b 100644
 + */
 +CGFloat macdrv_housing_inset(void)
 +{
-+    int inset;
++    if (!native_fullscreen_geometry)
++        return 0;
++    return get_housing_insets().primary;
++}
++
++/***********************************************************************
++ *              macdrv_housing_inset_for_display
++ *
++ * Returns the housing height in whole points of the screen with this display
++ * ID.  A screen other than the primary one only trims its own top rows: Wine's
++ * origin does not move for it, so no point of it needs a conversion.
++ */
++CGFloat macdrv_housing_inset_for_display(CGDirectDisplayID display_id)
++{
++    struct housing_insets snapshot;
++    int i;
 +
 +    if (!native_fullscreen_geometry)
 +        return 0;
 +
-+    inset = atomic_load(&housing_inset_points);
-+    if (inset < 0)
-+    {
-+        /* First query: compute before anything reads the monitors. */
-+        OnMainThread(^{
-+            [[WineApplicationController sharedController] refreshHousingInset];
-+        });
-+        inset = atomic_load(&housing_inset_points);
-+    }
-+    return inset > 0 ? inset : 0;
++    snapshot = get_housing_insets();
++    for (i = 0; i < snapshot.count; i++)
++        if (snapshot.ids[i] == display_id)
++            return snapshot.insets[i];
++    return 0;
 +}
 +
  /***********************************************************************
   *              macdrv_window_rejected_focus
   *
-@@ -2845,6 +3003,7 @@ int macdrv_get_cursor_position(CGPoint *pos)
+@@ -2845,6 +3074,7 @@ int macdrv_get_cursor_position(CGPoint *pos)
      OnMainThread(^{
          NSPoint location = [NSEvent mouseLocation];
          location = [[WineApplicationController sharedController] flippedMouseLocation:location];
@@ -320,7 +391,7 @@ index e3ab4597..f7d2db7b 100644
          *pos = cgpoint_win_from_mac(NSPointToCGPoint(location));
      });
  
-@@ -2898,7 +3057,7 @@ int macdrv_clip_cursor(CGRect r)
+@@ -2898,7 +3128,7 @@ int macdrv_clip_cursor(CGRect r)
              clipping = FALSE;
              for (screen in [NSScreen screens])
              {
@@ -361,7 +432,7 @@ index b6151a2c..2eafea04 100644
          return event;
      }
 diff --git a/dlls/winemac.drv/cocoa_display.m b/dlls/winemac.drv/cocoa_display.m
-index 2b8c483b..2aa002d6 100644
+index 2b8c483b..f9155523 100644
 --- a/dlls/winemac.drv/cocoa_display.m
 +++ b/dlls/winemac.drv/cocoa_display.m
 @@ -905,6 +905,7 @@ int macdrv_get_monitors(CGDirectDisplayID adapter_id, struct macdrv_monitor** ne
@@ -380,15 +451,17 @@ index 2b8c483b..2aa002d6 100644
  
      for (i = 0; i < display_id_count; i++)
      {
-@@ -942,6 +944,7 @@ int macdrv_get_monitors(CGDirectDisplayID adapter_id, struct macdrv_monitor** ne
+@@ -942,7 +944,9 @@ int macdrv_get_monitors(CGDirectDisplayID adapter_id, struct macdrv_monitor** ne
          for (j = 0; j < screens.count; j++)
          {
              NSScreen* screen = screens[j];
 +            NSRect frame, visible_frame;
              CGDirectDisplayID screen_displayID = [[screen deviceDescription][@"NSScreenNumber"] unsignedIntValue];
++            CGFloat screen_inset;
              CFDataRef edid_data;
              size_t length;
-@@ -963,8 +966,16 @@ int macdrv_get_monitors(CGDirectDisplayID adapter_id, struct macdrv_monitor** ne
+ 
+@@ -963,8 +967,17 @@ int macdrv_get_monitors(CGDirectDisplayID adapter_id, struct macdrv_monitor** ne
                      primary_index = monitor_count;
  
                  monitors[monitor_count].id = display_ids[i];
@@ -396,10 +469,11 @@ index 2b8c483b..2aa002d6 100644
 -                monitors[monitor_count].rc_work = cgrect_win_from_mac(convert_display_rect(screen.visibleFrame, primary_frame));
 +                frame = screen.frame;
 +                visible_frame = screen.visibleFrame;
-+                if (j == 0 && housing_inset > 0)
++                screen_inset = macdrv_housing_inset_for_display(screen_displayID);
++                if (screen_inset > 0)
 +                {
-+                    /* The monitor starts below the camera housing. */
-+                    frame.size.height -= housing_inset;
++                    /* The monitor starts below the camera housing of its screen. */
++                    frame.size.height -= screen_inset;
 +                    visible_frame = NSIntersectionRect(visible_frame, frame);
 +                }
 +                monitors[monitor_count].rc_monitor = cgrect_win_from_mac(convert_display_rect(frame, primary_frame));
@@ -904,7 +978,7 @@ index e50064c9..8f7f856a 100644
          [queue postEvent:event];
          macdrv_release_event(event);
 diff --git a/dlls/winemac.drv/display.c b/dlls/winemac.drv/display.c
-index 5132a255..1a27fbc0 100644
+index 5132a255..e4e5c939 100644
 --- a/dlls/winemac.drv/display.c
 +++ b/dlls/winemac.drv/display.c
 @@ -134,6 +134,42 @@ static BOOL display_mode_is_supported(CGDisplayModeRef display_mode)
@@ -912,8 +986,8 @@ index 5132a255..1a27fbc0 100644
  
  
 +/* The camera housing is not part of Wine's monitor (see macdrv_housing_inset).
-+   Return the rows it takes from the reported height of a mode of the main
-+   display.  Every mode of that display loses rows, so a mode that was reported
++   Return the rows it takes from the reported height of a mode of a display with
++   a housing.  Every mode of that display loses rows, so a mode that was reported
 +   before a mode switch still matches afterwards.
 +   The inset is measured in points of the current mode.  Assume the housing takes
 +   the same share of the height in every mode, so the rows of another mode scale
@@ -922,12 +996,12 @@ index 5132a255..1a27fbc0 100644
 +   The mode that CoreGraphics selects and matches stays unchanged. */
 +static DWORD housing_rows_of_mode(CGDirectDisplayID display_id, CGDisplayModeRef mode, BOOL doubled)
 +{
-+    CGFloat inset = macdrv_housing_inset();
++    CGFloat inset = macdrv_housing_inset_for_display(display_id);
 +    CGDisplayModeRef current;
 +    size_t current_height, mode_height;
 +    DWORD rows;
 +
-+    if (inset <= 0 || display_id != CGMainDisplayID())
++    if (inset <= 0)
 +        return 0;
 +
 +    current = CGDisplayCopyDisplayMode(display_id);
@@ -1021,7 +1095,7 @@ index 5132a255..1a27fbc0 100644
      CFRelease(display_mode);
  }
 diff --git a/dlls/winemac.drv/gdi.c b/dlls/winemac.drv/gdi.c
-index 727687d7..c92f6822 100644
+index 727687d7..64733bf1 100644
 --- a/dlls/winemac.drv/gdi.c
 +++ b/dlls/winemac.drv/gdi.c
 @@ -60,6 +60,7 @@ static const struct user_driver_funcs macdrv_funcs;
@@ -1039,20 +1113,20 @@ index 727687d7..c92f6822 100644
 -        desktop_rect = CGRectUnion(desktop_rect, CGDisplayBounds(displayIDs[i]));
 +    {
 +        CGRect bounds = CGDisplayBounds(displayIDs[i]);
++        CGFloat own = macdrv_housing_inset_for_display(displayIDs[i]);
 +
-+        /* Wine's origin is below the camera housing.  The main display loses
-+           the housing rows, so its own origin stays; the others move up. */
-+        if (displayIDs[i] == CGMainDisplayID())
-+            bounds.size.height -= inset;
-+        else
-+            bounds.origin.y -= inset;
++        /* Every display loses the housing rows at its own top.  Wine's origin is
++           below the housing of the main display, so every display moves up by
++           that inset.  The main display keeps its own origin. */
++        bounds.origin.y += own - inset;
++        bounds.size.height -= own;
 +        desktop_rect = CGRectUnion(desktop_rect, bounds);
 +    }
      desktop_rect = cgrect_win_from_mac(desktop_rect);
  }
  
 diff --git a/dlls/winemac.drv/macdrv_cocoa.h b/dlls/winemac.drv/macdrv_cocoa.h
-index 62ebef57..ba248ddd 100644
+index 62ebef57..343e5a86 100644
 --- a/dlls/winemac.drv/macdrv_cocoa.h
 +++ b/dlls/winemac.drv/macdrv_cocoa.h
 @@ -130,8 +130,12 @@
@@ -1068,15 +1142,16 @@ index 62ebef57..ba248ddd 100644
  /* CrossOver Hack 10912: Mac Edit menu */
  extern int mac_edit_menu;
  extern bool left_option_is_alt;
-@@ -218,6 +222,7 @@ static inline CGPoint cgpoint_win_from_mac(CGPoint point)
+@@ -218,6 +222,8 @@ static inline CGPoint cgpoint_win_from_mac(CGPoint point)
      return point;
  }
  
 +extern CGFloat macdrv_housing_inset(void);
++extern CGFloat macdrv_housing_inset_for_display(CGDirectDisplayID display_id);
  extern int macdrv_start_cocoa_app(unsigned long long tickcount);
  extern void macdrv_window_rejected_focus(const struct macdrv_event *event);
  extern void macdrv_beep(void);
-@@ -509,6 +514,7 @@ extern int macdrv_register_hot_key(macdrv_event_queue q, unsigned int vkey, unsi
+@@ -509,6 +515,7 @@ extern int macdrv_register_hot_key(macdrv_event_queue q, unsigned int vkey, unsi
      unsigned int    utility:1;
      unsigned int    shadow:1;
      unsigned int    prevents_app_activation:1;
