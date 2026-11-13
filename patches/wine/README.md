@@ -114,8 +114,11 @@ Content clicks stay in the Wine view and do not reach the Cocoa frame drag
 handler. Layered windows stay auxiliary to the fullscreen game. In a Space the
 close button sends the normal Win32 close.
 On a Mac with a camera housing, the desktop of Wine starts below the housing. The
-monitor, work area, display mode height, origin, and pointer positions all exclude
-the housing, so Wine and the Space use the same area. Every process of the prefix
+monitor, work area, display mode heights, origin, and pointer positions all exclude
+the housing, so Wine and the Space use the same area. The main thread rounds the
+housing height to whole points and publishes it. A display change updates it and
+posts a new display change when it moved. A display mode request with the trimmed
+or the full height selects the real mode. Every process of the prefix
 applies this when the gate is on, including the notice helper below. The housing
 height is zero on other Macs, which keep their geometry.
 The feature is off for the whole process when the program is
