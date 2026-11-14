@@ -117,7 +117,16 @@ On a Mac with a camera housing, the desktop of Wine starts below the housing. Th
 monitor, work area, display mode heights, origin, and pointer positions all exclude
 the housing, so Wine and the Space use the same area. A screen that is not primary
 trims only its own top rows and keeps the origin. The main thread rounds the
-housing height of every screen to whole points and publishes the values. A display change updates it and
+housing height of every screen to whole points and publishes the values. AppKit
+reports whole points of the current mode, so the share of the screen height moves
+a little from mode to mode. The patch latches the share per display from the
+initial display mode of the prefix, the mode of the desktop before Wine changed
+it. A mode that Wine sets never changes the latch. A display that leaves the
+screen list loses its latch. The housing rows of every mode, the current mode,
+and the monitor are the latched share times the height, rounded up. The rows of a
+mode do not depend on the current mode, so a saved resolution stays in the mode
+list. A process that starts while the desktop is not in its initial mode has no
+latch and uses the share of the current mode. A display change updates the values and
 posts a new display change when it moved. A display mode request with the trimmed
 or the full height selects the real mode. Every process of the prefix
 applies this when the gate is on, including the notice helper below. The housing
