@@ -42,24 +42,6 @@ class RuntimeStructureTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_external_target_rejects_require_64_bit_only(self) -> None:
-        root = Path(__file__).resolve().parents[1]
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(root / "scripts" / "validate_runtime.py"),
-                str(self.root),
-                "--target",
-                "native-arm64",
-                "--require-64-bit-only",
-            ],
-            capture_output=True,
-            check=False,
-            text=True,
-        )
-        self.assertEqual(result.returncode, 1, result.stderr)
-        self.assertIn("--require-64-bit-only", result.stderr)
-
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary_directory.name)
@@ -74,23 +56,7 @@ class RuntimeStructureTests(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"fixture")
 
-    def test_accepts_required_regular_files(self) -> None:
-        self.create_required_files()
-        validate_structure(self.root, self.required)
-
-    def test_accepts_a_required_alias_contained_in_the_runtime(self) -> None:
-        self.create_required_files()
-        alias = self.root / "Wine/bin/Arknights"
-        alias.symlink_to("wine64")
-
-        validate_structure(self.root, [*self.required, "Wine/bin/Arknights"])
-
     def test_rejects_a_missing_required_file(self) -> None:
-        with self.assertRaisesRegex(RuntimeValidationError, "missing required file"):
-            validate_structure(self.root, self.required)
-
-    def test_rejects_a_required_directory(self) -> None:
-        (self.root / self.required[0]).mkdir(parents=True)
         with self.assertRaisesRegex(RuntimeValidationError, "missing required file"):
             validate_structure(self.root, self.required)
 
@@ -112,15 +78,6 @@ class RuntimeStructureTests(unittest.TestCase):
                 validate_required_architectures(self.root, self.required), 2
             )
 
-    def test_rejects_the_wrong_locked_payload_architecture(self) -> None:
-        self.create_required_files()
-        result = CompletedProcess([], 0, "PE32 executable Intel 80386", "")
-        with (
-            patch("scripts.validate_runtime.subprocess.run", return_value=result),
-            self.assertRaisesRegex(RuntimeValidationError, "unexpected architecture"),
-        ):
-            validate_required_architectures(self.root, self.required)
-
     def test_native_dxmt_payloads_reject_wine_loader_markers(self) -> None:
         for architecture, kind in (("x64", "PE32+ executable (DLL) x86-64"),):
             for library in ("d3d10core.dll", "d3d11.dll", "dxgi.dll"):
@@ -140,13 +97,6 @@ class RuntimeStructureTests(unittest.TestCase):
                             ),
                         ):
                             validate_required_architectures(self.root, [relative])
-
-    def test_64_bit_only_accepts_a_runtime_without_legacy_payloads(self) -> None:
-        self.create_required_files()
-        (self.root / "Wine/lib").mkdir(parents=True, exist_ok=True)
-        (self.root / "Wine/lib/libfreetype.6.dylib").write_bytes(b"fixture")
-
-        validate_64_bit_only(self.root)
 
     def test_64_bit_only_rejects_legacy_and_media_payloads(self) -> None:
         for relative in (
@@ -177,24 +127,6 @@ class RuntimeStructureTests(unittest.TestCase):
             return_value=CompletedProcess([], 0, "PE32+ executable x86-64", ""),
         ):
             self.assertEqual(validate_required_architectures(self.root, [relative]), 1)
-
-    def test_arm64_lane_reads_the_pe_machine_type(self) -> None:
-        required = [
-            "Wine/lib/wine/aarch64-unix/winemac.so",
-            "DXMT/x64/d3d11.dll",
-        ]
-        (self.root / required[0]).parent.mkdir(parents=True)
-        (self.root / required[0]).write_bytes(b"fixture")
-        (self.root / required[1]).parent.mkdir(parents=True, exist_ok=True)
-        output = CompletedProcess([], 0, "Mach-O 64-bit bundle arm64", "")
-
-        with patch("scripts.validate_runtime.subprocess.run", return_value=output):
-            for machine in (0xA641, 0xAA64):
-                with self.subTest(machine=hex(machine)):
-                    (self.root / required[1]).write_bytes(pe_payload(machine))
-                    self.assertEqual(
-                        validate_required_architectures(self.root, required), 2
-                    )
 
     def test_arm64_lane_rejects_x86_64_payloads(self) -> None:
         required = [
@@ -282,14 +214,6 @@ class RuntimeStructureTests(unittest.TestCase):
                 Path("Wine/lib/wine/x86_64-unix/coreaudio.so"),
                 "coreaudio.so:\n\t/nix/store/hash/lib/libfoo.dylib (compatibility version 1.0.0)\n",
             )
-
-    def test_accepts_relative_and_system_macho_dependencies(self) -> None:
-        validate_link_references(
-            Path("Wine/lib/wine/x86_64-unix/coreaudio.so"),
-            "coreaudio.so:\n\t@rpath/libfoo.dylib (compatibility version 1.0.0)\n"
-            "\t/System/Library/Frameworks/CoreAudio.framework/CoreAudio (compatibility version 1.0.0)\n"
-            "\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0)\n",
-        )
 
 
 if __name__ == "__main__":

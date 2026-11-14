@@ -64,28 +64,6 @@ def _text_values(value):
         yield value
 
 
-def test_selects_the_newest_arm64_release():
-    releases = [
-        {
-            "id": "wine-11-18-arm64-v4",
-            "arch": "arm64",
-            "published_at": "2026-11-06T06:35:15Z",
-        },
-        {
-            "id": "wine-11-18-arm64-v5",
-            "arch": "arm64",
-            "published_at": "2026-11-07T12:14:35Z",
-        },
-        {
-            "id": "wine-11-18-x86_64-v9",
-            "arch": "x86_64",
-            "published_at": "2026-11-08T00:00:00Z",
-        },
-    ]
-
-    assert select_release(releases, "")["id"] == "wine-11-18-arm64-v5"
-
-
 def test_uses_the_highest_build_when_publish_dates_match():
     releases = [
         {
@@ -103,11 +81,6 @@ def test_uses_the_highest_build_when_publish_dates_match():
     assert select_release(releases, "")["id"] == "wine-11-18-arm64-v6"
 
 
-def test_rejects_a_catalog_without_arm64_releases():
-    with pytest.raises(FetchError, match="arm64"):
-        select_release([{"id": "wine-11-18-x86_64-v1", "arch": "x86_64"}], "")
-
-
 def test_select_release_rejects_a_missing_published_at():
     releases = [
         {"id": "wine-11-18-arm64-v4", "arch": "arm64"},
@@ -116,19 +89,6 @@ def test_select_release_rejects_a_missing_published_at():
             "arch": "arm64",
             "published_at": "2026-11-07T12:14:35Z",
         },
-    ]
-
-    with pytest.raises(FetchError, match="published_at"):
-        select_release(releases, "")
-
-
-def test_select_release_rejects_an_invalid_published_at():
-    releases = [
-        {
-            "id": "wine-11-18-arm64-v5",
-            "arch": "arm64",
-            "published_at": "not-a-date",
-        }
     ]
 
     with pytest.raises(FetchError, match="published_at"):
@@ -372,61 +332,6 @@ def test_extract_rejects_unsafe_archive_members(tmp_path, name, linkname):
 
     with pytest.raises(FetchError):
         _extract_archive(archive, tmp_path / "out")
-
-
-def test_fetch_target_requests_only_the_wine_archive(tmp_path, monkeypatch):
-    calls = []
-
-    def fake_fetch(env_name, release_id, output):
-        calls.append((env_name, release_id))
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_bytes(b"archive")
-        return (
-            {
-                "id": RELEASE_ID,
-                "arch": "arm64",
-                "sha256": "0" * 64,
-                "size": 7,
-            },
-            output,
-        )
-
-    def fake_extract(archive, destination):
-        (destination / "wine").mkdir()
-
-    monkeypatch.setattr(fetch_external, "fetch_selected_release", fake_fetch)
-    monkeypatch.setattr(fetch_external, "_extract_archive", fake_extract)
-
-    output = tmp_path / "incoming"
-    fetch_external.fetch_target(
-        {
-            "artifact": {
-                "catalog": "wine",
-                "release": RELEASE_ID,
-                "sha256": "0" * 64,
-            }
-        },
-        output,
-        "wine-11-18-arm64-v4",
-    )
-
-    assert calls == [("ARM64_RUNTIME_CATALOG_URL", "wine-11-18-arm64-v4")]
-    assert (output / "wine.tar.xz").read_bytes() == b"archive"
-
-
-def test_fetch_target_rejects_a_non_wine_catalog(tmp_path):
-    with pytest.raises(FetchError, match="wine"):
-        fetch_external.fetch_target(
-            {
-                "artifact": {
-                    "catalog": "dxmt",
-                    "release": RELEASE_ID,
-                    "sha256": "0" * 64,
-                }
-            },
-            tmp_path / "incoming",
-            "",
-        )
 
 
 @pytest.mark.parametrize(

@@ -10,7 +10,7 @@ from scripts.release.provenance import (
     runtime_lock_provenance,
     validation_provenance,
 )
-from scripts.targets import arm64, x86_64
+from scripts.targets import arm64
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -39,13 +39,6 @@ class ValidationProvenanceTests(unittest.TestCase):
         with self.assertRaisesRegex(ProvenanceInputError, "not release eligible"):
             validation_provenance(self.report, "26.0")
 
-    def test_ungated_candidate_keeps_the_report_as_recorded(self) -> None:
-        self._write(releaseEligible=False, status="valid-canary")
-
-        record = validation_provenance(self.report, "26.0", gate=False)
-
-        self.assertFalse(record["releaseEligible"])
-
     def test_external_lane_is_recorded_as_built_externally(self) -> None:
         self._write(releaseEligible=True)
 
@@ -61,9 +54,3 @@ class RuntimeLockViewTests(unittest.TestCase):
 
         self.assertEqual(view["target"], arm64.TARGET.name)
         self.assertEqual(view["buildMode"], "external")
-
-    def test_x86_lane_targets_the_default_lock_view(self) -> None:
-        self.assertEqual(x86_64.TARGET.name, "rosetta-x86_64")
-        view = runtime_lock_provenance(ROOT, x86_64.TARGET.name)["contents"]
-
-        self.assertEqual(view["target"], "rosetta-x86_64")

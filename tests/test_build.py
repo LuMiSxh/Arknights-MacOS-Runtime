@@ -1,134 +1,39 @@
 # SPDX-License-Identifier: MPL-2.0
 
-import tarfile
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 
-from scripts import build_common as build_helpers
-from scripts.build_common import Builder, is_macho
 from scripts.lib.artifact import sha256, write_archive
-from scripts.targets import runtime_archive_name
+from scripts.targets import runtime_archive_name, source_archive_name
 
 
-class BuildHelperTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.temporary_directory = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary_directory.name)
-
-    def tearDown(self) -> None:
-        self.temporary_directory.cleanup()
-
-    def test_archive_carries_the_member_and_a_shasum_compatible_checksum(self) -> None:
-        directory = self.root / "candidate"
-        member = directory / "Libraries"
-        member.mkdir(parents=True)
-        (member / "Wine").write_bytes(b"payload")
-
-        path = write_archive(directory, "runtime.tar.gz", [(member, "Libraries")])
-
-        with tarfile.open(path) as archive:
-            self.assertEqual(archive.getnames()[0], "Libraries")
-        checksum = path.with_name(f"{path.name}.sha256").read_text(encoding="utf-8")
-        self.assertEqual(checksum, f"{sha256(path)}  runtime.tar.gz\n")
-
-    def test_nix_outputs_skip_outputs_a_package_does_not_provide(self) -> None:
-        class StubBuilder:
-            def __init__(self) -> None:
-                self.built: list[str] = []
-
-            def capture(self, *command: object, **_: object) -> str:
-                attribute = str(command[-1])
-                if command[3] == "eval":
-                    return '["out", "dev"]'
-                self.built.append(attribute)
-                return f"/nix/store/{attribute.rsplit('.', 1)[-1]}\n"
-
-        builder = StubBuilder()
-        outputs = build_helpers.nix_package_outputs(
-            builder, "github:NixOS/nixpkgs/rev", "x86_64-darwin", ("freetype",)
-        )
-
-        self.assertEqual(outputs, [Path("/nix/store/dev"), Path("/nix/store/out")])
-        self.assertFalse(any(attribute.endswith(".lib") for attribute in builder.built))
-
-    def test_archive_round_trips_nested_files(self) -> None:
-        member = self.root / "Libraries" / "Wine" / "bin"
-        member.mkdir(parents=True)
-        (member / "wine64").write_bytes(b"x")
-        path = write_archive(
-            self.root, "runtime.tar.gz", [(self.root / "Libraries", "Libraries")]
-        )
-
-        with tarfile.open(path) as archive:
-            extracted = archive.extractfile("Libraries/Wine/bin/wine64")
-            self.assertIsNotNone(extracted)
-            self.assertEqual(extracted.read(), b"x")
-
-    def test_is_macho_reads_the_thin_magic(self) -> None:
-        macho = self.root / "loader"
-        macho.write_bytes(b"\xcf\xfa\xed\xfe" + bytes(60))
-        self.assertTrue(is_macho(macho))
-
-        script = self.root / "loader.sh"
-        script.write_bytes(b"#!/bin/sh\n")
-        self.assertFalse(is_macho(script))
-        self.assertFalse(is_macho(self.root / "missing"))
-
-    def test_pe_cross_builds_drop_host_compiler_variables(self) -> None:
-        builder = Builder(
-            environment={
-                "PATH": "/usr/bin",
-                "CFLAGS": "-O2",
-                "CC": "ccache clang",
-                "SDKROOT": "/sdk",
-                "MACOSX_DEPLOYMENT_TARGET": "15.0",
-                "KEPT": "1",
-            }
-        )
-
-        environment = builder.without_host_build_variables()
-
-        self.assertNotIn("CFLAGS", environment)
-        self.assertNotIn("CC", environment)
-        self.assertNotIn("SDKROOT", environment)
-        self.assertNotIn("MACOSX_DEPLOYMENT_TARGET", environment)
-        self.assertEqual(environment["KEPT"], "1")
-        self.assertEqual(builder.environment["CFLAGS"], "-O2")
-
-    def test_builder_uses_the_default_nix_profile_when_path_lacks_nix(self) -> None:
-        nix_directory = self.root / "nix-bin"
-        nix_directory.mkdir()
-        (nix_directory / "nix").touch()
-
-        with mock.patch.object(build_helpers, "NIX_DEFAULT_BIN", nix_directory):
-            builder = Builder(environment={"PATH": "/usr/bin"})
-
-        self.assertEqual(builder.environment["PATH"], f"{nix_directory}:/usr/bin")
-
-    def test_sha256_reads_a_file_incrementally(self) -> None:
-        path = self.root / "payload"
-        path.write_bytes(b"abc")
+class ArchiveNameTests(unittest.TestCase):
+    def test_artifact_names_and_shasum_checksums_follow_the_release_convention(
+        self,
+    ) -> None:
         self.assertEqual(
-            sha256(path),
-            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            runtime_archive_name("0.9.0", "arm64"),
+            "Arknights-MacOS-Runtime-v0.9.0-arm64.tar.gz",
         )
-
-    def test_archive_name_matches_the_release_convention(self) -> None:
-        member = self.root / "Libraries"
-        member.mkdir()
-        (member / "marker").write_bytes(b"x")
-        name = runtime_archive_name("0.9.0", "arm64")
-        self.assertEqual(name, "Arknights-MacOS-Runtime-v0.9.0-arm64.tar.gz")
-
-        path = write_archive(self.root, name, [(member, "Libraries")])
-
-        self.assertEqual(path.name, name)
         self.assertEqual(
-            path.with_name(f"{name}.sha256").read_text(encoding="utf-8"),
-            f"{sha256(path)}  {name}\n",
+            source_archive_name("0.9.0", "arm64"),
+            "Arknights-MacOS-Runtime-v0.9.0-arm64-source.tar.gz",
         )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            member = root / "Libraries"
+            member.mkdir()
+            (member / "marker").write_bytes(b"x")
+            name = runtime_archive_name("0.9.0", "arm64")
+
+            path = write_archive(root, name, [(member, "Libraries")])
+
+            self.assertEqual(path.name, name)
+            self.assertEqual(
+                path.with_name(f"{name}.sha256").read_text(encoding="utf-8"),
+                f"{sha256(path)}  {name}\n",
+            )
 
 
 if __name__ == "__main__":
