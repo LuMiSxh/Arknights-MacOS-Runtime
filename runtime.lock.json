@@ -235,7 +235,7 @@
         "rosetta-x86_64"
       ],
       "path": "patches/wine/0011-winemac-command-q-quit.patch",
-      "sha256": "7b4527773b3d536316f9f150bca0ea38df967918328b86bab67016452c807ff1"
+      "sha256": "ccedacf1110b8e2310b0cc23bb5c97dc5d710b00dbbb88b510c82d74c738022a"
     },
     {
       "id": "wine-audio-default-output",

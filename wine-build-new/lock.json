@@ -97,7 +97,7 @@
       {
         "order": 83,
         "path": "wine-build-new/patches/0011-winemac-command-q-quit.patch",
-        "sha256": "594daa344c8bb3bb34115bdd19ed653301e69af8d167482d6e4b459d88192122",
+        "sha256": "15f825f09c2a2822fe00d3e7f4ae1791e29821af0f151596515fc784fe5dfabd",
         "default": "on",
         "optional": true,
         "opt_out": "LMISXH_AKMOCL_MENU"
