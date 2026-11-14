@@ -9,17 +9,15 @@ from pathlib import Path
 
 import pytest
 
-from scripts.arm64 import fetch_external
-from scripts.arm64.assemble import AssemblyError, assemble
-from scripts.arm64.fetch_external import (
+from scripts.build_common import CLEARED_DOS_STUB
+from scripts.targets import arm64_external as fetch_external
+from scripts.targets.arm64_assemble import AssemblyError, assemble
+from scripts.targets.arm64_external import (
     FetchError,
     _extract_archive,
     fetch_selected_release,
     select_release,
 )
-from scripts.arm64.provenance import ProvenanceError, write_provenance
-from scripts.build_common import CLEARED_DOS_STUB, ROOT
-from scripts.release.provenance import runtime_lock_provenance
 
 RELEASE_ID = "wine-11-18-arm64-v5"
 
@@ -400,7 +398,7 @@ def test_fetch_target_requests_only_the_wine_archive(tmp_path, monkeypatch):
     monkeypatch.setattr(fetch_external, "_extract_archive", fake_extract)
 
     output = tmp_path / "incoming"
-    fetch_external._fetch_target(
+    fetch_external.fetch_target(
         {
             "artifact": {
                 "catalog": "wine",
@@ -413,14 +411,12 @@ def test_fetch_target_requests_only_the_wine_archive(tmp_path, monkeypatch):
     )
 
     assert calls == [("ARM64_RUNTIME_CATALOG_URL", "wine-11-18-arm64-v4")]
-    metadata = json.loads((output / "external.json").read_text())
-    assert metadata["id"] == RELEASE_ID
-    assert metadata["sha256"] == "0" * 64
+    assert (output / "wine.tar.xz").read_bytes() == b"archive"
 
 
 def test_fetch_target_rejects_a_non_wine_catalog(tmp_path):
     with pytest.raises(FetchError, match="wine"):
-        fetch_external._fetch_target(
+        fetch_external.fetch_target(
             {
                 "artifact": {
                     "catalog": "dxmt",
@@ -467,7 +463,7 @@ def test_fetch_target_updates_the_lock_when_the_catalog_release_differs(
     monkeypatch.setattr(fetch_external, "_extract_archive", fake_extract)
     monkeypatch.setattr(fetch_external, "write_artifact_pin", fake_write_artifact_pin)
 
-    fetch_external._fetch_target(
+    fetch_external.fetch_target(
         {
             "target": "native-arm64",
             "artifact": {
@@ -511,7 +507,7 @@ def test_fetch_target_keeps_the_lock_when_extraction_fails(tmp_path, monkeypatch
     monkeypatch.setattr(fetch_external, "write_artifact_pin", fake_write_artifact_pin)
 
     with pytest.raises(FetchError, match="cannot extract"):
-        fetch_external._fetch_target(
+        fetch_external.fetch_target(
             {
                 "target": "native-arm64",
                 "artifact": {
@@ -601,206 +597,3 @@ def test_assemble_rejects_a_symlink_escape(tmp_path):
             archive_root=tmp_path,
             interface=_interface(),
         )
-
-
-def test_provenance_records_the_external_build_without_urls(tmp_path):
-    runtime_archive = tmp_path / "Arknights-MacOS-Runtime-v0.9.0+arm.tar.gz"
-    runtime_archive.write_bytes(b"runtime payload")
-    source_archive = tmp_path / "Arknights-MacOS-Runtime-v0.9.0+arm-source.tar.gz"
-    source_archive.write_bytes(b"source payload")
-    lock = {
-        "buildMode": "external",
-        "target": "native-arm64",
-        "deploymentTarget": "26.0",
-        "interface": {"minimumMacOS": "26.0"},
-        "features": {
-            "hardwareCursor": True,
-            "metalFXSpatialUpscaling": True,
-            "nativeFullscreenSpace": True,
-        },
-        "sources": {"wine": {"commit": "7b3fff76fa5178f6ce0141b2c776afa2a822f101"}},
-    }
-
-    runtime_lock = {
-        "path": "runtime.lock.json",
-        "sha256": "d" * 64,
-        "contents": lock,
-    }
-    validation = {
-        "target": "native-arm64",
-        "deploymentTarget": "26.0",
-        "inheritedMachOAboveTarget": 0,
-        "releaseEligible": False,
-        "builtExternally": True,
-    }
-
-    write_provenance(
-        lock,
-        "v0.9.0+arm",
-        runtime_archive,
-        source_archive,
-        tmp_path / "provenance.json",
-        source_commit="c" * 40,
-        runtime_lock=runtime_lock,
-        validation=validation,
-    )
-
-    data = json.loads((tmp_path / "provenance.json").read_text())
-    assert data["releaseTag"] == "v0.9.0+arm"
-    assert data["sourceCommit"] == "c" * 40
-    assert data["runtimeLock"] == runtime_lock
-    assert data["validation"] == validation
-    assert data["target"] == "native-arm64"
-    assert data["minimumMacOS"] == "26.0"
-    assert data["features"] == {
-        "hardwareCursor": True,
-        "metalFXSpatialUpscaling": True,
-        "nativeFullscreenSpace": True,
-    }
-    assert (
-        data["externalBuild"]["repository"]
-        == "https://github.com/riverfog7/wine-build-new"
-    )
-    assert (
-        data["externalBuild"]["revision"] == "7b3fff76fa5178f6ce0141b2c776afa2a822f101"
-    )
-    assert data["runtimeArchive"]["name"] == "Arknights-MacOS-Runtime-v0.9.0+arm.tar.gz"
-    assert data["runtimeArchive"]["sha256"] == _sha256(b"runtime payload")
-    assert data["correspondingSourceArchive"]["sha256"] == _sha256(b"source payload")
-
-    data = json.loads((tmp_path / "provenance.json").read_text())
-    assert "catalog" not in data
-    assert "externalArtifact" not in data
-    assert not any("pull/4" in text for text in _text_values(data))
-
-
-def test_provenance_records_the_selected_catalog_artifact(tmp_path):
-    runtime_archive = tmp_path / "Arknights-MacOS-Runtime-v0.9.0+arm.tar.gz"
-    runtime_archive.write_bytes(b"runtime payload")
-    source_archive = tmp_path / "Arknights-MacOS-Runtime-v0.9.0+arm-source.tar.gz"
-    source_archive.write_bytes(b"source payload")
-    external = tmp_path / "external.json"
-    external.write_text(
-        json.dumps(
-            {
-                "id": RELEASE_ID,
-                "arch": "arm64",
-                "sha256": "a" * 64,
-                "size": 7,
-            }
-        ),
-        encoding="utf-8",
-    )
-    lock = {
-        "buildMode": "external",
-        "target": "native-arm64",
-        "deploymentTarget": "26.0",
-        "interface": {"minimumMacOS": "26.0"},
-        "artifact": {"catalog": "wine", "release": RELEASE_ID, "sha256": "a" * 64},
-        "features": {},
-        "sources": {"wine": {"commit": "7b3fff76fa5178f6ce0141b2c776afa2a822f101"}},
-    }
-
-    runtime_lock = {
-        "path": "runtime.lock.json",
-        "sha256": "d" * 64,
-        "contents": lock,
-    }
-
-    write_provenance(
-        lock,
-        "v0.9.0+arm",
-        runtime_archive,
-        source_archive,
-        tmp_path / "provenance.json",
-        source_commit="c" * 40,
-        runtime_lock=runtime_lock,
-        external_artifact=external,
-    )
-
-    data = json.loads((tmp_path / "provenance.json").read_text())
-    assert data["externalArtifact"] == {
-        "id": RELEASE_ID,
-        "sha256": "a" * 64,
-        "size": 7,
-    }
-
-
-def test_provenance_rejects_artifact_metadata_that_differs_from_the_lock(tmp_path):
-    runtime_archive = tmp_path / "runtime.tar.gz"
-    runtime_archive.write_bytes(b"runtime")
-    source_archive = tmp_path / "source.tar.gz"
-    source_archive.write_bytes(b"source")
-    external = tmp_path / "external.json"
-    external.write_text(
-        json.dumps({"id": "wine-11-18-arm64-v6", "sha256": "b" * 64, "size": 7}),
-        encoding="utf-8",
-    )
-    lock = {
-        "buildMode": "external",
-        "target": "native-arm64",
-        "deploymentTarget": "26.0",
-        "interface": {"minimumMacOS": "26.0"},
-        "artifact": {"catalog": "wine", "release": RELEASE_ID, "sha256": "a" * 64},
-        "features": {},
-        "sources": {"wine": {"commit": "7b3fff76fa5178f6ce0141b2c776afa2a822f101"}},
-    }
-
-    runtime_lock = {
-        "path": "runtime.lock.json",
-        "sha256": "d" * 64,
-        "contents": lock,
-    }
-
-    with pytest.raises(ProvenanceError, match="lock pin"):
-        write_provenance(
-            lock,
-            "v0.9.0+arm",
-            runtime_archive,
-            source_archive,
-            tmp_path / "provenance.json",
-            source_commit="c" * 40,
-            runtime_lock=runtime_lock,
-            external_artifact=external,
-        )
-
-
-def test_provenance_rejects_a_short_build_commit(tmp_path):
-    runtime_archive = tmp_path / "runtime.tar.gz"
-    runtime_archive.write_bytes(b"runtime")
-    source_archive = tmp_path / "source.tar.gz"
-    source_archive.write_bytes(b"source")
-    lock = {
-        "buildMode": "external",
-        "target": "native-arm64",
-        "interface": {"minimumMacOS": "26.0"},
-        "features": {},
-        "sources": {"wine": {"commit": "7b3fff76fa5178f6ce0141b2c776afa2a822f101"}},
-    }
-
-    with pytest.raises(ProvenanceError, match="full commit hash"):
-        write_provenance(
-            lock,
-            "v0.9.0+arm",
-            runtime_archive,
-            source_archive,
-            tmp_path / "provenance.json",
-            source_commit="7b3fff76",
-            runtime_lock={
-                "path": "runtime.lock.json",
-                "sha256": "d" * 64,
-                "contents": lock,
-            },
-        )
-
-
-def test_runtime_lock_provenance_resolves_the_target_view():
-    runtime_lock = runtime_lock_provenance(ROOT, "native-arm64")
-    contents = runtime_lock["contents"]
-
-    assert runtime_lock["path"] == "runtime.lock.json"
-    assert len(runtime_lock["sha256"]) == 64
-    assert contents["target"] == "native-arm64"
-    assert {"wine", "dxmt"} <= contents["sources"].keys()
-    for name in ("wine", "dxmt"):
-        assert {"repository", "commit", "version"} <= contents["sources"][name].keys()

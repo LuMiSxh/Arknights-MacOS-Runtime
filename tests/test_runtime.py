@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from scripts.build_common import sha256
+from scripts.lib.artifact import sha256
 from scripts.runtime import (
     LockError,
     load_lock,

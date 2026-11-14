@@ -43,18 +43,17 @@ just build
 just verify
 ```
 
-`just prepare` clones the pinned sources and applies every patch in lock order. `just build` creates the all-patches overlay canary. `just build-release` creates the clean release artifact. Outputs stay below `.build/`. These commands never install or start Wine, create a prefix, launch a game, or modify an Arknights installation.
+`just prepare` clones the pinned sources and applies every patch in lock order. `just build` creates a candidate runtime for the `rosetta-x86_64` lane. `just build-release` creates the clean release artifact. `just combine` merges the lane outputs into `.build/release/`. Outputs stay below `.build/`. These commands never install or start Wine, create a prefix, launch a game, or modify an Arknights installation.
 
 ### Native ARM64 lane
 
 Requirements: macOS 26+, Homebrew `llvm@15`, Meson, Ninja, Bison, Flex, pkg-config, and a pinned llvm-mingw release.
 
 ```sh
-just arm64-fetch
-just arm64-dxmt
-just arm64-assemble
-just arm64-verify
+just build-release native-arm64 0.9.0
 ```
+
+Set `ARM64_RELEASE_ID` to choose a catalog release.
 
 The ARM64 Wine payload is built in [wine-build-new](https://github.com/riverfog7/wine-build-new). This repository builds DXMT for ARM64EC, repacks the external tree into the client contract, and validates the result. See the [native ARM64 lane](docs/arm/README.md) and the [patch export](wine-build-new/README.md).
 

@@ -1,7 +1,6 @@
-#!/usr/bin/env -S uv run --locked --no-dev
 # SPDX-License-Identifier: MPL-2.0
 
-"""The x86_64 lanes: one patch-family overlay, and the clean release artifact."""
+"""The x86_64 lane: WineCX built from source, DXMT, and Nix libraries for Rosetta 2."""
 
 from __future__ import annotations
 
@@ -10,67 +9,44 @@ import shutil
 import sys
 from pathlib import Path
 
-if __package__:
-    from .build_common import (
-        LICENSE_CLI,
-        MACHO_SUFFIXES,
-        NIX_PACKAGES,
-        NIX_STORE,
-        TOOLCHAIN_CLI,
-        VALIDATE_CLI,
-        WINE_CONFIGURE_FLAGS,
-        WINE_PREFIX,
-        Builder,
-        BuildError,
-        adhoc_sign,
-        bundle_nix_libraries,
-        clear_dos_stub,
-        clone_tree,
-        ensure_loader_rpath,
-        extract_archive,
-        library_flags,
-        logical_cpu_count,
-        nix_build,
-        nix_package_outputs,
-        references_in,
-        write_archive,
-        write_compiler_launcher_cross_file,
-        write_dxmt_native_file,
-    )
-    from .runtime import BUILD_ROOT, fetch_base, load_lock, prepare
-else:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from scripts.build_common import (
-        LICENSE_CLI,
-        MACHO_SUFFIXES,
-        NIX_PACKAGES,
-        NIX_STORE,
-        TOOLCHAIN_CLI,
-        VALIDATE_CLI,
-        WINE_CONFIGURE_FLAGS,
-        WINE_PREFIX,
-        Builder,
-        BuildError,
-        adhoc_sign,
-        bundle_nix_libraries,
-        clear_dos_stub,
-        clone_tree,
-        ensure_loader_rpath,
-        extract_archive,
-        library_flags,
-        logical_cpu_count,
-        nix_build,
-        nix_package_outputs,
-        references_in,
-        write_archive,
-        write_compiler_launcher_cross_file,
-        write_dxmt_native_file,
-    )
-    from scripts.runtime import BUILD_ROOT, fetch_base, load_lock, prepare
+from scripts.build_common import (
+    MACHO_SUFFIXES,
+    NIX_PACKAGES,
+    NIX_STORE,
+    ROOT,
+    VALIDATE_CLI,
+    WINE_CONFIGURE_FLAGS,
+    WINE_PREFIX,
+    Builder,
+    BuildError,
+    adhoc_sign,
+    bundle_nix_libraries,
+    clear_dos_stub,
+    clone_tree,
+    compiler_launcher,
+    ensure_loader_rpath,
+    extract_archive,
+    library_flags,
+    logical_cpu_count,
+    nix_build,
+    nix_package_outputs,
+    references_in,
+)
+from scripts.release.licenses import generate
+from scripts.runtime import BUILD_ROOT, fetch_base, load_lock, prepare
+from scripts.targets import ROSETTA_X86_64_TARGET, Target, inventory_name
+from scripts.targets.dxmt import build_dxmt
+from scripts.targets.package import package_runtime
 
+TARGET = Target(
+    name=ROSETTA_X86_64_TARGET,
+    arch="x86_64",
+    wine_source="built",
+    dxmt_cross_file="build-win64.txt",
+    pe_compiler="x86_64-w64-mingw32",
+)
 
 # Every Wine file that a patch in runtime.lock.json changes.
-ARCHIVE_NAME = "Arknights-MacOS-Runtime.tar.gz"
 WINE_OVERLAY_ARTIFACTS = (
     "lib/wine/x86_64-unix/winecoreaudio.so",
     "lib/wine/x86_64-windows/ntdll.dll",
@@ -84,6 +60,20 @@ WINE_OVERLAY_ARTIFACTS = (
     "lib/wine/x86_64-unix/win32u.so",
 )
 
+# Repository paths that the corresponding-source archive carries besides the sources.
+SOURCE_REPOSITORY_MEMBERS = (
+    "patches",
+    "runtime.lock.json",
+    "docs/patch-registry.md",
+    "docs/legal",
+    "LICENSE",
+    "LICENSES",
+    "scripts",
+    "Justfile",
+    "pyproject.toml",
+    "uv.lock",
+)
+
 
 def patched_machos() -> tuple[str, ...]:
     return tuple(
@@ -93,7 +83,7 @@ def patched_machos() -> tuple[str, ...]:
     )
 
 
-def canary_environment(
+def build_environment(
     builder: Builder, lock: dict[str, object]
 ) -> tuple[str, list[Path]]:
     nixpkgs_revision = str(lock["build"]["nixpkgs"]["commit"])
@@ -150,16 +140,32 @@ def llvm_native_tree(builder: Builder, nixpkgs: str, root: Path) -> Path:
     return tree
 
 
-def configure_wine(builder: Builder, wine_source: Path, wine_build: Path) -> None:
-    wine_build.mkdir(parents=True, exist_ok=True)
-    builder.run(
-        wine_source / "configure",
+def wine_configure_command(wine_source: Path, environment: dict[str, str]) -> list[str]:
+    """Return the Wine configure command.
+
+    With a compiler launcher set, the PE compiles of Wine go through it too. Wine reads
+    the `x86_64_CC` variable for its PE cross compiler.
+    """
+
+    command = [
+        str(wine_source / "configure"),
         "--host=x86_64-apple-darwin24",
         "--enable-archs=x86_64",
         "--disable-tests",
         *WINE_CONFIGURE_FLAGS,
         f"--prefix={WINE_PREFIX}",
-        cwd=wine_build,
+    ]
+    launcher = compiler_launcher(environment)
+    if launcher:
+        compiler = f"{TARGET.pe_compiler}-gcc"
+        command.append("x86_64_CC=" + " ".join((*launcher, compiler)))
+    return command
+
+
+def configure_wine(builder: Builder, wine_source: Path, wine_build: Path) -> None:
+    wine_build.mkdir(parents=True, exist_ok=True)
+    builder.run(
+        *wine_configure_command(wine_source, builder.environment), cwd=wine_build
     )
     builder.run("make", f"-j{logical_cpu_count()}", cwd=wine_build)
 
@@ -208,37 +214,15 @@ def build_dxmt_x86_64(
     candidate: Path,
 ) -> None:
     builder.run("git", "submodule", "update", "--init", "--recursive", cwd=source)
-    install = root / "dxmt-install"
-    build = root / "dxmt-build64"
-    environment = builder.without_host_build_variables()
-    native_file = write_dxmt_native_file(root, deployment)
-    cross_arguments: list[object] = ["--cross-file", source / "build-win64.txt"]
-    launcher_file = write_compiler_launcher_cross_file(
-        root,
-        {"c": "x86_64-w64-mingw32-gcc", "cpp": "x86_64-w64-mingw32-g++"},
-        builder.environment,
+    install = build_dxmt(
+        builder,
+        target=TARGET,
+        source=source,
+        root=root,
+        wine_build=wine_build,
+        llvm=llvm,
+        deployment=deployment,
     )
-    if launcher_file is not None:
-        cross_arguments.extend(("--cross-file", launcher_file))
-    builder.run(
-        "meson",
-        "setup",
-        *cross_arguments,
-        "--native-file",
-        native_file,
-        f"-Dnative_llvm_path={llvm}",
-        f"-Dwine_build_path={wine_build}",
-        "--buildtype",
-        "release",
-        "--prefix",
-        install,
-        "--strip",
-        build,
-        source,
-        environment=environment,
-    )
-    builder.run("meson", "compile", "-C", build, environment=environment)
-    builder.run("meson", "install", "-C", build, environment=environment)
     for library in ("d3d10core.dll", "d3d11.dll", "dxgi.dll", "winemetal.dll"):
         shutil.copy2(
             install / "x86_64-windows" / library, candidate / "DXMT/x64" / library
@@ -256,14 +240,9 @@ def build_dxmt_x86_64(
         clear_dos_stub(candidate / "DXMT/x64" / library)
 
 
-def write_release_metadata(
-    builder: Builder,
-    root: Path,
-    candidate: Path,
-    inventory: list[str],
-    nixpkgs_revision: str,
-) -> None:
-    inventory_path = root / "runtime-component-inventory.tsv"
+def write_inventory(path: Path, libraries: list[str], nixpkgs_revision: str) -> None:
+    """Write the component inventory: the shipped components and the Nix libraries."""
+
     rows = [
         "component\trole\tsource",
         "WineCX/Wine\tWindows compatibility runtime\truntime.lock.json:sources.wine",
@@ -273,21 +252,11 @@ def write_release_metadata(
             "(SHA-256-pinned third-party base archive; not built from source)"
         ),
     ]
-    for output in inventory:
+    for output in libraries:
         rows.append(
             f"{Path(output).name}\tBundled Nix library\t{output} (nixpkgs {nixpkgs_revision})"
         )
-    inventory_path.write_text("\n".join(rows) + "\n", encoding="utf-8")
-    builder.run(sys.executable, TOOLCHAIN_CLI, root / "build-toolchain.json")
-    builder.run(
-        sys.executable,
-        LICENSE_CLI,
-        "generate",
-        "--inventory",
-        inventory_path,
-        "--output",
-        root / "candidate",
-    )
+    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
 
 def prepare_base(root: Path, *, clean_release: bool) -> Path:
@@ -316,7 +285,7 @@ def configure_runtime(
 ) -> tuple[str, list[Path], Path]:
     """Prepare the patched sources and build Wine."""
 
-    nixpkgs, outputs = canary_environment(builder, lock)
+    nixpkgs, outputs = build_environment(builder, lock)
     prepare(source_root)
     wine_build = root / "wine-build"
     configure_wine(builder, source_root / "wine", wine_build)
@@ -373,93 +342,114 @@ def install_runtime(
     fix_patched_machos(builder, candidate)
 
 
-def finalize_runtime(
+def source_entries(source_root: Path, inventory: Path) -> list[tuple[Path, str]]:
+    """Return the corresponding-source members of the x86_64 lane."""
+
+    return [
+        (source_root / "wine", "wine"),
+        (source_root / "dxmt", "dxmt"),
+        (inventory, "runtime-component-inventory.tsv"),
+        *((ROOT / name, name) for name in SOURCE_REPOSITORY_MEMBERS),
+    ]
+
+
+def build_runtime(
     builder: Builder,
-    root: Path,
-    candidate: Path,
     *,
-    clean_release: bool,
-    nixpkgs: str,
-    outputs: list[Path],
-    nixpkgs_revision: str,
-    source_root: Path,
-    wine_build: Path,
-    deployment: str,
+    release: bool,
+    version: str,
+    output: Path,
+    source_commit: str,
 ) -> Path:
-    """Build the DXMT payload, validate the tree, and write the archive."""
+    """Build the x86_64 runtime and return the path of its provenance fragment.
 
-    inventory: list[str] = []
-    if clean_release:
-        inventory = bundle_nix_libraries(builder, candidate, outputs)
+    A release build is clean and gated. A candidate overlays the patched Wine files on the
+    pinned base.
+    """
 
+    lock = load_lock(target=TARGET.name)
+    root = BUILD_ROOT / TARGET.arch
+    if root.exists():
+        raise BuildError(f"build output already exists: {root}")
+    builder.require("git", "tar", "uv")
+
+    candidate = prepare_base(root, clean_release=release)
+
+    builder.require(
+        "nix", "clang", "make", "meson", "ninja", f"{TARGET.pe_compiler}-gcc"
+    )
+    source_root = root / "sources"
+    nixpkgs, outputs, wine_build = configure_runtime(builder, lock, root, source_root)
+    install_runtime(builder, root, candidate, wine_build, clean_release=release)
+    libraries = bundle_nix_libraries(builder, candidate, outputs) if release else []
     llvm = llvm_native_tree(builder, nixpkgs, root)
     (candidate / "DXMT/x64").mkdir(parents=True, exist_ok=True)
     build_dxmt_x86_64(
         builder,
-        deployment,
+        str(lock["deploymentTarget"]),
         source_root / "dxmt",
         root,
         wine_build,
         llvm,
         candidate,
     )
+    if (
+        release
+        and builder.capture("git", "-C", str(ROOT), "status", "--porcelain").strip()
+    ):
+        raise BuildError("build modified tracked repository files")
 
-    if clean_release:
+    output.mkdir(parents=True, exist_ok=True)
+    inventory = output / inventory_name(TARGET.arch)
+    write_inventory(inventory, libraries, str(lock["build"]["nixpkgs"]["commit"]))
+    validation_report = root / "validation.json"
+    if release:
         builder.run(
             sys.executable,
             VALIDATE_CLI,
             candidate,
+            "--target",
+            TARGET.name,
             "--require-64-bit-only",
+            "--report",
+            validation_report,
         )
-        write_release_metadata(builder, root, candidate, inventory, nixpkgs_revision)
+        generate(ROOT, candidate.parent, inventory=inventory, target=TARGET.name)
         members = ("Libraries", "Licenses", "NOTICE.md")
     else:
         builder.run(
             sys.executable,
             VALIDATE_CLI,
             candidate,
+            "--target",
+            TARGET.name,
             "--baseline",
             root / "base" / "Libraries",
+            "--report",
+            validation_report,
         )
         members = ("Libraries",)
-    return write_archive(
-        root,
-        ARCHIVE_NAME,
-        members,
+    return package_runtime(
+        repository_root=ROOT,
+        target=TARGET,
+        version=version,
+        release=release,
+        output=output,
         content_root=candidate.parent,
-    )
-
-
-def build_canary(builder: Builder, *, clean_release: bool = False) -> Path:
-    """Build the all-patches overlay canary, or the clean release artifact."""
-
-    lock = load_lock()
-    root = BUILD_ROOT / "runtime"
-    if root.exists():
-        raise BuildError(f"build output already exists: {root}")
-    builder.require("git", "tar", "uv")
-
-    candidate = prepare_base(root, clean_release=clean_release)
-
-    builder.require("nix", "clang", "make", "meson", "ninja", "x86_64-w64-mingw32-gcc")
-    source_root = root / "sources"
-    nixpkgs, outputs, wine_build = configure_runtime(builder, lock, root, source_root)
-    install_runtime(
-        builder,
-        root,
-        candidate,
-        wine_build,
-        clean_release=clean_release,
-    )
-    return finalize_runtime(
-        builder,
-        root,
-        candidate,
-        clean_release=clean_release,
-        nixpkgs=nixpkgs,
-        outputs=outputs,
-        nixpkgs_revision=str(lock["build"]["nixpkgs"]["commit"]),
+        members=members,
+        source_entries=source_entries(source_root, inventory),
         source_root=source_root,
-        wine_build=wine_build,
-        deployment=str(lock["deploymentTarget"]),
+        inventory=inventory,
+        validation_report=validation_report,
+        wine={
+            "repository": lock["sources"]["wine"]["repository"],
+            "commit": lock["sources"]["wine"]["commit"],
+            "version": lock["sources"]["wine"]["version"],
+        },
+        dxmt={
+            "repository": lock["sources"]["dxmt"]["repository"],
+            "commit": lock["sources"]["dxmt"]["commit"],
+            "version": lock["sources"]["dxmt"]["version"],
+        },
+        source_commit=source_commit,
     )

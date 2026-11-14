@@ -185,10 +185,10 @@ class ReleaseVerificationTests(unittest.TestCase):
         digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
         checksum.write_text(f"{digest}  {artifact.name}\n", encoding="utf-8")
 
-    def _verify(self, *, build_toolchain: Path | None = None) -> dict[str, Path]:
+    def _verify(self) -> dict[str, object]:
         return verify_release(
             repository_root=self.root,
-            tag="v0.1.0",
+            version="0.1.0",
             commit="3" * 40,
             archive=self.archive,
             checksum=self.checksum,
@@ -196,41 +196,20 @@ class ReleaseVerificationTests(unittest.TestCase):
             source_archive=self.source_archive,
             source_checksum=self.source_checksum,
             validation_report=self.validation_report,
-            output_directory=self.root / "release",
             component_inventory=self.component_inventory,
-            build_toolchain=build_toolchain,
         )
 
-    def test_writes_provenance_and_notices_after_all_gates_pass(self) -> None:
-        outputs = self._verify()
+    def test_returns_the_validation_record_after_all_gates_pass(self) -> None:
+        validation = self._verify()
 
-        provenance = json.loads(outputs["provenance"].read_text(encoding="utf-8"))
-        self.assertEqual(provenance["releaseTag"], "v0.1.0")
-        self.assertEqual(provenance["sourceCommit"], "3" * 40)
-        self.assertEqual(
-            provenance["runtimeArchive"]["sha256"],
-            hashlib.sha256(self.archive.read_bytes()).hexdigest(),
-        )
-        self.assertIn("wine license", outputs["notices"].read_text(encoding="utf-8"))
-        self.assertIn("apache license", outputs["notices"].read_text(encoding="utf-8"))
-        self.assertIn("gpl3 license", outputs["notices"].read_text(encoding="utf-8"))
-        self.assertIn(
-            "redistribution inventory",
-            outputs["notices"].read_text(encoding="utf-8"),
-        )
-        self.assertIn(
-            "Wine\truntime\texample@commit",
-            outputs["notices"].read_text(encoding="utf-8"),
-        )
+        self.assertTrue(validation["releaseEligible"])
 
-    def test_normalizes_a_semver_version_to_a_tag(self) -> None:
-        self.assertEqual(normalize_version("0.5.0"), "v0.5.0")
-        self.assertEqual(
-            normalize_version("v1.2.3-rc.1+build.2"), "v1.2.3-rc.1+build.2"
-        )
+    def test_normalizes_a_bare_semver_version(self) -> None:
+        self.assertEqual(normalize_version("0.5.0"), "0.5.0")
+        self.assertEqual(normalize_version("1.2.3-rc.1"), "1.2.3-rc.1")
 
     def test_rejects_non_semver_versions(self) -> None:
-        for value in ("", "01.2.3", "1.2", "1.2.3-01", "1.2.3+"):
+        for value in ("", "v0.5.0", "01.2.3", "1.2", "1.2.3-01", "1.2.3+build.2"):
             with self.subTest(value=value), self.assertRaises(ReleaseValidationError):
                 normalize_version(value)
 
@@ -292,25 +271,6 @@ class ReleaseVerificationTests(unittest.TestCase):
                 ):
                     self._verify()
 
-    def test_records_the_build_toolchain_in_provenance(self) -> None:
-        toolchain = self.root / "build-toolchain.json"
-        toolchain.write_text(
-            json.dumps({"brew": {"meson": "1.9.0"}, "sdkVersion": "15.5"}),
-            encoding="utf-8",
-        )
-
-        outputs = self._verify(build_toolchain=toolchain)
-
-        provenance = json.loads(outputs["provenance"].read_text(encoding="utf-8"))
-        self.assertEqual(provenance["buildToolchain"]["sdkVersion"], "15.5")
-
-    def test_rejects_a_build_toolchain_report_that_is_not_an_object(self) -> None:
-        toolchain = self.root / "build-toolchain.json"
-        toolchain.write_text("[]", encoding="utf-8")
-
-        with self.assertRaisesRegex(ReleaseValidationError, "JSON object"):
-            self._verify(build_toolchain=toolchain)
-
     def test_rejects_unsafe_source_archive_member(self) -> None:
         with tarfile.open(self.source_archive, "w:gz") as archive:
             source = tarfile.TarInfo("../escape")
@@ -322,94 +282,95 @@ class ReleaseVerificationTests(unittest.TestCase):
             self._verify()
 
 
-class ReleaseWorkflowContractTests(unittest.TestCase):
-    def test_workflow_is_manual_and_accepts_only_a_version(self) -> None:
-        workflow = (
-            Path(__file__).resolve().parents[1] / ".github/workflows/release.yml"
-        ).read_text(encoding="utf-8")
+WORKFLOW = Path(__file__).resolve().parents[1] / ".github/workflows/release.yml"
 
-        self.assertIn("workflow_dispatch:", workflow)
-        self.assertIn("version:", workflow)
-        self.assertNotIn("\n      tag:", workflow)
-        self.assertNotRegex(workflow, r"\n  push:")
+
+def _job(workflow: str, name: str) -> str:
+    """Return the text of one top-level job."""
+
+    match = re.search(
+        rf"\n    {re.escape(name)}:\n(.*?)(?=\n    \S|\Z)", workflow, re.DOTALL
+    )
+    assert match is not None, name
+    return match.group(1)
+
+
+class ReleaseWorkflowContractTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.workflow = WORKFLOW.read_text(encoding="utf-8")
+
+    def test_one_workflow_replaces_the_per_lane_workflows(self) -> None:
+        directory = WORKFLOW.parent
+
+        self.assertFalse((directory / "release-arm64.yml").exists())
+        self.assertFalse((directory / "candidate.yml").exists())
+
+    def test_workflow_is_manual_with_version_channel_and_target(self) -> None:
+        self.assertIn("workflow_dispatch:", self.workflow)
+        for name in ("version:", "channel:", "target:", "arm64_release_id:"):
+            self.assertIn(f"            {name}", self.workflow)
+        self.assertNotRegex(self.workflow, r"\n    push:")
+
+    def test_release_requires_both_lanes_and_the_default_branch(self) -> None:
+        plan = _job(self.workflow, "prepare")
+
+        self.assertIn('"$TARGET" != both', plan)
+        self.assertIn('"$REF_NAME" != "$DEFAULT_BRANCH"', plan)
+        self.assertIn("--require rosetta-x86_64,native-arm64", self.workflow)
 
     def test_workflow_creates_a_draft_at_the_built_sha(self) -> None:
-        workflow = (
-            Path(__file__).resolve().parents[1] / ".github/workflows/release.yml"
-        ).read_text(encoding="utf-8")
+        self.assertIn('gh release create "$RELEASE_TAG"', self.workflow)
+        self.assertIn('-f sha="$BUILD_COMMIT"', self.workflow)
+        self.assertIn("BUILD_COMMIT: ${{ github.sha }}", self.workflow)
+        self.assertIn("--verify-tag", self.workflow)
+        self.assertNotIn('--target "$BUILD_COMMIT"', self.workflow)
+        self.assertIn("--draft", self.workflow)
+        self.assertIn("--latest=false", self.workflow)
+        self.assertNotIn("git tag ", self.workflow)
+        self.assertNotIn("git push ", self.workflow)
+        self.assertGreaterEqual(self.workflow.count("git ls-remote"), 1)
+        self.assertGreaterEqual(self.workflow.count("git/ref/tags/"), 2)
+        self.assertGreaterEqual(self.workflow.count("releases/tags/"), 2)
 
-        self.assertIn("ref: ${{ github.event.repository.default_branch }}", workflow)
-        self.assertIn('gh release create "$RELEASE_TAG"', workflow)
-        self.assertIn('-f sha="$BUILD_COMMIT"', workflow)
-        self.assertIn("git/ref/tags/$RELEASE_TAG", workflow)
-        self.assertIn("--verify-tag", workflow)
-        self.assertNotIn('--target "$BUILD_COMMIT"', workflow)
-        self.assertIn("--draft", workflow)
-        self.assertIn("--latest=false", workflow)
-        self.assertNotIn("git tag ", workflow)
-        self.assertNotIn("git push ", workflow)
-        self.assertGreaterEqual(workflow.count("git ls-remote"), 1)
-        self.assertGreaterEqual(workflow.count("git/ref/tags/"), 2)
-        self.assertGreaterEqual(workflow.count("releases/tags/"), 2)
+    def test_release_channel_uses_the_release_gated_build(self) -> None:
+        self.assertIn('just build-release rosetta-x86_64 "$VERSION"', self.workflow)
+        self.assertIn('just build-release native-arm64 "$VERSION"', self.workflow)
 
-    def test_workflow_never_uses_the_overlay_builder_for_a_release(self) -> None:
-        workflow = (
-            Path(__file__).resolve().parents[1] / ".github/workflows/release.yml"
-        ).read_text(encoding="utf-8")
+    def test_only_publish_writes_and_it_never_checks_out_code(self) -> None:
+        publish = _job(self.workflow, "publish")
 
-        self.assertNotIn("just build\n", workflow)
-        self.assertNotIn("build-canary.sh", workflow)
-        self.assertIn("just build-release", workflow)
-
-    def test_workflow_exports_the_release_directory(self) -> None:
-        workflow = (
-            Path(__file__).resolve().parents[1] / ".github/workflows/release.yml"
-        ).read_text(encoding="utf-8")
-
-        self.assertIn(
-            "printf 'RELEASE_DIRECTORY=%s\\n' \"$RELEASE_DIRECTORY\"", workflow
-        )
-
-    def test_workflow_includes_the_legal_inventory_in_source_assets(self) -> None:
-        workflow = (
-            Path(__file__).resolve().parents[1] / ".github/workflows/release.yml"
-        ).read_text(encoding="utf-8")
-
-        self.assertIn(
-            "docs/legal LICENSE LICENSES scripts Justfile pyproject.toml uv.lock",
-            workflow,
-        )
-
-    def test_workflow_separates_the_read_only_build_from_the_publish_job(self) -> None:
-        workflow = (
-            Path(__file__).resolve().parents[1] / ".github/workflows/release.yml"
-        ).read_text(encoding="utf-8")
-        build, publish = workflow.split("\n    publish:\n")
-
-        self.assertIn("contents: read", build)
-        self.assertNotIn("contents: write", build)
-        self.assertNotIn("id-token", build)
-        self.assertIn("persist-credentials: false", build)
         self.assertIn("contents: write", publish)
         self.assertIn("id-token: write", publish)
         self.assertIn("attestations: write", publish)
         self.assertIn("actions/attest-build-provenance@v", publish)
         self.assertNotIn("actions/checkout", publish)
-        self.assertNotIn("just build-release", publish)
+        self.assertNotIn("just build", publish)
+        self.assertEqual(self.workflow.count("contents: write"), 1)
+        self.assertEqual(self.workflow.count("id-token: write"), 1)
 
-    def test_workflow_uses_tagged_actions_and_minimal_write_scope(self) -> None:
-        workflow = (
-            Path(__file__).resolve().parents[1] / ".github/workflows/release.yml"
-        ).read_text(encoding="utf-8")
+    def test_lane_jobs_are_read_only_and_arm64_alone_uses_its_environment(
+        self,
+    ) -> None:
+        for name in ("build-x86_64", "build-arm64"):
+            job = _job(self.workflow, name)
+            self.assertIn("contents: read", job)
+            self.assertIn("persist-credentials: false", job)
+        self.assertEqual(self.workflow.count("environment:"), 1)
+        self.assertIn("environment: release-arm64", _job(self.workflow, "build-arm64"))
+        self.assertEqual(self.workflow.count("secrets.ARM64_RUNTIME_CATALOG_URL"), 1)
 
-        self.assertIn("permissions: {}", workflow)
-        self.assertEqual(workflow.count("contents: write"), 1)
+    def test_workflow_uses_tagged_actions_and_no_inline_inputs(self) -> None:
+        self.assertIn("permissions: {}", self.workflow)
         self.assertTrue(
             all(
                 re.fullmatch(r"v[0-9A-Za-z.\-]+", version)
-                for version in re.findall(r"uses: [^\s]+@(v[^\s]+)", workflow)
+                for version in re.findall(r"uses: [^\s]+@(v[^\s]+)", self.workflow)
             )
         )
+        for block in re.findall(
+            r"run: \|\n(.*?)(?=\n            - |\n    \S|\Z)", self.workflow, re.DOTALL
+        ):
+            self.assertNotIn("${{", block)
 
 
 def _write_external_fixture(root: Path) -> None:
@@ -587,9 +548,9 @@ def test_external_target_accepts_the_minimal_notice_set(tmp_path):
         encoding="utf-8",
     )
 
-    outputs = verify_release(
+    validation = verify_release(
         repository_root=root,
-        tag="v0.9.0+arm",
+        version="0.9.0",
         commit="7" * 40,
         archive=root / "runtime.tar.gz",
         checksum=root / "runtime.tar.gz.sha256",
@@ -597,13 +558,12 @@ def test_external_target_accepts_the_minimal_notice_set(tmp_path):
         source_archive=root / "sources.tar.gz",
         source_checksum=root / "sources.tar.gz.sha256",
         validation_report=root / "validation.json",
-        output_directory=root / "release",
+        component_inventory=root / "inventory.tsv",
         target="native-arm64",
     )
 
-    provenance = json.loads(outputs["provenance"].read_text(encoding="utf-8"))
-    assert provenance["validation"]["releaseEligible"] is False
-    assert provenance["validation"]["builtExternally"] is True
+    assert validation["releaseEligible"] is False
+    assert validation["builtExternally"] is True
 
     with tarfile.open(root / "runtime.tar.gz", "r:gz") as archive:
         names = {member.name for member in archive.getmembers() if member.isfile()}

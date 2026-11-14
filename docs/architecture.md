@@ -5,7 +5,7 @@ The initial candidate is an overlay build. It verifies and extracts the pinned r
 ```text
 runtime.lock.json -> verified source checkouts -> ordered patch families
                  -> component builds -> verified base copy -> overlay
-                 -> structural report -> canary artifact
+                 -> structural report -> candidate artifact
 ```
 
 The release artifact contains the patched x86_64 components. Release validation requires a clean build of every component. Both lanes keep archive schema 2: top-level `Wine/` and `DXMT/`, the Wine loader and server, the macOS driver, the WineMetal bridge, and the DXMT payload.

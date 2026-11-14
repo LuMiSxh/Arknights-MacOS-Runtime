@@ -4,20 +4,20 @@ import struct
 
 import pytest
 
-from scripts.arm64.build_dxmt import (
+from scripts.build_common import BuildError
+from scripts.targets.arm64_dxmt import (
     LC_BUILD_VERSION,
     LC_VERSION_MIN_MACOSX,
     MINIMAL_WINE_TARGETS,
     deployment_target,
     macho_minimum_macos,
-    meson_setup_command,
     parse_version,
     reject_macho_above,
     stage_winemac_so,
     verify_dxmt_install,
     verify_minimal_wine_outputs,
 )
-from scripts.build_common import BuildError
+from scripts.targets.dxmt import meson_setup_command
 
 
 def _macho(command: int, version: tuple[int, int]) -> bytes:
@@ -122,6 +122,7 @@ def test_meson_setup_uses_the_wine_build_tree_not_an_install_tree(tmp_path):
     command = meson_setup_command(
         tmp_path / "dxmt-build",
         tmp_path / "dxmt-source",
+        [tmp_path / "dxmt-source" / "build-arm64ec.txt"],
         tmp_path / "dxmt-native.ini",
         tmp_path / "llvm",
         tmp_path / "wine-build",
@@ -139,6 +140,7 @@ def test_meson_setup_reconfigures_an_existing_build(tmp_path):
     command = meson_setup_command(
         tmp_path / "dxmt-build",
         tmp_path / "dxmt-source",
+        [tmp_path / "dxmt-source" / "build-arm64ec.txt"],
         tmp_path / "dxmt-native.ini",
         tmp_path / "llvm",
         tmp_path / "wine-build",

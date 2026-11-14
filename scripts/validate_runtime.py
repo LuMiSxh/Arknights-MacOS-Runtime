@@ -294,6 +294,9 @@ def main() -> int:
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--target")
     parser.add_argument(
+        "--report", type=Path, help="write the JSON validation report to this path"
+    )
+    parser.add_argument(
         "--require-64-bit-only",
         action="store_true",
         help="reject i386, DXMT x32, GStreamer, and FFmpeg payloads (clean builds)",
@@ -333,9 +336,10 @@ def main() -> int:
     ) as caught_error:
         error(str(caught_error))
         return 1
-    reports = BUILD_ROOT / "reports"
-    reports.mkdir(parents=True, exist_ok=True)
-    report = reports / f"{arguments.runtime.parent.name}-validation.json"
+    report = arguments.report or (
+        BUILD_ROOT / "reports" / f"{arguments.runtime.parent.name}-validation.json"
+    )
+    report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(
         json.dumps(
             {

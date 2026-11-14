@@ -4,7 +4,7 @@
 """Repack the external native-arm64 tree into the client runtime contract.
 
 The external builder ships a signed `wine/` tree. DXMT is built locally for
-ARM64EC by `build_dxmt.py`. This wrapper moves both into the `Libraries/` layout,
+ARM64EC by `scripts/targets/arm64_dxmt.py`. This wrapper moves both into the `Libraries/` layout,
 adds the launcher aliases, and clears the Wine DOS-stub marker from the native DXMT
 D3D payloads. It renames the signed `wine.app` loader bundle to `Arknights.app` and never
 rewrites bytes inside it.
@@ -12,36 +12,14 @@ rewrites bytes inside it.
 
 from __future__ import annotations
 
-import argparse
 import os
 import re
 import shutil
-import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-if __package__:
-    from ..build_common import (
-        NATIVE_ARM64_TARGET,
-        ROOT,
-        WINE_BUILD_NEW_REPOSITORY,
-        clear_dos_stub,
-    )
-    from ..lib.console import error, success
-    from ..release.licenses import EXTERNAL_NOTICE_FILES
-    from ..runtime import LockError, load_lock
-else:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from scripts.build_common import (
-        NATIVE_ARM64_TARGET,
-        ROOT,
-        WINE_BUILD_NEW_REPOSITORY,
-        clear_dos_stub,
-    )
-    from scripts.lib.console import error, success
-    from scripts.release.licenses import EXTERNAL_NOTICE_FILES
-    from scripts.runtime import LockError, load_lock
-
+from scripts.build_common import ROOT, WINE_BUILD_NEW_REPOSITORY, clear_dos_stub
+from scripts.release.licenses import EXTERNAL_NOTICE_FILES
 
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:")
 
@@ -257,41 +235,8 @@ def assemble(
     return output
 
 
-def _verify_interface(libraries: Path, interface: dict[str, Any]) -> None:
+def verify_interface(libraries: Path, interface: dict[str, Any]) -> None:
     for relative in (*interface["executables"], *interface["requiredFiles"]):
         path = libraries / relative
         if not path.exists():
             raise AssemblyError(f"assembled tree is missing: {relative}")
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--wine", type=Path, required=True)
-    parser.add_argument("--dxmt", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument(
-        "--archive-root",
-        type=Path,
-        help="directory for Licenses/ and NOTICE.md; defaults to the output parent",
-    )
-    arguments = parser.parse_args()
-    try:
-        lock = load_lock(target=NATIVE_ARM64_TARGET)
-        archive_root = arguments.archive_root or arguments.output.parent
-        libraries = assemble(
-            arguments.wine,
-            arguments.dxmt,
-            arguments.output,
-            archive_root,
-            lock["interface"],
-        )
-        _verify_interface(libraries, lock["interface"])
-    except (AssemblyError, LockError, OSError) as caught_error:
-        error(str(caught_error))
-        return 1
-    success(f"assembled {libraries}")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

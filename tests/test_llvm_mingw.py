@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MPL-2.0
 
-from scripts.arm64 import llvm_mingw
+from scripts.targets import llvm_mingw
 
 
 def _run_main(monkeypatch, lock: dict, capsys) -> str:

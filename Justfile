@@ -34,26 +34,17 @@ prepare:
 fetch-base:
     {{ uv }} scripts/runtime.py fetch-base
 
-build:
-    {{ uv }} scripts/build.py canary
+# Build one lane as a candidate. The default version is a SemVer prerelease.
+build target="rosetta-x86_64" version="0.0.0-dev":
+    {{ uv }} scripts/build.py candidate --target "{{ target }}" --version "{{ version }}"
 
-build-release:
-    {{ uv }} scripts/build.py release
+# Build one lane as a gated release artifact.
+build-release target version:
+    {{ uv }} scripts/build.py release --target "{{ target }}" --version "{{ version }}"
 
-verify path=".build/runtime/candidate/Libraries":
+# Combine lane output directories into one release under .build/release.
+combine version +inputs:
+    args=(); for dir in {{ inputs }}; do args+=(--input "$dir"); done; {{ uv }} scripts/release/combine.py --version "{{ version }}" --output .build/release "${args[@]}"
+
+verify path=".build/x86_64/candidate/Libraries":
     {{ uv }} scripts/validate_runtime.py "{{ path }}"
-
-arm64-fetch:
-    {{ uv }} scripts/arm64/fetch_external.py --target native-arm64 --output .build/arm64/incoming
-
-arm64-dxmt:
-    {{ uv }} scripts/arm64/build_dxmt.py --target native-arm64 --root .build/arm64
-
-arm64-assemble:
-    {{ uv }} scripts/arm64/assemble.py --wine .build/arm64/incoming/wine --dxmt .build/arm64/dxmt --output .build/arm64/Libraries
-
-arm64-provenance tag:
-    {{ uv }} scripts/arm64/provenance.py --target native-arm64 --tag "{{ tag }}" --runtime-archive ".build/arm64/release/Arknights-MacOS-Runtime-{{ tag }}.tar.gz" --source-archive ".build/arm64/release/Arknights-MacOS-Runtime-{{ tag }}-source.tar.gz" --external-artifact .build/arm64/incoming/external.json --output .build/arm64/release/provenance.json
-
-arm64-verify:
-    {{ uv }} scripts/validate_runtime.py .build/arm64/Libraries --target native-arm64

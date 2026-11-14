@@ -19,13 +19,14 @@
 | Validate lock            | `just validate`      |
 | Monitor source pins      | `just monitor`       |
 | Prepare pinned sources   | `just prepare`       |
-| Build all-patches canary | `just build`         |
+| Build candidate runtime  | `just build`         |
 | Build release runtime    | `just build-release` |
+| Combine lane outputs     | `just combine`       |
 | Verify artifact          | `just verify`        |
 
 ## Conventions
 
-- `runtime.lock.json` is the sole source of source pins, patch order, archive paths, and deployment target. The native ARM64 artifact comes from the external catalog; the workflow verifies its SHA-256 and records the selection in provenance. When the selected release differs from the lock pin, the fetch writes the new release id and SHA-256 to the lock; when it matches, it enforces the locked SHA-256.
+- `runtime.lock.json` is the sole source of source pins, patch order, archive paths, and deployment target. The native ARM64 artifact comes from the external catalog; the lane verifies its SHA-256 and records the selection in its provenance fragment. When the selected release differs from the lock pin, the fetch writes the new release id and SHA-256 to the lock; when it matches, it enforces the locked SHA-256.
 - Use full commits and SHA-256 hashes; reject floating refs and unverified downloads.
 - Keep generated sources, downloads, reports, and artifacts under `.build/`; never commit binaries.
 - Run Python through the root `pyproject.toml` and `uv.lock` with `uv run --locked`; keep runtime orchestration standard-library-only.

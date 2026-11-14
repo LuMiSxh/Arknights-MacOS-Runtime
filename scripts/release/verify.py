@@ -1,52 +1,30 @@
-#!/usr/bin/env -S uv run --locked --no-dev
 # SPDX-License-Identifier: MPL-2.0
 
-"""Verify and describe the immutable inputs of a runtime release."""
+"""Release gates that every runtime lane runs before it writes its release outputs."""
 
 from __future__ import annotations
 
-import argparse
 import json
 import re
-import sys
 import tarfile
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-if __package__:
-    from ..build_common import NATIVE_ARM64_TARGET, sha256
-    from .licenses import (
-        ARCHIVE_LICENSES_DIRECTORY,
-        ARCHIVE_NOTICE,
-        EXTERNAL_NOTICE_FILES,
-        INDEX_NAME,
-        TARGET_COMPONENTS,
-    )
-    from .provenance import (
-        COMMIT_PATTERN,
-        ProvenanceInputError,
-        runtime_lock_provenance,
-        validation_provenance,
-    )
-else:
-    if str(REPOSITORY_ROOT) not in sys.path:
-        sys.path.insert(0, str(REPOSITORY_ROOT))
-    from scripts.build_common import NATIVE_ARM64_TARGET, sha256
-    from scripts.release.licenses import (
-        ARCHIVE_LICENSES_DIRECTORY,
-        ARCHIVE_NOTICE,
-        EXTERNAL_NOTICE_FILES,
-        INDEX_NAME,
-        TARGET_COMPONENTS,
-    )
-    from scripts.release.provenance import (
-        COMMIT_PATTERN,
-        ProvenanceInputError,
-        runtime_lock_provenance,
-        validation_provenance,
-    )
-
+from scripts.build_common import NATIVE_ARM64_TARGET
+from scripts.lib.artifact import sha256
+from scripts.release.licenses import (
+    ARCHIVE_LICENSES_DIRECTORY,
+    ARCHIVE_NOTICE,
+    EXTERNAL_NOTICE_FILES,
+    INDEX_NAME,
+    TARGET_COMPONENTS,
+)
+from scripts.release.provenance import (
+    COMMIT_PATTERN,
+    ProvenanceInputError,
+    runtime_lock_provenance,
+    validation_provenance,
+)
 
 SEMVER_CORE_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 IDENTIFIER_PATTERN = re.compile(r"^[0-9A-Za-z-]+$")
@@ -121,20 +99,16 @@ def _valid_semver_identifiers(value: str, *, reject_numeric_leading_zero: bool) 
 
 
 def normalize_version(value: str) -> str:
-    """Return a canonical v-prefixed SemVer tag for a release version."""
+    """Return a bare SemVer version: no leading "v" and no build metadata."""
 
     normalized = value.strip()
-    normalized = normalized.removeprefix("v")
     if not normalized:
         raise ReleaseValidationError("release version must not be empty")
-
-    version_and_build = normalized.split("+", maxsplit=1)
-    if len(version_and_build) == 2 and not _valid_semver_identifiers(
-        version_and_build[1], reject_numeric_leading_zero=False
-    ):
-        raise ReleaseValidationError(f"invalid SemVer build metadata: {value!r}")
-    main = version_and_build[0]
-    version_and_prerelease = main.split("-", maxsplit=1)
+    if "+" in normalized:
+        raise ReleaseValidationError(
+            f"release version must not have build metadata: {value!r}"
+        )
+    version_and_prerelease = normalized.split("-", maxsplit=1)
     core = version_and_prerelease[0]
     if SEMVER_CORE_PATTERN.fullmatch(core) is None:
         raise ReleaseValidationError(f"invalid SemVer release version: {value!r}")
@@ -142,7 +116,7 @@ def normalize_version(value: str) -> str:
         version_and_prerelease[1], reject_numeric_leading_zero=True
     ):
         raise ReleaseValidationError(f"invalid SemVer prerelease: {value!r}")
-    return f"v{normalized}"
+    return normalized
 
 
 def _regular_file(path: Path, description: str) -> Path:
@@ -327,55 +301,10 @@ def _validate_required_patches(
         )
 
 
-def _read_build_toolchain(path: Path | None) -> dict[str, Any] | None:
-    if path is None:
-        return None
-    try:
-        toolchain = json.loads(
-            _regular_file(path, "build toolchain report").read_text(encoding="utf-8")
-        )
-    except (OSError, ValueError) as error:
-        raise ReleaseValidationError(
-            f"cannot read build toolchain report: {path}"
-        ) from error
-    if not isinstance(toolchain, dict):
-        raise ReleaseValidationError("build toolchain report must be a JSON object")
-    return toolchain
-
-
-def _write_notices(repository_root: Path, destination: Path) -> None:
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    sections = [
-        "Arknights macOS Runtime third-party notices",
-        "",
-        "Source and patch provenance is recorded in provenance.json and runtime.lock.json.",
-        "The patch registry is included in the source repository.",
-        "Canonical license texts and the realised runtime component inventory follow.",
-    ]
-    for relative in (path for path in NOTICE_FILES if path.startswith("LICENSES/")):
-        sections.extend(
-            [
-                "",
-                f"===== {relative} =====",
-                (repository_root / relative).read_text(encoding="utf-8").rstrip(),
-            ]
-        )
-    sections.extend(
-        [
-            "",
-            "===== docs/legal/redistribution.md =====",
-            (repository_root / "docs/legal/redistribution.md")
-            .read_text(encoding="utf-8")
-            .rstrip(),
-        ]
-    )
-    destination.write_text("\n".join(sections) + "\n", encoding="utf-8")
-
-
 def verify_release(
     *,
     repository_root: Path,
-    tag: str,
+    version: str,
     commit: str,
     archive: Path,
     checksum: Path,
@@ -383,25 +312,23 @@ def verify_release(
     source_archive: Path,
     source_checksum: Path,
     validation_report: Path,
-    output_directory: Path,
-    component_inventory: Path | None = None,
-    build_toolchain: Path | None = None,
+    component_inventory: Path,
     target: str = DEFAULT_TARGET,
-) -> dict[str, Path]:
+) -> dict[str, Any]:
+    """Run the release gates of one lane and return its validation record.
+
+    A built lane must have a release-eligible report and a clean component inventory.
+    An external lane keeps the report gates but is never release eligible.
+    """
+
     if target not in TARGET_COMPONENTS:
         raise ReleaseValidationError(
             f"unknown target {target!r}; expected one of {', '.join(sorted(TARGET_COMPONENTS))}"
         )
     external = target == EXTERNAL_TARGET
-    try:
-        canonical_tag = normalize_version(tag)
-    except ReleaseValidationError as error:
+    if normalize_version(version) != version:
         raise ReleaseValidationError(
-            f"release tag is not an explicit SemVer tag: {tag!r}"
-        ) from error
-    if canonical_tag != tag:
-        raise ReleaseValidationError(
-            f"release tag is not an explicit SemVer tag: {tag!r}"
+            f"release version must be plain SemVer: {version!r}"
         )
     if COMMIT_PATTERN.fullmatch(commit) is None:
         raise ReleaseValidationError("release commit must be a full commit hash")
@@ -414,16 +341,11 @@ def verify_release(
     if not external:
         _validate_required_patches(lock, TARGET_REQUIRED_PATCHES[target])
     _validate_notices(repository_root, lock)
-    inventory_text: str | None = None
-    if external:
-        inventory_text = None
-    else:
-        if component_inventory is None:
-            raise ReleaseValidationError("runtime component inventory is required")
-        inventory_text = _regular_file(
+    if not external:
+        inventory = _regular_file(
             component_inventory, "runtime component inventory"
         ).read_text(encoding="utf-8")
-        if not inventory_text.startswith("component\trole\tsource\n"):
+        if not inventory.startswith("component\trole\tsource\n"):
             raise ReleaseValidationError(
                 "runtime component inventory has invalid syntax"
             )
@@ -434,80 +356,10 @@ def verify_release(
     except ProvenanceInputError as error:
         raise ReleaseValidationError(str(error)) from error
     _validate_source_directories(source_root, TARGET_SOURCE_DIRECTORIES[target])
-    archive_digest = _verify_checksum(archive, checksum, "runtime archive")
-    source_digest = _validate_source_archive(
+    _verify_checksum(archive, checksum, "runtime archive")
+    _validate_source_archive(
         source_archive, source_checksum, TARGET_SOURCE_ARCHIVE_MEMBERS[target]
     )
     if external:
         _validate_external_archive_licenses(archive, EXTERNAL_NOTICE_FILES)
-
-    output_directory.mkdir(parents=True, exist_ok=True)
-    provenance_path = output_directory / "provenance.json"
-    notices_path = output_directory / "THIRD-PARTY-NOTICES.txt"
-    provenance = {
-        "schemaVersion": 1,
-        "releaseTag": tag,
-        "sourceCommit": commit,
-        "runtimeLock": runtime_lock,
-        "runtimeArchive": {"name": archive.name, "sha256": archive_digest},
-        "correspondingSourceArchive": {
-            "name": source_archive.name,
-            "sha256": source_digest,
-        },
-        "validation": report,
-        "buildToolchain": _read_build_toolchain(build_toolchain),
-    }
-    provenance_path.write_text(
-        json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    _write_notices(repository_root, notices_path)
-    if inventory_text is not None:
-        with notices_path.open("a", encoding="utf-8") as notices:
-            notices.write("\n===== runtime-component-inventory.tsv =====\n")
-            notices.write(inventory_text)
-    return {"provenance": provenance_path, "notices": notices_path}
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--tag", required=True)
-    parser.add_argument("--commit", required=True)
-    parser.add_argument("--archive", type=Path, required=True)
-    parser.add_argument("--checksum", type=Path, required=True)
-    parser.add_argument("--source-root", type=Path, required=True)
-    parser.add_argument("--source-archive", type=Path, required=True)
-    parser.add_argument("--source-checksum", type=Path, required=True)
-    parser.add_argument("--validation-report", type=Path, required=True)
-    parser.add_argument("--output-directory", type=Path, required=True)
-    parser.add_argument("--component-inventory", type=Path)
-    parser.add_argument("--build-toolchain", type=Path)
-    parser.add_argument(
-        "--target", choices=tuple(TARGET_COMPONENTS), default=DEFAULT_TARGET
-    )
-    arguments = parser.parse_args()
-    try:
-        outputs = verify_release(
-            repository_root=REPOSITORY_ROOT,
-            tag=arguments.tag,
-            commit=arguments.commit,
-            archive=arguments.archive,
-            checksum=arguments.checksum,
-            source_root=arguments.source_root,
-            source_archive=arguments.source_archive,
-            source_checksum=arguments.source_checksum,
-            validation_report=arguments.validation_report,
-            output_directory=arguments.output_directory,
-            component_inventory=arguments.component_inventory,
-            build_toolchain=arguments.build_toolchain,
-            target=arguments.target,
-        )
-    except (ReleaseValidationError, OSError) as error:
-        print(f"error: {error}", file=sys.stderr)
-        return 1
-    for path in outputs.values():
-        print(path)
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    return report
