@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import shutil
@@ -54,12 +53,6 @@ WINE_BUILD_NEW_REPOSITORY = "https://github.com/riverfog7/wine-build-new"
 
 
 VALIDATE_CLI = ROOT / "scripts" / "validate_runtime.py"
-
-
-LICENSE_CLI = ROOT / "scripts" / "release" / "licenses.py"
-
-
-TOOLCHAIN_CLI = ROOT / "scripts" / "release" / "toolchain.py"
 
 
 ARCHIVE_BUNDLED_LIBRARIES = ("libfreetype.6.dylib", "libgnutls.30.dylib")
@@ -188,37 +181,6 @@ class Builder:
         for name in HOST_BUILD_VARIABLES:
             environment.pop(name, None)
         return environment
-
-
-def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        while chunk := source.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def write_archive(
-    directory: Path,
-    tar_name: str,
-    members: tuple[str, ...],
-    *,
-    content_root: Path | None = None,
-) -> Path:
-    """Create the tar.gz and its shasum-compatible checksum file.
-
-    `content_root` holds the members when the archive itself is written elsewhere.
-    """
-
-    root = content_root or directory
-    path = directory / tar_name
-    with tarfile.open(path, "w:gz") as tar:
-        for member in members:
-            tar.add(root / member, arcname=member)
-    (directory / f"{tar_name}.sha256").write_text(
-        f"{sha256(path)}  {tar_name}\n", encoding="utf-8"
-    )
-    return path
 
 
 def extract_archive(source: Path, destination: Path) -> None:

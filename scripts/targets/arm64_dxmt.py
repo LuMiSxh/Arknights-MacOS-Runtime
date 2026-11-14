@@ -13,56 +13,29 @@ the external v5 tree.
 
 from __future__ import annotations
 
-import argparse
 import os
 import re
 import shutil
 import struct
-import subprocess
-import sys
 from pathlib import Path
 from typing import Any
 
-if __package__:
-    from ..build_common import (
-        NATIVE_ARM64_TARGET,
-        WINE_CONFIGURE_FLAGS,
-        WINE_PREFIX,
-        Builder,
-        BuildError,
-        adhoc_sign,
-        is_macho,
-        logical_cpu_count,
-        write_compiler_launcher_cross_file,
-        write_dxmt_native_file,
-    )
-    from ..lib.console import error, success
-    from ..runtime import LockError
-    from .fetch_external import require_external_lock
-else:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from scripts.arm64.fetch_external import require_external_lock
-    from scripts.build_common import (
-        NATIVE_ARM64_TARGET,
-        WINE_CONFIGURE_FLAGS,
-        WINE_PREFIX,
-        Builder,
-        BuildError,
-        adhoc_sign,
-        is_macho,
-        logical_cpu_count,
-        write_compiler_launcher_cross_file,
-        write_dxmt_native_file,
-    )
-    from scripts.lib.console import error, success
-    from scripts.runtime import LockError
-
+from scripts.build_common import (
+    WINE_CONFIGURE_FLAGS,
+    WINE_PREFIX,
+    Builder,
+    BuildError,
+    adhoc_sign,
+    is_macho,
+    logical_cpu_count,
+)
+from scripts.targets import Target
+from scripts.targets.dxmt import build_dxmt
 
 WINE_SOURCE_DIRECTORY = "wine-build-source"
 DXMT_SOURCE_DIRECTORY = "dxmt-source"
 WINE_BUILD_DIRECTORY = "wine-build"
-DXMT_BUILD_DIRECTORY = "dxmt-build"
-DXMT_INSTALL_DIRECTORY = "dxmt"
+
 EXTERNAL_WINE_DIRECTORY = Path("incoming") / "wine"
 
 # Wine's generated Makefile has no target named after a source directory, so
@@ -158,41 +131,6 @@ def reject_macho_above(root: Path, maximum: tuple[int, int]) -> None:
             )
 
 
-def meson_setup_command(
-    build: Path,
-    source: Path,
-    native_file: Path,
-    llvm: Path,
-    wine_build: Path,
-    install: Path,
-    *,
-    reconfigure: bool = False,
-) -> list[str]:
-    """Return the Meson setup command for the ARM64EC DXMT build."""
-
-    command = ["meson", "setup"]
-    if reconfigure:
-        command.append("--reconfigure")
-    command += [
-        str(build),
-        str(source),
-        "--cross-file",
-        str(source / "build-arm64ec.txt"),
-        "--native-file",
-        str(native_file),
-        f"-Dnative_llvm_path={llvm}",
-        # The external install tree lacks import libraries, so DXMT must link
-        # against the minimal Wine build tree instead.
-        f"-Dwine_build_path={wine_build}",
-        "--buildtype",
-        "release",
-        "--prefix",
-        str(install),
-        "--strip",
-    ]
-    return command
-
-
 def verify_dxmt_install(install: Path) -> None:
     """Require every DXMT payload that the assembled runtime consumes."""
 
@@ -231,7 +169,7 @@ def _resolve_llvm(builder: Builder, candidate: Path | None) -> Path:
     value = candidate or os.environ.get("LLVM_ROOT")
     llvm = Path(value) if value else Path(_brew_prefix(builder, "llvm@15"))
     if not (llvm / "bin" / "llvm-config").is_file():
-        raise BuildError("set --llvm or LLVM_ROOT to an LLVM 15 install")
+        raise BuildError("set LLVM_ROOT to an LLVM 15 install")
     # Keep the Homebrew `opt` symlink: DXMT links Homebrew's static zstd only when
     # the LLVM path starts with `/opt/homebrew/opt`, and resolving it yields the Cellar path.
     return llvm.absolute()
@@ -251,9 +189,7 @@ def _resolve_llvm_mingw(builder: Builder, candidate: Path | None) -> None:
             shutil.which(f"{triple}-clang", path=builder.environment.get("PATH"))
             is None
         ):
-            raise BuildError(
-                f"{triple}-clang is missing; set --llvm-mingw or LLVM_MINGW_ROOT"
-            )
+            raise BuildError(f"{triple}-clang is missing; set LLVM_MINGW_ROOT")
 
 
 def _require_bison_3(builder: Builder) -> None:
@@ -342,7 +278,7 @@ def stage_winemac_so(build: Path, wine_install: Path) -> None:
     source = wine_install / "lib" / "wine" / "aarch64-unix" / "winemac.so"
     if not source.is_file():
         raise BuildError(
-            "the external Wine tree has no winemac.so; run fetch_external.py first"
+            "the external Wine tree has no winemac.so; fetch the Wine artifact first"
         )
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.symlink_to(source)
@@ -372,76 +308,32 @@ def _build_minimal_wine(
     return build
 
 
-def _build_dxmt(
-    builder: Builder,
-    lock: dict[str, Any],
-    root: Path,
-    llvm: Path,
-    wine_build: Path,
-    deployment: str,
+def build_dxmt_arm64(
+    builder: Builder, target: Target, lock: dict[str, Any], root: Path
 ) -> Path:
-    source = root / DXMT_SOURCE_DIRECTORY
+    """Build the ARM64EC DXMT payload under `root` and return its install tree."""
+
+    _prepare_toolchain(builder)
+    deployment = deployment_target(lock, builder.environment)
+    llvm = _resolve_llvm(builder, None)
+    _resolve_llvm_mingw(builder, None)
+    wine_build = _build_minimal_wine(builder, lock, root, deployment)
     dxmt = lock["sources"]["dxmt"]
+    source = root / DXMT_SOURCE_DIRECTORY
     _clone_pinned(builder, dxmt["repository"], dxmt["commit"], source)
     builder.run("git", "submodule", "update", "--init", "--recursive", cwd=source)
-    if not (source / "build-arm64ec.txt").is_file():
-        raise BuildError("the DXMT source has no build-arm64ec.txt")
-
-    build = root / DXMT_BUILD_DIRECTORY
-    install = root / DXMT_INSTALL_DIRECTORY
-    native_file = write_dxmt_native_file(root, deployment)
-    environment = builder.without_host_build_variables()
-    command = meson_setup_command(
-        build,
-        source,
-        native_file,
-        llvm,
-        wine_build,
-        install,
-        reconfigure=(build / "build.ninja").is_file(),
+    install = build_dxmt(
+        builder,
+        target=target,
+        source=source,
+        root=root,
+        wine_build=wine_build,
+        llvm=llvm,
+        deployment=deployment,
     )
-    launcher_file = write_compiler_launcher_cross_file(
-        root,
-        {"c": "arm64ec-w64-mingw32-gcc", "cpp": "arm64ec-w64-mingw32-g++"},
-        builder.environment,
-    )
-    if launcher_file is not None:
-        command += ["--cross-file", str(launcher_file)]
-    builder.run(*command, environment=environment)
-    builder.run("meson", "compile", "-C", build, environment=environment)
-    builder.run("meson", "install", "-C", build, environment=environment)
+    verify_dxmt_install(install)
+    # DXMT is unsigned at install time. Ad-hoc sign only the Mach-O payload;
+    # the PE files must keep their Wine builtin marker handling to assembly.
+    adhoc_sign(builder, install / "aarch64-unix" / "winemetal.so")
+    reject_macho_above(install, parse_version(deployment))
     return install
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target", default=NATIVE_ARM64_TARGET)
-    parser.add_argument("--root", type=Path, default=Path(".build/arm64"))
-    parser.add_argument("--llvm", type=Path)
-    parser.add_argument("--llvm-mingw", type=Path)
-    arguments = parser.parse_args()
-    try:
-        lock = require_external_lock(arguments.target)
-        root = arguments.root.resolve()
-        root.mkdir(parents=True, exist_ok=True)
-        builder = Builder()
-        _prepare_toolchain(builder)
-        deployment = deployment_target(lock, builder.environment)
-        llvm = _resolve_llvm(builder, arguments.llvm)
-        _resolve_llvm_mingw(builder, arguments.llvm_mingw)
-        wine_build = _build_minimal_wine(builder, lock, root, deployment)
-        install = _build_dxmt(builder, lock, root, llvm, wine_build, deployment)
-        verify_dxmt_install(install)
-        # DXMT is unsigned at install time. Ad-hoc sign only the Mach-O payload;
-        # the PE files must keep their Wine builtin marker handling to assembly.
-        adhoc_sign(builder, install / "aarch64-unix" / "winemetal.so")
-        reject_macho_above(install, parse_version(deployment))
-    except (BuildError, LockError, OSError, subprocess.CalledProcessError) as caught:
-        error(str(caught))
-        return 1
-    success(f"built DXMT at {install}")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

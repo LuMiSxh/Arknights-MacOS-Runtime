@@ -9,18 +9,17 @@ import argparse
 import json
 import re
 import subprocess
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import urlparse
 
 if __package__:
-    from .build_common import sha256
-    from .lib.console import Progress, error, info, success
+    from .lib.artifact import ArtifactError, fetch_verified, sha256
+    from .lib.console import error, info, success
 else:
-    from build_common import sha256
-    from lib.console import Progress, error, info, success
+    from lib.artifact import ArtifactError, fetch_verified, sha256
+    from lib.console import error, info, success
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCK_PATH = ROOT / "runtime.lock.json"
@@ -496,37 +495,18 @@ def fetch_base(*, target: str | None = None) -> Path:
         raise LockError(
             f"the {lock['target']} target builds every component and has no base artifact"
         )
-    downloads = BUILD_ROOT / "downloads"
-    downloads.mkdir(parents=True, exist_ok=True)
-    destination = downloads / "Libraries.tar.gz"
-    partial = downloads / "Libraries.tar.gz.part"
-    if destination.is_file() and sha256(destination) == artifact["sha256"]:
-        success("Using verified base runtime archive from the local cache")
-        return destination
-    info("Downloading the pinned base runtime archive")
-    with (
-        urllib.request.urlopen(artifact["url"], timeout=60) as response,
-        partial.open("wb") as output,
-    ):
-        content_length = response.headers.get("Content-Length", "")
-        total = int(content_length) if content_length.isdigit() else 0
-        progress = Progress("Downloading runtime", total)
-        current = 0
-        try:
-            while chunk := response.read(1024 * 1024):
-                output.write(chunk)
-                current += len(chunk)
-                progress.update(current)
-        finally:
-            progress.finish()
-    actual = sha256(partial)
-    if actual != artifact["sha256"]:
-        raise LockError(
-            f"base artifact hash mismatch: {actual} != {artifact['sha256']}"
+    destination = BUILD_ROOT / "downloads" / "Libraries.tar.gz"
+    try:
+        path = fetch_verified(
+            artifact["url"],
+            artifact["sha256"],
+            destination,
+            label="Downloading runtime",
         )
-    partial.replace(destination)
+    except ArtifactError as problem:
+        raise LockError(f"base artifact: {problem}") from problem
     success("Verified the base runtime archive")
-    return destination
+    return path
 
 
 def main() -> int:

@@ -7,12 +7,9 @@ from pathlib import Path
 from unittest import mock
 
 from scripts import build_common as build_helpers
-from scripts.build_common import (
-    Builder,
-    is_macho,
-    sha256,
-    write_archive,
-)
+from scripts.build_common import Builder, is_macho
+from scripts.lib.artifact import sha256, write_archive
+from scripts.targets import runtime_archive_name
 
 
 class BuildHelperTests(unittest.TestCase):
@@ -29,7 +26,7 @@ class BuildHelperTests(unittest.TestCase):
         member.mkdir(parents=True)
         (member / "Wine").write_bytes(b"payload")
 
-        path = write_archive(directory, "runtime.tar.gz", ("Libraries",))
+        path = write_archive(directory, "runtime.tar.gz", [(member, "Libraries")])
 
         with tarfile.open(path) as archive:
             self.assertEqual(archive.getnames()[0], "Libraries")
@@ -60,27 +57,14 @@ class BuildHelperTests(unittest.TestCase):
         member = self.root / "Libraries" / "Wine" / "bin"
         member.mkdir(parents=True)
         (member / "wine64").write_bytes(b"x")
-        path = write_archive(self.root, "runtime.tar.gz", ("Libraries",))
+        path = write_archive(
+            self.root, "runtime.tar.gz", [(self.root / "Libraries", "Libraries")]
+        )
 
         with tarfile.open(path) as archive:
             extracted = archive.extractfile("Libraries/Wine/bin/wine64")
             self.assertIsNotNone(extracted)
             self.assertEqual(extracted.read(), b"x")
-
-    def test_archive_reads_members_from_another_content_root(self) -> None:
-        content = self.root / "candidate"
-        member = content / "Libraries" / "Wine"
-        member.mkdir(parents=True)
-        (member / "wine64").write_bytes(b"x")
-        self.root.mkdir(exist_ok=True)
-
-        path = write_archive(
-            self.root, "runtime.tar.gz", ("Libraries",), content_root=content
-        )
-
-        self.assertEqual(path.parent, self.root)
-        with tarfile.open(path) as archive:
-            self.assertEqual(archive.getnames()[0], "Libraries")
 
     def test_is_macho_reads_the_thin_magic(self) -> None:
         macho = self.root / "loader"
@@ -135,9 +119,10 @@ class BuildHelperTests(unittest.TestCase):
         member = self.root / "Libraries"
         member.mkdir()
         (member / "marker").write_bytes(b"x")
-        name = "Arknights-MacOS-Runtime-arm64-canary.tar.gz"
+        name = runtime_archive_name("0.9.0", "arm64")
+        self.assertEqual(name, "Arknights-MacOS-Runtime-v0.9.0-arm64.tar.gz")
 
-        path = write_archive(self.root, name, ("Libraries",))
+        path = write_archive(self.root, name, [(member, "Libraries")])
 
         self.assertEqual(path.name, name)
         self.assertEqual(

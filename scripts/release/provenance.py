@@ -1,23 +1,21 @@
 # SPDX-License-Identifier: MPL-2.0
 
-"""Resolve the lock and validation inputs shared by release provenance writers."""
+"""Build the provenance fragment that each runtime lane writes.
+
+A fragment records one lane. `scripts/release/combine.py` merges the fragments into the
+release `provenance.json`.
+"""
 
 from __future__ import annotations
 
 import json
 import re
-import sys
 from pathlib import Path
 from typing import Any
 
-if __package__:
-    from ..build_common import sha256
-    from ..runtime import LockError, load_lock
-else:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from scripts.build_common import sha256
-    from scripts.runtime import LockError, load_lock
-
+from scripts.lib.artifact import sha256
+from scripts.runtime import LockError, load_lock
+from scripts.targets import Target
 
 LOCK_FILE_NAME = "runtime.lock.json"
 COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
@@ -43,9 +41,18 @@ def runtime_lock_provenance(repository_root: Path, target: str) -> dict[str, Any
 
 
 def validation_provenance(
-    path: Path, deployment_target: str, *, external: bool = False
+    path: Path,
+    deployment_target: str,
+    *,
+    external: bool = False,
+    gate: bool = True,
 ) -> dict[str, Any]:
-    """Return the normalized validation report recorded in provenance."""
+    """Return the validation report that a fragment records.
+
+    With `gate`, the report must match the lock, have no Mach-O above the target, and,
+    for a built lane, be release eligible. An external lane is never release eligible,
+    because its Wine tree is built upstream.
+    """
 
     if path.is_symlink() or not path.is_file():
         raise ProvenanceInputError(f"validation report is not a regular file: {path}")
@@ -55,23 +62,79 @@ def validation_provenance(
         raise ProvenanceInputError(f"cannot read validation report: {path}") from error
     if not isinstance(report, dict):
         raise ProvenanceInputError("validation report must be an object")
-    if not external and (
-        report.get("releaseEligible") is not True or report.get("status") != "valid"
-    ):
-        raise ProvenanceInputError(
-            "candidate is not release eligible; a clean source build is required "
-            f"(status={report.get('status')!r}, releaseEligible={report.get('releaseEligible')!r})"
-        )
-    if report.get("deploymentTarget") != deployment_target:
-        raise ProvenanceInputError(
-            "validation report deployment target does not match lock"
-        )
-    if report.get("inheritedMachOAboveTarget") != 0:
-        raise ProvenanceInputError(
-            "validation report contains inherited Mach-O targets"
-        )
+    if gate:
+        if not external and (
+            report.get("releaseEligible") is not True or report.get("status") != "valid"
+        ):
+            raise ProvenanceInputError(
+                "candidate is not release eligible; a clean source build is required "
+                f"(status={report.get('status')!r}, releaseEligible={report.get('releaseEligible')!r})"
+            )
+        if report.get("deploymentTarget") != deployment_target:
+            raise ProvenanceInputError(
+                "validation report deployment target does not match lock"
+            )
+        if report.get("inheritedMachOAboveTarget") != 0:
+            raise ProvenanceInputError(
+                "validation report contains inherited Mach-O targets"
+            )
     result = {key: value for key, value in report.items() if key != "runtime"}
     if external:
         result["releaseEligible"] = False
         result["builtExternally"] = True
     return result
+
+
+def archive_record(path: Path) -> dict[str, Any]:
+    """Return the name, SHA-256, and size of one release archive."""
+
+    return {
+        "name": path.name,
+        "sha256": sha256(path),
+        "sizeBytes": path.stat().st_size,
+    }
+
+
+def runtime_fragment(
+    *,
+    target: Target,
+    version: str,
+    source_commit: str,
+    runtime_lock: dict[str, Any],
+    wine: dict[str, Any],
+    dxmt: dict[str, Any],
+    runtime_archive: Path,
+    source_archive: Path,
+    validation: dict[str, Any],
+    build_toolchain: dict[str, Any],
+) -> dict[str, Any]:
+    """Return the provenance fragment of one lane.
+
+    `wine` holds the lane-specific Wine data. The source kind comes from the target.
+    Catalog URLs never appear in a fragment.
+    """
+
+    if COMMIT_PATTERN.fullmatch(source_commit) is None:
+        raise ProvenanceInputError("release commit must be a full commit hash")
+    return {
+        "target": target.name,
+        "arch": target.arch,
+        "version": version,
+        "buildCommit": source_commit,
+        "runtimeLock": runtime_lock,
+        "wine": {"source": target.wine_source, **wine},
+        "dxmt": dxmt,
+        "runtimeArchive": archive_record(runtime_archive),
+        "correspondingSourceArchive": archive_record(source_archive),
+        "validation": validation,
+        "buildToolchain": build_toolchain,
+    }
+
+
+def write_fragment(path: Path, fragment: dict[str, Any]) -> Path:
+    """Write one fragment as sorted, indented JSON."""
+
+    path.write_text(
+        json.dumps(fragment, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return path

@@ -5,7 +5,7 @@ import re
 import unittest
 from pathlib import Path
 
-from scripts.build_x86 import WINE_OVERLAY_ARTIFACTS, patched_machos
+from scripts.targets.x86_64 import WINE_OVERLAY_ARTIFACTS, patched_machos
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 LOCK_PATH = REPOSITORY_ROOT / "runtime.lock.json"

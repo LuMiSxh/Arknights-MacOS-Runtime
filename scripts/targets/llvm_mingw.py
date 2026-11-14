@@ -14,15 +14,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
-if __package__:
-    from ..build_common import NATIVE_ARM64_TARGET
-    from ..lib.console import error
-    from ..runtime import LockError, load_lock
-else:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from scripts.build_common import NATIVE_ARM64_TARGET
-    from scripts.lib.console import error
-    from scripts.runtime import LockError, load_lock
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.build_common import NATIVE_ARM64_TARGET
+from scripts.lib.console import error
+from scripts.runtime import LockError, load_lock
 
 
 def llvm_mingw_pin(lock: dict[str, Any]) -> tuple[str, str]:

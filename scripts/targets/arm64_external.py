@@ -6,16 +6,14 @@
 The catalog URL lives only in the GitHub Actions secret `ARM64_RUNTIME_CATALOG_URL`.
 This script reads it from an environment variable and never writes a URL to output, logs,
 or error messages.
-DXMT is built locally by `build_dxmt.py`, not downloaded.
+DXMT is built locally by `scripts/targets/arm64_dxmt.py`, not downloaded.
 """
 
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import re
-import sys
 import tarfile
 import urllib.request
 from collections.abc import Callable
@@ -23,18 +21,11 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-if __package__:
-    from ..build_common import NATIVE_ARM64_TARGET, ROOT, sha256
-    from ..lib.console import error, info, success, warning
-    from ..release.pins import write_artifact_pin
-    from ..runtime import LockError, load_lock
-else:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from scripts.build_common import NATIVE_ARM64_TARGET, ROOT, sha256
-    from scripts.lib.console import error, info, success, warning
-    from scripts.release.pins import write_artifact_pin
-    from scripts.runtime import LockError, load_lock
-
+from scripts.build_common import NATIVE_ARM64_TARGET, ROOT
+from scripts.lib.artifact import ArtifactError, fetch_verified
+from scripts.lib.console import info, success, warning
+from scripts.release.pins import write_artifact_pin
+from scripts.runtime import LockError, load_lock
 
 # The catalog URL is a secret. It is never logged, so a leaked catalog or archive
 # location stays out of CI output.
@@ -130,20 +121,6 @@ def select_release(releases: list[Any], release_id: str) -> dict[str, Any]:
     )
 
 
-def _download_archive(
-    url: str, partial: Path, fetch: Callable[[str], bytes] | None
-) -> None:
-    if fetch is not None:
-        partial.write_bytes(fetch(url))
-        return
-    with (
-        urllib.request.urlopen(url, timeout=60) as response,
-        partial.open("wb") as output,
-    ):
-        while chunk := response.read(1024 * 1024):
-            output.write(chunk)
-
-
 def fetch_selected_release(
     env_name: str,
     release_id: str,
@@ -166,25 +143,23 @@ def fetch_selected_release(
     archive_url = release.get("url")
     if not isinstance(archive_url, str) or not archive_url:
         raise FetchError("catalog release has no archive URL")
-
-    output.parent.mkdir(parents=True, exist_ok=True)
-    partial = output.with_name(output.name + ".part")
-    _download_archive(archive_url, partial, fetch)
-
     size = release.get("size")
-    if size is not None:
-        try:
-            expected_size = int(size)
-        except (TypeError, ValueError) as problem:
-            raise FetchError("catalog release has an invalid size") from problem
-        if partial.stat().st_size != expected_size:
-            raise FetchError("archive size does not match the catalog size")
-
-    actual = sha256(partial)
-    if actual != declared:
-        raise FetchError("archive SHA-256 does not match the catalog SHA-256")
-    partial.replace(output)
-    return release, output
+    try:
+        expected_size = None if size is None else int(size)
+    except (TypeError, ValueError) as problem:
+        raise FetchError("catalog release has an invalid size") from problem
+    try:
+        archive = fetch_verified(
+            archive_url,
+            declared,
+            output,
+            label="Downloading the wine archive",
+            size=expected_size,
+            fetch=fetch,
+        )
+    except ArtifactError as problem:
+        raise FetchError(str(problem)) from problem
+    return release, archive
 
 
 def _validate_member(member: tarfile.TarInfo) -> None:
@@ -218,7 +193,12 @@ def _extract_archive(archive: Path, destination: Path) -> None:
             raise FetchError(f"cannot extract the wine archive: {problem}") from problem
 
 
-def _fetch_target(lock: dict[str, Any], output: Path, release_id: str) -> None:
+def fetch_target(lock: dict[str, Any], output: Path, release_id: str) -> dict[str, Any]:
+    """Fetch, verify, and extract the pinned Wine archive into `output`.
+
+    Return the catalog release. A changed archive under a pinned id re-pins the lock.
+    """
+
     output.mkdir(parents=True, exist_ok=True)
     artifact = lock["artifact"]
     if artifact["catalog"] != "wine":
@@ -226,16 +206,7 @@ def _fetch_target(lock: dict[str, Any], output: Path, release_id: str) -> None:
     release, archive = fetch_selected_release(
         WINE_CATALOG_ENV, release_id, output / "wine.tar.xz"
     )
-    metadata = {
-        key: release[key]
-        for key in ("id", "arch", "sha256", "size", "published_at")
-        if key in release
-    }
-    (output / "external.json").write_text(
-        json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
-    )
     info(f"Selected catalog release {release['id']}")
-    info("Verifying the wine archive")
     _extract_archive(archive, output)
     if not (output / "wine").is_dir():
         raise FetchError("extracted archive has no wine directory")
@@ -254,6 +225,7 @@ def _fetch_target(lock: dict[str, Any], output: Path, release_id: str) -> None:
             f"({release['sha256']})"
         )
     success("Fetched and verified the wine archive")
+    return release
 
 
 def require_external_lock(target: str = NATIVE_ARM64_TARGET) -> dict[str, Any]:
@@ -263,26 +235,3 @@ def require_external_lock(target: str = NATIVE_ARM64_TARGET) -> dict[str, Any]:
     if lock["buildMode"] != "external":
         raise LockError(f"the {lock['target']} target is not an external target")
     return lock
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target", default=NATIVE_ARM64_TARGET)
-    parser.add_argument(
-        "--release-id",
-        default="",
-        help="catalog release id; defaults to the newest ARM64 release",
-    )
-    parser.add_argument("--output", type=Path, required=True)
-    arguments = parser.parse_args()
-    try:
-        lock = require_external_lock(arguments.target)
-        _fetch_target(lock, arguments.output, arguments.release_id.strip())
-    except (FetchError, LockError, KeyError, OSError) as caught_error:
-        error(str(caught_error))
-        return 1
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

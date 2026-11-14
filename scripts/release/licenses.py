@@ -19,13 +19,10 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-if __package__:
-    from ..lib.console import error, success, warning
-else:
-    if str(REPOSITORY_ROOT / "scripts") not in sys.path:
-        sys.path.insert(0, str(REPOSITORY_ROOT / "scripts"))
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from lib.console import error, success, warning
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
+
+from scripts.lib.console import error, success, warning
 
 LICENSES_DIRECTORY = "LICENSES"
 INDEX_NAME = "index.json"
@@ -471,6 +468,33 @@ def render_notice(index: dict[str, Any], licenses_root: Path) -> str:
     return "\n".join(lines)
 
 
+def needed_files(shipped: dict[str, Any]) -> list[str]:
+    """Return the license and notice files that the shipped components name."""
+
+    return sorted(
+        {
+            relative
+            for item in shipped["components"]
+            for relative in (
+                *item["files"],
+                *([item["notice"]] if "notice" in item else []),
+            )
+        }
+    )
+
+
+def third_party_notices(repository_root: Path, inventory: Path, target: str) -> str:
+    """Return one lane's notices: the notice table, then every license text it names."""
+
+    licenses_root = repository_root / LICENSES_DIRECTORY
+    shipped = generate(repository_root, None, inventory=inventory, target=target)
+    sections = [render_notice(shipped, licenses_root)]
+    for relative in needed_files(shipped):
+        text = (licenses_root / relative).read_text(encoding="utf-8").rstrip()
+        sections.append(f"===== LICENSES/{relative} =====\n\n{text}\n")
+    return "\n".join(sections)
+
+
 def generate(
     repository_root: Path,
     output: Path | None,
@@ -506,14 +530,7 @@ def generate(
     destination = output / ARCHIVE_LICENSES_DIRECTORY
     if destination.exists() or (output / ARCHIVE_NOTICE).exists():
         raise LicenseError(f"output already exists below {output}")
-    needed = {
-        relative
-        for item in shipped["components"]
-        for relative in (
-            *item["files"],
-            *([item["notice"]] if "notice" in item else []),
-        )
-    }
+    needed = set(needed_files(shipped))
     for relative in sorted(needed):
         target = destination / relative
         target.parent.mkdir(parents=True, exist_ok=True)
