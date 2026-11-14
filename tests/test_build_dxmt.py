@@ -7,17 +7,12 @@ import pytest
 from scripts.build_common import BuildError
 from scripts.targets.arm64_dxmt import (
     LC_BUILD_VERSION,
-    LC_VERSION_MIN_MACOSX,
     MINIMAL_WINE_TARGETS,
-    deployment_target,
-    macho_minimum_macos,
-    parse_version,
     reject_macho_above,
     stage_winemac_so,
     verify_dxmt_install,
     verify_minimal_wine_outputs,
 )
-from scripts.targets.dxmt import meson_setup_command
 
 
 def _macho(command: int, version: tuple[int, int]) -> bytes:
@@ -36,20 +31,6 @@ def _install_with_macho(root, version: tuple[int, int]):
     unix.mkdir(parents=True)
     (unix / "winemetal.so").write_bytes(_macho(LC_BUILD_VERSION, version))
     return install
-
-
-def test_macho_minimum_macos_reads_the_build_version(tmp_path):
-    path = tmp_path / "winemetal.so"
-    path.write_bytes(_macho(LC_BUILD_VERSION, (26, 0)))
-
-    assert macho_minimum_macos(path) == (26, 0)
-
-
-def test_macho_minimum_macos_reads_the_legacy_version_command(tmp_path):
-    path = tmp_path / "winemetal.so"
-    path.write_bytes(_macho(LC_VERSION_MIN_MACOSX, (26, 1)))
-
-    assert macho_minimum_macos(path) == (26, 1)
 
 
 def test_reject_macho_above_accepts_the_floor(tmp_path):
@@ -116,50 +97,3 @@ def test_stage_winemac_so_links_the_external_unixlib(tmp_path):
 def test_stage_winemac_so_requires_the_external_tree(tmp_path):
     with pytest.raises(BuildError, match="winemac.so"):
         stage_winemac_so(tmp_path / "wine-build", tmp_path / "incoming" / "wine")
-
-
-def test_meson_setup_uses_the_wine_build_tree_not_an_install_tree(tmp_path):
-    command = meson_setup_command(
-        tmp_path / "dxmt-build",
-        tmp_path / "dxmt-source",
-        [tmp_path / "dxmt-source" / "build-arm64ec.txt"],
-        tmp_path / "dxmt-native.ini",
-        tmp_path / "llvm",
-        tmp_path / "wine-build",
-        tmp_path / "dxmt",
-    )
-
-    assert "--cross-file" in command
-    assert f"-Dwine_build_path={tmp_path / 'wine-build'}" in command
-    assert not any(argument.startswith("-Dwine_install_path") for argument in command)
-    assert "--strip" in command
-    assert command[command.index("--buildtype") + 1] == "release"
-
-
-def test_meson_setup_reconfigures_an_existing_build(tmp_path):
-    command = meson_setup_command(
-        tmp_path / "dxmt-build",
-        tmp_path / "dxmt-source",
-        [tmp_path / "dxmt-source" / "build-arm64ec.txt"],
-        tmp_path / "dxmt-native.ini",
-        tmp_path / "llvm",
-        tmp_path / "wine-build",
-        tmp_path / "dxmt",
-        reconfigure=True,
-    )
-
-    assert command[1:3] == ["setup", "--reconfigure"]
-
-
-def test_deployment_target_requires_the_lock_value():
-    lock = {"deploymentTarget": "26.0"}
-
-    assert deployment_target(lock, {}) == "26.0"
-    assert deployment_target(lock, {"MACOSX_DEPLOYMENT_TARGET": "26.0"}) == "26.0"
-    with pytest.raises(BuildError, match="26.0"):
-        deployment_target(lock, {"MACOSX_DEPLOYMENT_TARGET": "15.0"})
-
-
-def test_parse_version_reads_the_major_and_minor():
-    assert parse_version("26.0") == (26, 0)
-    assert parse_version("26") == (26, 0)

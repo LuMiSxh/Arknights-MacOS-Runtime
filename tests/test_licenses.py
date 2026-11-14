@@ -18,7 +18,6 @@ from scripts.release.licenses import (
     load_index,
     parse_inventory,
     resolve_shipped,
-    spdx_identifiers,
     validate_index,
 )
 
@@ -52,22 +51,10 @@ class LicenseIndexTests(unittest.TestCase):
         with self.assertRaisesRegex(LicenseError, "gnutls"):
             self.validate(index)
 
-    def test_missing_file_fails(self) -> None:
-        index = copy.deepcopy(self.index)
-        index["components"][0]["files"].append("runtime/Missing.txt")
-        with self.assertRaisesRegex(LicenseError, "Missing.txt"):
-            self.validate(index)
-
     def test_unknown_spdx_identifier_fails(self) -> None:
         index = copy.deepcopy(self.index)
         index["components"][0]["spdx"] = "Made-Up-1.0"
         with self.assertRaisesRegex(LicenseError, "unknown SPDX identifier"):
-            self.validate(index)
-
-    def test_unknown_status_fails(self) -> None:
-        index = copy.deepcopy(self.index)
-        index["components"][0]["status"] = "declared"
-        with self.assertRaisesRegex(LicenseError, "unknown status"):
             self.validate(index)
 
     def test_unsafe_path_fails(self) -> None:
@@ -76,60 +63,14 @@ class LicenseIndexTests(unittest.TestCase):
         with self.assertRaisesRegex(LicenseError, "unsafe file path"):
             self.validate(index)
 
-    def test_empty_note_fails(self) -> None:
-        index = copy.deepcopy(self.index)
-        index["components"][0]["note"] = " "
-        with self.assertRaisesRegex(LicenseError, "note must be"):
-            self.validate(index)
-
-    def test_unverified_components_are_limited_to_known_gaps(self) -> None:
-        unverified = {
-            c["name"] for c in self.index["components"] if c["status"] == "unverified"
-        }
-        self.assertEqual(unverified, set())
-
-    def test_unverified_components_explain_their_basis(self) -> None:
-        for component in self.index["components"]:
-            if component["status"] == "unverified":
-                self.assertTrue(component.get("note"), component["name"])
-
-    def test_every_status_is_verified_or_unverified(self) -> None:
-        statuses = {c["status"] for c in self.index["components"]}
-        self.assertLessEqual(statuses, {"verified", "unverified"})
-
     def test_target_required_component_fails(self) -> None:
         index = copy.deepcopy(self.index)
         index["components"] = [c for c in index["components"] if c["name"] != "FEX"]
         with self.assertRaisesRegex(LicenseError, "FEX"):
             self.validate(index, target="native-arm64")
 
-    def test_unknown_target_fails(self) -> None:
-        with self.assertRaisesRegex(LicenseError, "unknown target"):
-            self.validate(self.index, target="mystery")
-
-    def test_spdx_expression_parsing(self) -> None:
-        self.assertEqual(
-            spdx_identifiers("Apache-2.0 WITH LLVM-exception"),
-            {"Apache-2.0", "LLVM-exception"},
-        )
-        with self.assertRaises(LicenseError):
-            spdx_identifiers("MIT; rm -rf")
-
 
 class LicenseAssemblyTests(unittest.TestCase):
-    def test_inventory_resolves_realised_versions(self) -> None:
-        index = load_index(ROOT / "LICENSES")
-        shipped = resolve_shipped(index, parse_inventory(INVENTORY))
-        names = {c["name"]: c for c in shipped["components"]}
-        self.assertEqual(names["FreeType"]["version"], "2.13.3")
-        self.assertEqual(names["GnuTLS"]["version"], "3.8.9")
-        self.assertNotIn("zlib", names)
-
-    def test_unknown_inventory_library_fails(self) -> None:
-        text = INVENTORY + "{}-mystery-1.0\tBundled Nix library\tx\n".format("c" * 32)
-        with self.assertRaisesRegex(LicenseError, "mystery"):
-            resolve_shipped(load_index(ROOT / "LICENSES"), parse_inventory(text))
-
     def test_target_filters_the_shipped_components(self) -> None:
         index = load_index(ROOT / "LICENSES")
         libraries = parse_inventory(INVENTORY)

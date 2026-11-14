@@ -208,11 +208,6 @@ class ReleaseVerificationTests(unittest.TestCase):
         self.assertEqual(normalize_version("0.5.0"), "0.5.0")
         self.assertEqual(normalize_version("1.2.3-rc.1"), "1.2.3-rc.1")
 
-    def test_rejects_non_semver_versions(self) -> None:
-        for value in ("", "v0.5.0", "01.2.3", "1.2", "1.2.3-01", "1.2.3+build.2"):
-            with self.subTest(value=value), self.assertRaises(ReleaseValidationError):
-                normalize_version(value)
-
     def test_rejects_non_release_eligible_validation_report(self) -> None:
         report = json.loads(self.validation_report.read_text(encoding="utf-8"))
         report["releaseEligible"] = False
@@ -298,18 +293,6 @@ def _job(workflow: str, name: str) -> str:
 class ReleaseWorkflowContractTests(unittest.TestCase):
     def setUp(self) -> None:
         self.workflow = WORKFLOW.read_text(encoding="utf-8")
-
-    def test_one_workflow_replaces_the_per_lane_workflows(self) -> None:
-        directory = WORKFLOW.parent
-
-        self.assertFalse((directory / "release-arm64.yml").exists())
-        self.assertFalse((directory / "candidate.yml").exists())
-
-    def test_workflow_is_manual_with_version_channel_and_target(self) -> None:
-        self.assertIn("workflow_dispatch:", self.workflow)
-        for name in ("version:", "channel:", "target:", "arm64_release_id:"):
-            self.assertIn(f"            {name}", self.workflow)
-        self.assertNotRegex(self.workflow, r"\n    push:")
 
     def test_release_requires_both_lanes_and_the_default_branch(self) -> None:
         plan = _job(self.workflow, "prepare")

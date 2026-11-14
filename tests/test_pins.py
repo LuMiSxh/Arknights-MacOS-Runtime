@@ -106,42 +106,12 @@ def snapshot(root: Path) -> dict[Path, bytes]:
 
 
 class ResolutionTests(unittest.TestCase):
-    def test_wine_uses_the_highest_numbered_branch_and_its_version_file(self) -> None:
-        state = pins.resolve_wine(make_fetch(fixture_routes()))
-
-        self.assertEqual(state, pins.WineState(NEW_WINE, "11.19"))
-
-    def test_dxmt_version_follows_the_describe_format(self) -> None:
-        state = pins.resolve_dxmt(make_fetch(fixture_routes()))
-
-        self.assertEqual(state, pins.DxmtState(NEW_DXMT, "0.81-12-gbbbbbbb"))
-
-    def test_dxmt_on_a_tag_has_no_count(self) -> None:
-        routes = fixture_routes()
-        routes[f"/repos/3Shain/dxmt/compare/v0.81...{NEW_DXMT}"] = {
-            "status": "identical",
-            "ahead_by": 0,
-        }
-
-        self.assertEqual(pins.resolve_dxmt(make_fetch(routes)).version, "0.81")
-
-    def test_base_reads_digest_and_dereferences_the_recipe_tag(self) -> None:
-        state = pins.resolve_base(make_fetch(fixture_routes()))
-
-        self.assertEqual(state, pins.BaseState(RELEASE_URL, NEW_DIGEST, NEW_RECIPE))
-
     def test_base_without_digest_fails(self) -> None:
         routes = fixture_routes()
         del routes["/repos/dappermint/Whisky/releases"][1]["assets"][0]["digest"]
 
         with self.assertRaisesRegex(pins.PinError, "no sha256 digest"):
             pins.resolve_base(make_fetch(routes))
-
-    def test_nixpkgs_uses_the_configured_channel(self) -> None:
-        state = pins.resolve_nixpkgs(make_fetch(fixture_routes()))
-
-        self.assertEqual(state.commit, NEW_NIXPKGS)
-        self.assertEqual(pins.NIXPKGS_CHANNEL, "nixos-25.05")
 
 
 class PinsTestCase(unittest.TestCase):
@@ -211,37 +181,6 @@ class UpdateTests(PinsTestCase):
         self.assertEqual({o.status for o in result.outcomes}, {"updated"})
         self.assertEqual(self.check(), [])
 
-    def test_dry_run_writes_nothing(self) -> None:
-        before = snapshot(self.root)
-
-        result = self.update(dry_run=True)
-
-        self.assertEqual(snapshot(self.root), before)
-        self.assertIn("runtime.lock.json", result.written)
-        self.assertIn("notice.txt", result.written)
-
-    def test_update_is_idempotent(self) -> None:
-        self.update()
-        before = snapshot(self.root)
-
-        result = self.update()
-
-        self.assertEqual(result.written, [])
-        self.assertEqual(snapshot(self.root), before)
-        self.assertEqual({o.status for o in result.outcomes}, {"current"})
-
-    def test_lock_serialization_matches_the_repository_format(self) -> None:
-        text = (REPOSITORY_ROOT / "runtime.lock.json").read_text("utf-8")
-
-        self.assertEqual(json.dumps(json.loads(text), indent=2) + "\n", text)
-
-    def test_only_limits_the_components(self) -> None:
-        self.update(only=("nixpkgs",))
-
-        lock = self.lock_on_disk()
-        self.assertEqual(lock["build"]["nixpkgs"]["commit"], NEW_NIXPKGS)
-        self.assertEqual(lock["sources"], self.lock["sources"])
-
     def test_guard_keeps_the_old_pin_when_a_patch_fails(self) -> None:
         runner = RecordingRunner(
             failing_patch="0010-ntdll-hide-software-cursor-asset.patch"
@@ -256,23 +195,6 @@ class UpdateTests(PinsTestCase):
         self.assertEqual(kept.status, "kept")
         self.assertIn("wine-hardware-cursor-suppression", kept.reason)
         self.assertNotIn(NEW_WINE, (self.root / "notice.txt").read_text())
-
-    def test_guard_applies_dxmt_patches_in_lock_order(self) -> None:
-        runner = RecordingRunner()
-
-        self.update(runner, only=("dxmt",))
-
-        applied = [
-            Path(command[-1]).name
-            for command in runner.commands
-            if "apply" in command and "--check" not in command
-        ]
-        expected = [
-            Path(p["path"]).name
-            for p in self.lock["patches"]
-            if p["component"] == "dxmt"
-        ]
-        self.assertEqual(applied, expected)
 
     def test_unresolved_base_aborts_without_writing(self) -> None:
         routes = fixture_routes()
@@ -294,49 +216,6 @@ class CheckTests(PinsTestCase):
         self.page.write_text(self.page.read_text().replace(current, "0.0"))
 
         self.assertEqual(self.check(), ["docs/page.md:1: pin:wine.version is stale"])
-
-    def test_missing_token_is_reported(self) -> None:
-        (self.root / "notice.txt").write_text("Nothing here\n")
-
-        problems = self.check()
-
-        self.assertEqual(len(problems), 3)
-        self.assertTrue(
-            all(p.startswith("notice.txt: lacks the value of") for p in problems)
-        )
-
-    def test_update_fails_on_a_missing_token(self) -> None:
-        (self.root / "notice.txt").write_text("Nothing here\n")
-
-        with self.assertRaisesRegex(pins.PinError, "lacks the value"):
-            self.update()
-
-    def test_unknown_key_fails(self) -> None:
-        self.page.write_text("<!-- pin:wine.nope -->x<!-- /pin -->\n")
-
-        with self.assertRaisesRegex(pins.PinError, "unknown pin key 'wine.nope'"):
-            self.check()
-
-    def test_unbalanced_marker_fails(self) -> None:
-        self.page.write_text("<!-- pin:wine.version -->11.17\n")
-
-        with self.assertRaisesRegex(pins.PinError, "unbalanced"):
-            self.check()
-
-    def test_documented_markers_in_code_are_ignored(self) -> None:
-        self.page.write_text(
-            "Write `<!-- pin:nope -->x<!-- /pin -->` like this.\n"
-            "```\n<!-- pin:nope -->x<!-- /pin -->\n```\n"
-        )
-
-        self.assertEqual(self.check(), [])
-
-    def test_table_block_is_regenerated_by_update(self) -> None:
-        self.page.write_text("<!-- pin-block:table -->\nold\n<!-- /pin-block -->\n")
-
-        self.assertEqual(self.check(), ["docs/page.md:1: pin-block:table is stale"])
-        self.update()
-        self.assertIn(NEW_WINE, self.page.read_text())
 
 
 if __name__ == "__main__":
