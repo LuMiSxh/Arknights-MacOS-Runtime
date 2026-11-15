@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
 
-from __future__ import annotations
 
 import hashlib
 import io
@@ -174,11 +173,31 @@ class ReleaseVerificationTests(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
 
-    def _write_runtime_archive(self) -> None:
+    def _write_runtime_archive(self, *, omit: str | None = None) -> None:
+        components = ("Wine", "DXMT", "MoltenVK")
+        index = {
+            "components": [
+                {"name": name, "files": [f"{name}.txt"], "notice": None}
+                for name in components
+            ]
+        }
+        files = {
+            "Licenses/index.json": json.dumps(index).encode(),
+            "NOTICE.md": b"# Third-party notices\n",
+            **{
+                f"Licenses/{name}.txt": b"license\n"
+                for name in components
+                if name != omit
+            },
+        }
         with tarfile.open(self.archive, "w:gz") as archive:
             root = tarfile.TarInfo("Libraries")
             root.type = tarfile.DIRTYPE
             archive.addfile(root)
+            for name, data in files.items():
+                member = tarfile.TarInfo(name)
+                member.size = len(data)
+                archive.addfile(member, io.BytesIO(data))
 
     @staticmethod
     def _write_checksum(artifact: Path, checksum: Path) -> None:
@@ -203,6 +222,13 @@ class ReleaseVerificationTests(unittest.TestCase):
         validation = self._verify()
 
         self.assertTrue(validation["releaseEligible"])
+
+    def test_rejects_a_runtime_archive_missing_a_listed_license_file(self) -> None:
+        self._write_runtime_archive(omit="DXMT")
+        self._write_checksum(self.archive, self.checksum)
+
+        with self.assertRaisesRegex(ReleaseValidationError, "missing a license file"):
+            self._verify()
 
     def test_normalizes_a_bare_semver_version(self) -> None:
         self.assertEqual(normalize_version("0.5.0"), "0.5.0")
