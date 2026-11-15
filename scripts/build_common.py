@@ -3,8 +3,6 @@
 
 """Shared helpers for every runtime build lane."""
 
-from __future__ import annotations
-
 import json
 import os
 import shutil
@@ -302,7 +300,7 @@ def nix_output_names(builder: Builder, attribute: str) -> list[str]:
 def fix_release_macho(builder: Builder, directory: Path, binary: Path) -> None:
     """Relocate a bundled Nix library next to the modules that load it."""
 
-    relative = os.path.relpath(directory, binary.parent)
+    relative = directory.relative_to(binary.parent, walk_up=True)
     binary.chmod(binary.stat().st_mode | 0o200)
     if ".dylib" in binary.name:
         builder.run("install_name_tool", "-id", f"@loader_path/{binary.name}", binary)

@@ -3,8 +3,6 @@
 
 """Record a manually started Arknights scene with Metal Performance Trace."""
 
-from __future__ import annotations
-
 import argparse
 import json
 import os

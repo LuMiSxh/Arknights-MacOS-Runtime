@@ -8,8 +8,6 @@ command checks the index against `runtime.lock.json`, the build script, and the
 realised component inventory. It then writes `Licenses/` and `NOTICE.md`.
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import re
@@ -38,8 +36,7 @@ TARGET_COMPONENTS = {
 }
 TARGETS = tuple(TARGET_COMPONENTS)
 DEFAULT_TARGET = "rosetta-x86_64"
-# The x86_64 release verifier uses the default target's components.
-REQUIRED_COMPONENTS = TARGET_COMPONENTS[DEFAULT_TARGET]
+
 # The four license texts copied into the external native-arm64 archive, in
 # addition to the upstream `wine/share/licenses` tree. Paths are relative to
 # `LICENSES/` and map only to files that exist in the repository.
@@ -152,7 +149,7 @@ def _lock_entry(lock: dict[str, Any], dotted: str) -> Any:
 
 
 def _component_problems(
-    component: Any, licenses_root: Path, lock: dict[str, Any]
+    component: object, licenses_root: Path, lock: dict[str, Any]
 ) -> list[str]:
     if not isinstance(component, dict):
         return ["a component entry is not an object"]

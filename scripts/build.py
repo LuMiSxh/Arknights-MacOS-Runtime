@@ -8,8 +8,6 @@ same files to the output directory. The toolchain stays the caller's job: Nix fo
 rosetta-x86_64, and llvm-mingw through `LLVM_MINGW_ROOT` for native-arm64.
 """
 
-from __future__ import annotations
-
 import argparse
 import subprocess
 import sys

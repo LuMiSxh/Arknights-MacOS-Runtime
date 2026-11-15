@@ -1,6 +1,6 @@
 # Architecture
 
-The initial candidate is an overlay build. It verifies and extracts the pinned runtime archive, rebuilds only the patched Wine and DXMT components from their exact source commits, and replaces the matching files in a new artifact. It is not a release build: unchanged base components keep the upstream provenance and deployment target.
+A candidate build is an overlay build. It verifies and extracts the pinned runtime archive, rebuilds only the patched Wine and DXMT components from their exact source commits, and replaces the matching files in a new artifact. It is not a release build: unchanged base components keep the upstream provenance and deployment target. A release build is clean. It installs Wine from a fresh build and takes MoltenVK from the pinned base archive.
 
 ```text
 runtime.lock.json -> verified source checkouts -> ordered patch families

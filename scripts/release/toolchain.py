@@ -3,8 +3,6 @@
 
 """Record the unpinned host toolchain that a release build used."""
 
-from __future__ import annotations
-
 import argparse
 import json
 import subprocess
@@ -24,7 +22,7 @@ def run_command(command: list[str]) -> str | None:
 
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=True)
-    except (OSError, subprocess.CalledProcessError):
+    except OSError, subprocess.CalledProcessError:
         return None
     return result.stdout.strip()
 

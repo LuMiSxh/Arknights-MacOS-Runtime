@@ -8,8 +8,6 @@ has no `toolchain.llvmMingw` entry, so the release workflow can fall back to
 the repository variables.
 """
 
-from __future__ import annotations
-
 import sys
 from pathlib import Path
 from typing import Any

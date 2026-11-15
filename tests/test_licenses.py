@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
 
-from __future__ import annotations
 
 import copy
 import json
@@ -27,7 +26,7 @@ INVENTORY = (
     "component\trole\tsource\n"
     "WineCX/Wine\tWindows compatibility runtime\tlock\n"
     "abc-freetype-2.13.3-bin\tBundled Nix library\tx\n".replace("abc", "a" * 32)
-    + "{}-gnutls-3.8.9\tBundled Nix library\tx\n".format("b" * 32)
+    + f"{'b' * 32}-gnutls-3.8.9\tBundled Nix library\tx\n"
 )
 
 

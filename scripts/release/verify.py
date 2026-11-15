@@ -2,8 +2,6 @@
 
 """Release gates that every runtime lane runs before it writes its release outputs."""
 
-from __future__ import annotations
-
 import json
 import re
 import tarfile
@@ -362,4 +360,6 @@ def verify_release(
     )
     if external:
         _validate_external_archive_licenses(archive, EXTERNAL_NOTICE_FILES)
+    else:
+        _validate_archive_licenses(archive, TARGET_COMPONENTS[target])
     return report

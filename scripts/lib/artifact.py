@@ -2,8 +2,6 @@
 
 """Checksums, archives, and verified downloads that every runtime lane shares."""
 
-from __future__ import annotations
-
 import hashlib
 import tarfile
 import urllib.request

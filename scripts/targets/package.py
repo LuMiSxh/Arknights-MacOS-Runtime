@@ -6,8 +6,6 @@ A lane supplies its runtime tree, its source members, and its inventory. This mo
 the archives and notices, runs the release gates, and records the provenance fragment.
 """
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any

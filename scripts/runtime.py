@@ -3,8 +3,6 @@
 
 """Validate, fetch, and prepare Arknights MacOS Runtime's pinned runtime sources."""
 
-from __future__ import annotations
-
 import argparse
 import json
 import re

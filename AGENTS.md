@@ -4,8 +4,8 @@
 
 - Build a reproducible WineCX and DXMT runtime for Arknights Client on Apple Silicon.
 - Target macOS 15+. Overlay canaries may inherit byte-identical newer base binaries only when validation marks them non-release-eligible; releases reject them.
-- Treat the v0.5 runtime artifact as release-bound only after its documented structural, licensing,
-  provenance, and manual compatibility gates pass.
+- Treat a runtime artifact as release-bound only after its structural, licensing, provenance, and
+  manual compatibility gates pass. Both lanes share one tag, `vX.Y.Z`.
 - Treat runtime environment variables as component-local controls. Each patch parses only its own
   gate; the gate rule below defines the accepted values.
 - Keep original code, documentation, patch metadata, and commits in English.

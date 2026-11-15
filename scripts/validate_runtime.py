@@ -3,8 +3,6 @@
 
 """Read-only structural and Mach-O validation for an Arknights MacOS Runtime candidate."""
 
-from __future__ import annotations
-
 import argparse
 import filecmp
 import json

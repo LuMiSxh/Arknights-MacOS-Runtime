@@ -93,35 +93,6 @@ class RuntimeLockTests(unittest.TestCase):
         path.write_text(json.dumps(self.lock), encoding="utf-8")
         return path
 
-    def add_arm64_target(self) -> None:
-        self.lock["targets"]["native-arm64"] = {
-            "buildMode": "external",
-            "deploymentTarget": "26.0",
-            "sources": {
-                "wine": {
-                    "repository": "https://github.com/dappermint/winecx.git",
-                    "commit": "c" * 40,
-                },
-                "dxmt": {
-                    "repository": "https://github.com/3Shain/dxmt.git",
-                    "commit": "d" * 40,
-                },
-                "fex": {
-                    "repository": "https://github.com/dappermint/FEX.git",
-                    "commit": "e" * 40,
-                },
-            },
-            "artifact": {
-                "catalog": "wine",
-                "release": "wine-arm64",
-                "sha256": "a" * 64,
-            },
-            "baseArtifact": None,
-            "interface": {
-                "executables": ["Wine/bin/wine64"],
-            },
-        }
-
     def test_rejects_a_patch_path_outside_the_repository(self) -> None:
         self.lock["patches"][0]["path"] = "../escape.patch"
         with self.assertRaisesRegex(LockError, "repository-relative"):

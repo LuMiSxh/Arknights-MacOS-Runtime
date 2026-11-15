@@ -6,8 +6,6 @@ Each lane module defines one `TARGET` and one `build_runtime` function. Shared s
 `Target` and never branch on its name. The deployment target comes from `runtime.lock.json`.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 from scripts.build_common import NATIVE_ARM64_TARGET

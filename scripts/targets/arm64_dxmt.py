@@ -11,8 +11,6 @@ driver `winemac.so` comes from the external tree. The shipped Wine payload stays
 the external v5 tree.
 """
 
-from __future__ import annotations
-
 import os
 import re
 import shutil

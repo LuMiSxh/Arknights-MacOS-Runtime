@@ -7,8 +7,6 @@ The lanes share this skeleton. A lane supplies its cross file and compilers thro
 that DXMT links against.
 """
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 from pathlib import Path
 

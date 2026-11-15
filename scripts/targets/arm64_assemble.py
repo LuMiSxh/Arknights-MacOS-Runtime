@@ -10,8 +10,6 @@ D3D payloads. It renames the signed `wine.app` loader bundle to `Arknights.app` 
 rewrites bytes inside it.
 """
 
-from __future__ import annotations
-
 import os
 import re
 import shutil

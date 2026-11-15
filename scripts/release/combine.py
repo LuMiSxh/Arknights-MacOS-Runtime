@@ -9,8 +9,6 @@ one `provenance.json` and one `THIRD-PARTY-NOTICES.txt` for the release. It need
 standard library, so it runs on Linux.
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import shutil

@@ -1,15 +1,15 @@
 [project]
 name = "arknights-macos-runtime-scripts"
 version = "0.0.0"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = []
 
 [dependency-groups]
 dev = [
-    "actionlint-py==1.7.12.24",
-    "pytest==9.1.1",
-    "pytest-socket==0.7.0",
-    "ruff==0.16.3",
+    "actionlint-py==1.7.12.25",
+    "pytest==9.2.0",
+    "pytest-socket==0.8.1",
+    "ruff==0.17.5",
 ]
 
 [tool.pytest.ini_options]

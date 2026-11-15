@@ -34,8 +34,6 @@ Mentions use two mechanisms:
   with the new one. `check` fails when a file lacks the value of the lock.
 """
 
-from __future__ import annotations
-
 import argparse
 import base64
 import copy
