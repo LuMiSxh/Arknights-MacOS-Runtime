@@ -2,8 +2,6 @@
 
 """The x86_64 lane: WineCX built from source, DXMT, and Nix libraries for Rosetta 2."""
 
-from __future__ import annotations
-
 import os
 import shutil
 import sys
@@ -252,10 +250,10 @@ def write_inventory(path: Path, libraries: list[str], nixpkgs_revision: str) -> 
             "(SHA-256-pinned third-party base archive; not built from source)"
         ),
     ]
-    for output in libraries:
-        rows.append(
-            f"{Path(output).name}\tBundled Nix library\t{output} (nixpkgs {nixpkgs_revision})"
-        )
+    rows.extend(
+        f"{Path(output).name}\tBundled Nix library\t{output} (nixpkgs {nixpkgs_revision})"
+        for output in libraries
+    )
     path.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
 

@@ -6,8 +6,6 @@ A fragment records one lane. `scripts/release/combine.py` merges the fragments i
 release `provenance.json`.
 """
 
-from __future__ import annotations
-
 import json
 import re
 from pathlib import Path

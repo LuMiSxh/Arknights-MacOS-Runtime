@@ -3,8 +3,6 @@
 
 """Verify pinned runtime sources and summarize changed repository heads."""
 
-from __future__ import annotations
-
 import argparse
 import json
 import os

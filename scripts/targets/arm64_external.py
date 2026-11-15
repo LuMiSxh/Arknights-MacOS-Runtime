@@ -9,8 +9,6 @@ or error messages.
 DXMT is built locally by `scripts/targets/arm64_dxmt.py`, not downloaded.
 """
 
-from __future__ import annotations
-
 import json
 import os
 import re

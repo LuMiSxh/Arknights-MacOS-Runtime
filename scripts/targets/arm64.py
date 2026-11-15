@@ -6,8 +6,6 @@ The catalog URL comes from `ARM64_RUNTIME_CATALOG_URL` and is never printed. The
 `ARM64_RELEASE_ID` pins one catalog release. Leave it empty for the newest ARM64 release.
 """
 
-from __future__ import annotations
-
 import os
 import shutil
 import sys

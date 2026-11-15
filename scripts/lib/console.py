@@ -2,25 +2,16 @@
 
 """Unified colored, unicode-aware terminal output for repository scripts.
 
-Status lines (`info`/`success`/`warning`/`error`) always print immediately. `spinner`
-animates a message around a single blocking, output-less operation (an extraction, a
-network call); never wrap a subprocess that prints its own output with it, since the
-interleaved frames and the subprocess's stdout would garble each other. `progress` is for
+Status lines (`info`/`success`/`warning`/`error`) always print immediately. `progress` is for
 byte-counted work with a known or unknown total, like a download.
 
 All output goes to stderr, so scripts that print a result to stdout (paths, values) stay
 pipeable.
 """
 
-from __future__ import annotations
-
-import itertools
 import os
 import sys
-import threading
 import time
-from collections.abc import Iterator
-from contextlib import contextmanager
 
 _IS_TTY = sys.stderr.isatty()
 USE_COLOR = _IS_TTY and os.environ.get("NO_COLOR") is None
@@ -41,7 +32,7 @@ _CODES = {
     "warning": "33;1",
     "error": "31;1",
 }
-_SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏" if USE_UNICODE else "|/-\\"
+
 _BAR_FULL = "█" if USE_UNICODE else "#"
 _BAR_EMPTY = "░" if USE_UNICODE else "-"
 _CLEAR_LINE = "\033[K"
@@ -73,46 +64,6 @@ def warning(message: str) -> None:
 
 def error(message: str) -> None:
     _line("error", message)
-
-
-@contextmanager
-def spinner(message: str) -> Iterator[None]:
-    """Animate `message` while the wrapped block runs silently in the background."""
-    if not USE_ANIMATION:
-        info(message)
-        yield
-        return
-
-    stop = threading.Event()
-
-    def animate() -> None:
-        for frame in itertools.cycle(_SPINNER_FRAMES):
-            if stop.is_set():
-                return
-            print(
-                f"\r{styled(frame, _CODES['info'])} {message}",
-                end="",
-                file=sys.stderr,
-                flush=True,
-            )
-            stop.wait(0.08)
-
-    thread = threading.Thread(target=animate, daemon=True)
-    thread.start()
-    failed = False
-    try:
-        yield
-    except BaseException:
-        failed = True
-        raise
-    finally:
-        stop.set()
-        thread.join()
-        kind = "error" if failed else "success"
-        print(
-            f"\r{styled(_symbol(kind), _CODES[kind])} {message}{_CLEAR_LINE}",
-            file=sys.stderr,
-        )
 
 
 class Progress:
