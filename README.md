@@ -76,7 +76,7 @@ Use the Runtime problem template in the [Arknights Client issue tracker](https:/
 
 Original build tooling and documentation use the [Mozilla Public License 2.0](LICENSE). The modified Wine source in the Wine patches is subject to Wine's [LGPL-2.1-or-later terms](LICENSES/Wine-LGPL-2.1.txt).
 
-DXMT is LGPL-2.1-or-later at the pinned x86_64 commit <!-- pin:dxmt.commit|code -->`9839e55f98d4aca103957ee4132d6395a325a9ed`<!-- /pin --> and at the ARM64 commit `647b0020ba5764e5593b12407afd76964fa11e20`. DXMT release v0.80 and older releases use the MIT License. The texts are in [`LICENSES/DXMT-LGPL-2.1.txt`](LICENSES/DXMT-LGPL-2.1.txt) and [`LICENSES/runtime/MIT-DXMT.txt`](LICENSES/runtime/MIT-DXMT.txt).
+DXMT is LGPL-2.1-or-later at the pinned x86_64 commit <!-- pin:dxmt.commit|code -->`0df86108348bab2aaa5c4610a5eb63a9de9047ac`<!-- /pin --> and at the ARM64 commit `647b0020ba5764e5593b12407afd76964fa11e20`. DXMT release v0.80 and older releases use the MIT License. The texts are in [`LICENSES/DXMT-LGPL-2.1.txt`](LICENSES/DXMT-LGPL-2.1.txt) and [`LICENSES/runtime/MIT-DXMT.txt`](LICENSES/runtime/MIT-DXMT.txt).
 
 [`LICENSES/`](LICENSES/) holds the license texts and notices of every component in the runtime archive. [`LICENSES/index.json`](LICENSES/index.json) lists them. Run `uv run --locked scripts/release/licenses.py generate --check` to validate it.
 

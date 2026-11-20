@@ -44,7 +44,7 @@ The filter matches the case-insensitive final basename `a9d41799f1af1868f2db4956
 
 - ID: `dxmt-skip-release-present-statistics`
 - File: `patches/dxmt/0001-dxmt-skip-release-present-statistics.patch`
-- Component/base: DXMT <!-- pin:dxmt.commit|code -->`9839e55f98d4aca103957ee4132d6395a325a9ed`<!-- /pin -->
+- Component/base: DXMT <!-- pin:dxmt.commit|code -->`0df86108348bab2aaa5c4610a5eb63a9de9047ac`<!-- /pin -->
 - Source/author: Original runtime optimization, runtime maintainers
 - License: LGPL-2.1-or-later (DXMT)
 - Gate: `DXMT_DEBUG`; debug builds keep statistics aggregation and HUD updates, release builds skip both
@@ -55,7 +55,7 @@ The filter matches the case-insensitive final basename `a9d41799f1af1868f2db4956
 
 Both `Present` paths keep `UpdateStatistics` behind `DXMT_DEBUG`, which avoids its per-present `std::format` calls in release builds. `PresentBoundary` gates the rolling statistics aggregation the same way. Release builds keep the frame counters and synchronization.
 
-The display query leak patch is not carried. The pin moved to DXMT 0.80-361, which contains the fix. The pinned commit is <!-- pin:dxmt.commit|code -->`9839e55f98d4aca103957ee4132d6395a325a9ed`<!-- /pin -->.
+The display query leak patch is not carried. The pin moved to DXMT 0.80-361, which contains the fix. The pinned commit is <!-- pin:dxmt.commit|code -->`0df86108348bab2aaa5c4610a5eb63a9de9047ac`<!-- /pin -->.
 
 ## ACE
 

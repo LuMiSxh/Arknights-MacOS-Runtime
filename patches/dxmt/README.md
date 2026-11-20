@@ -8,8 +8,8 @@ These patches apply to the `rosetta-x86_64` target.
 
 ## 0001 Release present statistics
 
-Target DXMT <!-- pin:dxmt.commit|code -->`9839e55f98d4aca103957ee4132d6395a325a9ed`<!-- /pin -->
-(<!-- pin:dxmt.describe|code -->`v0.80-361-g9839e55`<!-- /pin -->, an unreleased
+Target DXMT <!-- pin:dxmt.commit|code -->`0df86108348bab2aaa5c4610a5eb63a9de9047ac`<!-- /pin -->
+(<!-- pin:dxmt.describe|code -->`v0.80-408-g0df8610`<!-- /pin -->, an unreleased
 post-<!-- pin:dxmt.tag -->0.80<!-- /pin --> canary).
 The patch is unconditional. It has no runtime flag.
 

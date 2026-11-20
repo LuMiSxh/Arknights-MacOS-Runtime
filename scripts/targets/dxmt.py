@@ -7,6 +7,7 @@ The lanes share this skeleton. A lane supplies its cross file and compilers thro
 that DXMT links against.
 """
 
+import re
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -20,6 +21,8 @@ from scripts.targets import Target
 
 DXMT_BUILD_DIRECTORY = "dxmt-build"
 DXMT_INSTALL_DIRECTORY = "dxmt-install"
+
+AIR_TRIPLE = re.compile(r'target triple = "air64_v\d+-apple-macosx([\d.]+)"')
 
 
 def meson_setup_command(
@@ -55,6 +58,42 @@ def meson_setup_command(
     return command
 
 
+def version_tuple(version: str) -> tuple[int, int]:
+    major, minor, *_ = (*(int(part) for part in version.split(".")), 0)
+    return major, minor
+
+
+def reject_metal_above(disassembly: str, deployment: str, name: str) -> None:
+    """Reject a Metal library whose AIR targets a newer macOS than the lane supports.
+
+    The Metal compiler defaults to the SDK. An SDK 27 default produces Metal 4.1 AIR,
+    which macOS 26 and earlier cannot load.
+    """
+
+    triples = AIR_TRIPLE.findall(disassembly)
+    if not triples:
+        raise BuildError(f"{name} has no AIR target triple")
+    limit = version_tuple(deployment)
+    for triple in triples:
+        if version_tuple(triple) > limit:
+            raise BuildError(
+                f"{name} targets macOS {triple}, above the deployment target {deployment}"
+            )
+
+
+def verify_metal_libraries(builder: Builder, build: Path, deployment: str) -> None:
+    """Disassemble every Metal library of the build and check its target."""
+
+    libraries = sorted(build.rglob("*.metallib"))
+    if not libraries:
+        raise BuildError(f"the DXMT build has no Metal library under {build}")
+    for library in libraries:
+        disassembly = builder.capture(
+            "xcrun", "-sdk", "macosx", "metal-objdump", "--disassemble", library
+        )
+        reject_metal_above(disassembly, deployment, library.name)
+
+
 def build_dxmt(
     builder: Builder,
     *,
@@ -80,6 +119,8 @@ def build_dxmt(
     if launcher_file is not None:
         cross_files.append(launcher_file)
     environment = builder.without_host_build_variables()
+    # The Metal compiler reads this variable to pick its AIR target and language version.
+    environment["MACOSX_DEPLOYMENT_TARGET"] = deployment
     command = meson_setup_command(
         build,
         source,
@@ -93,4 +134,5 @@ def build_dxmt(
     builder.run(*command, environment=environment)
     builder.run("meson", "compile", "-C", build, environment=environment)
     builder.run("meson", "install", "-C", build, environment=environment)
+    verify_metal_libraries(builder, build, deployment)
     return install

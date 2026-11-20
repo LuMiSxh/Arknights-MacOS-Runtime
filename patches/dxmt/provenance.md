@@ -3,8 +3,8 @@
 ## Source pin
 
 - Upstream: [3Shain/dxmt](https://github.com/3Shain/dxmt)
-- DXMT commit: <!-- pin:dxmt.commit|code -->`9839e55f98d4aca103957ee4132d6395a325a9ed`<!-- /pin -->
-- DXMT version: <!-- pin:dxmt.describe|code -->`v0.80-361-g9839e55`<!-- /pin -->
+- DXMT commit: <!-- pin:dxmt.commit|code -->`0df86108348bab2aaa5c4610a5eb63a9de9047ac`<!-- /pin -->
+- DXMT version: <!-- pin:dxmt.describe|code -->`v0.80-408-g0df8610`<!-- /pin -->
   (unreleased post-<!-- pin:dxmt.tag -->0.80<!-- /pin --> canary)
 - License: LGPL-2.1-or-later, matching the pinned DXMT revision and the modified
   source files

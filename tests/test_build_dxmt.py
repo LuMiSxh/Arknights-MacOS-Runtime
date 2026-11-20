@@ -13,6 +13,7 @@ from scripts.targets.arm64_dxmt import (
     verify_dxmt_install,
     verify_minimal_wine_outputs,
 )
+from scripts.targets.dxmt import reject_metal_above
 
 
 def _macho(command: int, version: tuple[int, int]) -> bytes:
@@ -97,3 +98,14 @@ def test_stage_winemac_so_links_the_external_unixlib(tmp_path):
 def test_stage_winemac_so_requires_the_external_tree(tmp_path):
     with pytest.raises(BuildError, match="winemac.so"):
         stage_winemac_so(tmp_path / "wine-build", tmp_path / "incoming" / "wine")
+
+
+def test_reject_metal_above_rejects_an_sdk_default_target():
+    ok = 'target triple = "air64_v27-apple-macosx15.0.0"\n'
+    reject_metal_above(ok, "15.0", "x.metallib")
+    with pytest.raises(BuildError, match="27.2.0"):
+        reject_metal_above(
+            ok + 'target triple = "air64_v29-apple-macosx27.2.0"\n',
+            "15.0",
+            "x.metallib",
+        )
