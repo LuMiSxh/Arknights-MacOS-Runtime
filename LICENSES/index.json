@@ -64,9 +64,9 @@
         },
         {
             "name": "DXMT",
-            "version": "0.80-361-g9839e55",
+            "version": "0.80-408-g0df8610",
             "spdx": "LGPL-2.1-or-later",
-            "source": "https://github.com/3Shain/dxmt/tree/9839e55f98d4aca103957ee4132d6395a325a9ed",
+            "source": "https://github.com/3Shain/dxmt/tree/0df86108348bab2aaa5c4610a5eb63a9de9047ac",
             "files": ["DXMT-LGPL-2.1.txt", "runtime/MIT-DXMT.txt"],
             "status": "verified",
             "basis": "upstream-declared",
@@ -75,9 +75,9 @@
         },
         {
             "name": "DXMT vendored DXBCParser",
-            "version": "0.80-361-g9839e55",
+            "version": "0.80-408-g0df8610",
             "spdx": "MIT",
-            "source": "https://github.com/3Shain/dxmt/tree/9839e55f98d4aca103957ee4132d6395a325a9ed/libs/DXBCParser",
+            "source": "https://github.com/3Shain/dxmt/tree/0df86108348bab2aaa5c4610a5eb63a9de9047ac/libs/DXBCParser",
             "files": ["runtime/MIT.txt"],
             "status": "verified",
             "basis": "upstream-declared",
@@ -85,9 +85,9 @@
         },
         {
             "name": "DXMT vendored DXVK-derived code",
-            "version": "0.80-361-g9839e55",
+            "version": "0.80-408-g0df8610",
             "spdx": "Zlib",
-            "source": "https://github.com/3Shain/dxmt/tree/9839e55f98d4aca103957ee4132d6395a325a9ed/src/util",
+            "source": "https://github.com/3Shain/dxmt/tree/0df86108348bab2aaa5c4610a5eb63a9de9047ac/src/util",
             "files": ["runtime/Zlib.txt"],
             "status": "verified",
             "basis": "upstream-declared",
@@ -95,9 +95,9 @@
         },
         {
             "name": "DXMT vendored tl::generator header",
-            "version": "0.80-361-g9839e55",
+            "version": "0.80-408-g0df8610",
             "spdx": "CC0-1.0",
-            "source": "https://github.com/3Shain/dxmt/blob/9839e55f98d4aca103957ee4132d6395a325a9ed/include/tl/generator.hpp",
+            "source": "https://github.com/3Shain/dxmt/blob/0df86108348bab2aaa5c4610a5eb63a9de9047ac/include/tl/generator.hpp",
             "files": ["runtime/CC0-1.0.txt"],
             "status": "verified",
             "basis": "upstream-declared",
@@ -105,7 +105,7 @@
         },
         {
             "name": "DXMT mingw-directx-headers (include/native/directx)",
-            "version": "0.80-361-g9839e55",
+            "version": "0.80-408-g0df8610",
             "spdx": "LGPL-2.1-or-later",
             "source": "https://github.com/misyltoad/mingw-directx-headers/tree/9df86f2341616ef1888ae59919feaa6d4fad693d",
             "files": ["runtime/LGPL-2.1.txt"],
@@ -116,9 +116,9 @@
         },
         {
             "name": "DXMT Windows toolchain runtime (libstdc++, libgcc, mingw-w64 CRT)",
-            "version": "0.80-361-g9839e55",
+            "version": "0.80-408-g0df8610",
             "spdx": "ZPL-2.1 AND MIT AND (GPL-3.0-or-later WITH GCC-exception-3.1)",
-            "source": "https://github.com/3Shain/dxmt/tree/9839e55f98d4aca103957ee4132d6395a325a9ed",
+            "source": "https://github.com/3Shain/dxmt/tree/0df86108348bab2aaa5c4610a5eb63a9de9047ac",
             "files": [
                 "runtime/ZPL-2.1.txt",
                 "runtime/MinGW-w64-runtime.txt",

@@ -17,8 +17,8 @@
     },
     "dxmt": {
       "repository": "https://github.com/3Shain/dxmt.git",
-      "commit": "9839e55f98d4aca103957ee4132d6395a325a9ed",
-      "version": "0.80-361-g9839e55"
+      "commit": "0df86108348bab2aaa5c4610a5eb63a9de9047ac",
+      "version": "0.80-408-g0df8610"
     }
   },
   "baseArtifact": {

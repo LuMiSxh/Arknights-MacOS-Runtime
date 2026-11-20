@@ -1,6 +1,6 @@
-DXMT 0.80-361-g9839e55 mingw-directx-headers
+DXMT 0.80-408-g0df8610 mingw-directx-headers
 Source: https://github.com/misyltoad/mingw-directx-headers/tree/9df86f2341616ef1888ae59919feaa6d4fad693d
-DXMT source: https://github.com/3Shain/dxmt/tree/9839e55f98d4aca103957ee4132d6395a325a9ed
+DXMT source: https://github.com/3Shain/dxmt/tree/0df86108348bab2aaa5c4610a5eb63a9de9047ac
 
 License: LGPL-2.1-or-later.
 - include/native/directx is a git submodule of DXMT (misyltoad/mingw-directx-headers, commit 9df86f2341616ef1888ae59919feaa6d4fad693d).

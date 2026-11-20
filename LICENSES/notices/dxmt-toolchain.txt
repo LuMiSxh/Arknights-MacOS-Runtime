@@ -1,5 +1,5 @@
-DXMT 0.80-361-g9839e55 Windows toolchain runtime
-Source: https://github.com/3Shain/dxmt/tree/9839e55f98d4aca103957ee4132d6395a325a9ed
+DXMT 0.80-408-g0df8610 Windows toolchain runtime
+Source: https://github.com/3Shain/dxmt/tree/0df86108348bab2aaa5c4610a5eb63a9de9047ac
 
 License: ZPL-2.1 AND MIT AND (GPL-3.0-or-later WITH GCC-exception-3.1).
 
