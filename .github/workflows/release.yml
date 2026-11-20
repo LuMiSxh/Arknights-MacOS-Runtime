@@ -221,7 +221,6 @@ jobs:
     smoke-x86_64:
         name: smoke (${{ matrix.runner }})
         needs: build-x86_64
-        if: ${{ inputs.channel == 'candidate' }}
         runs-on: ${{ matrix.runner }}
         timeout-minutes: 60
         strategy:
@@ -301,7 +300,11 @@ jobs:
                   msl_errors="$(grep -c -i -E 'language version|internal command library' "$log_dir/d3d11smoke.log")"
                   result="RESULT runner=$RUNNER_LABEL wineboot=$wineboot_rc d3d11=$d3d11_rc msl_errors=$msl_errors smoke=[$smoke_line]"
                   echo "$result" | tee -a "$log_dir/result.txt" >> "$GITHUB_STEP_SUMMARY"
-                  exit 0
+                  # A runtime that cannot boot a prefix or create a D3D11 device must not ship.
+                  if [ "$wineboot_rc" -ne 0 ] || [ "$d3d11_rc" -ne 0 ] || [ "$msl_errors" -ne 0 ]; then
+                      echo "::error::x86_64 smoke failed on $RUNNER_LABEL: $result"
+                      exit 1
+                  fi
 
             - name: Upload the smoke logs
               if: ${{ always() }}
@@ -447,7 +450,7 @@ jobs:
     # Combining runs repository code, so it gets read-only permissions. The publish job
     # downloads its output and never checks out the repository.
     combine:
-        needs: [prepare, build-x86_64, build-arm64]
+        needs: [prepare, build-x86_64, smoke-x86_64, build-arm64]
         if: ${{ inputs.channel == 'release' }}
         runs-on: ubuntu-24.04
         timeout-minutes: 15
