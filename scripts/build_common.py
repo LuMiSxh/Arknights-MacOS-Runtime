@@ -276,9 +276,11 @@ def nix_package_outputs(
         attribute = f"{nixpkgs}#legacyPackages.{system}.{package}"
         available = set(nix_output_names(builder, attribute))
         # Not every package splits out dev or lib (freetype has no lib output).
-        for output_name in ("dev", "out", "lib"):
-            if output_name in available:
-                outputs.append(nix_build(builder, f"{attribute}.{output_name}"))
+        outputs.extend(
+            nix_build(builder, f"{attribute}.{output_name}")
+            for output_name in ("dev", "out", "lib")
+            if output_name in available
+        )
     return outputs
 
 
