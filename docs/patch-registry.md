@@ -152,6 +152,21 @@ Remove a patch when the pinned WineCX supplies the behavior or the route is no l
 
 The patch changes one line in `dlls/winemac.drv/cocoa_app.m`. It sets the Quit item to the Command modifier only. Hide Others (Option-Command-H) and the other menu items keep their masks.
 
+## Dock
+
+- ID: `wine-winemac-squircle-app-icon`
+- File: `patches/wine/0019-winemac-squircle-app-icon.patch`
+- Component/base: WineCX <!-- pin:wine.commit|code -->`a54b8240683e92bf4c15cb1ba6bf92a9539bd768`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
+- Source/author: Original runtime change, runtime maintainers
+- License: LGPL-2.1-or-later (Wine)
+- Gate: `LMISXH_AKMOCL_SQUIRCLE_ICON` (default on: unset or exactly `1`)
+- Inactive behavior: `0` or any other value publishes the full-bleed executable icon.
+- Automated gate: Hash, clean apply in lock order, `winemac.so` compile in the single x86_64 build
+- Manual gate: The Dock icon shows a rounded square inside the icon grid, sharp on a Retina display.
+- Removal: Drop when the client no longer needs a squircle icon
+
+The patch redraws the icon in `setApplicationIconFromCGImageArray:`. It uses a drawing handler on a 512-point canvas. The content is the centered 412-point square, clipped to a 92-point rounded rectangle.
+
 ## Fullscreen
 
 - ID: `wine-fullscreen-native-space`

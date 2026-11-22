@@ -20,7 +20,7 @@ The canonical copy of each patch is listed under [Canonical copies](#canonical-c
 
 ## What is in the export
 
-The workspace applies all fourteen patches at build time. The `LMISXH_AKMOCL_*` variables gate
+The workspace applies all sixteen patches at build time. The `LMISXH_AKMOCL_*` variables gate
 behavior at runtime; they do not select patches at build time.
 
 | Patch                                              | Runtime gate             | Need                  | Purpose                                                  |
@@ -36,11 +36,12 @@ behavior at runtime; they do not select patches at build time.
 | `0009-winemac-native-fullscreen-space.patch`       | `_FULLSCREEN` (default off) | ours, user-visible | Puts fullscreen games in a native macOS Space.           |
 | `0010-ntdll-hide-software-cursor-asset.patch`      | `_CURSOR` (default off)  | ours, user-visible    | Hides the two game software-cursor assets.               |
 | `0011-winemac-command-q-quit.patch`               | opt-out `_MENU`          | ours, user-visible    | Makes Command+Q quit from the app menu.                  |
-| `0012-ntdll-name-the-macos-loader-link-after-the-application.patch` | opt-out `_LOADER_LINK` | ours, user-visible | Names the loader link and `WINEPRELOADERAPPNAME` after the program. |
-| `0013-winemac-name-the-application-menu-after-the-program.patch` | opt-out `_LOADER_LINK` | ours, user-visible | Shows `WINEPRELOADERAPPNAME` in the Hide and Quit menu items. |
-| `0014-ntdll-promote-cx-unix-environment-variables.patch` | none (always on) | launcher helper injection | Promotes `__CX_UNIX_<name>` to the child's Unix environment. |
+| `0016-ntdll-name-the-macos-loader-link-after-the-application.patch` | opt-out `_LOADER_LINK` | ours, user-visible | Names the loader link and `WINEPRELOADERAPPNAME` after the program. |
+| `0017-winemac-name-the-application-menu-after-the-program.patch` | opt-out `_LOADER_LINK` | ours, user-visible | Shows `WINEPRELOADERAPPNAME` in the Hide and Quit menu items. |
+| `0018-ntdll-promote-cx-unix-environment-variables.patch` | none (always on) | launcher helper injection | Promotes `__CX_UNIX_<name>` to the child's Unix environment. |
+| `0019-winemac-squircle-app-icon.patch` | opt-out `_SQUIRCLE_ICON` | ours, user-visible | Draws the Dock icon as a rounded square on the macOS icon grid. |
 
-`0001` to `0006` and `0011` to `0013` default on: unset or exactly `1` keeps the patch on. `0007`, `0008`, `0009`, and `0010` default off: only exactly `1` enables them. Any other value turns the patch off.
+`0001` to `0006`, `0011`, `0016`, `0017`, and `0019` default on: unset or exactly `1` keeps the patch on. `0007`, `0008`, `0009`, and `0010` default off: only exactly `1` enables them. Any other value turns the patch off.
 
 ### Why the ACE patches stay
 
@@ -99,18 +100,18 @@ path for both separate and in-place buffers.
 - **Address space, W^X, ID registers, EC bitmap, and FEX JIT patches.** The Hadron queue
   already provides them.
 - **Audio and DXMT.** Not required for login or ACE. The DXMT patch also targets a
-  different DXMT pin. The loader-name patches `0012` and `0013` are in the export.
+  different DXMT pin. The loader-name patches `0016` and `0017` are in the export.
 
 ## Gates and opt-outs
 
-`0001` to `0006` and `0011` to `0013` default on: unset or exactly `1` keeps the patch on.
+`0001` to `0006`, `0011`, `0016`, `0017`, and `0019` default on: unset or exactly `1` keeps the patch on.
 Any other value turns it off.
 
-`0012` and `0013` share the gate `LMISXH_AKMOCL_LOADER_LINK`. `0012` names the loader
+`0016` and `0017` share the gate `LMISXH_AKMOCL_LOADER_LINK`. `0016` names the loader
 link after the program, for direct starts and spawned processes, and sets
-`WINEPRELOADERAPPNAME`; `0013` reads that variable. With the gate off, `0012` starts no
-link and no extra re-exec, and `0013` keeps the upstream menu name.
-`0014` has no gate and does nothing unless the program sets a `__CX_UNIX_<name>` variable.
+`WINEPRELOADERAPPNAME`; `0017` reads that variable. With the gate off, `0016` starts no
+link and no extra re-exec, and `0017` keeps the upstream menu name.
+`0018` has no gate and does nothing unless the program sets a `__CX_UNIX_<name>` variable.
 
 ```sh
 LMISXH_AKMOCL_EFLAGS=0          # Do not carry PF, AF and DF
@@ -121,6 +122,7 @@ LMISXH_AKMOCL_WINSOCK=0         # Do not implement SIO_ADDRESS_LIST_SORT
 LMISXH_AKMOCL_CEF=0             # Do not apply the Bilibili CEF descriptor
 LMISXH_AKMOCL_MENU=0            # Do not make Command+Q quit from the app menu
 LMISXH_AKMOCL_LOADER_LINK=0     # Do not name the loader link and app menu after the program
+LMISXH_AKMOCL_SQUIRCLE_ICON=0   # Keep the full-bleed executable icon
 ```
 
 `0007`, `0008`, `0009`, and `0010` default off. Only exactly `1` enables them:
@@ -185,7 +187,7 @@ Edit the canonical copy, then rebase it into `wine-build-new/patches/`. Where th
 | `0007`, `0008`         | `patches/wine/0007-win32u-winemac-bilibili-layered-child.patch`, `patches/wine/0008-winemac-bilibili-join-all-spaces.patch` (rebased) |
 | `0009`                 | `patches/wine/0009-winemac-native-fullscreen-space.patch` (rebased) |
 | `0010`                 | `patches/wine/0010-ntdll-hide-software-cursor-asset.patch` |
-| `0012`, `0013`, `0014` | `wine-build-new/patches/` (this directory)  |
+| `0016`, `0017`, `0018` | `wine-build-new/patches/` (this directory)  |
 | `fex/0001`             | `wine-build-new/fex/` (this directory)      |
 
 ## Workspace queue audit
@@ -245,6 +247,6 @@ Arknights client sets the opt-outs it needs. The CN and cursor patches still nee
 
 ## Validation
 
-- All fourteen Wine patches apply with `patch -p1 -F0` after the workspace's 72-patch queue.
+- All sixteen Wine patches apply with `patch -p1 -F0` after the workspace's 72-patch queue.
 - No Wine build, prefix, game launch, or ACE run was performed for this export.
 - ACE remains unverified. Complete the China update before judging an ACE result.

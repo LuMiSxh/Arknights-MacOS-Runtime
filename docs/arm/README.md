@@ -40,7 +40,7 @@ wine/                       # lowercase
 
 `provenance-arm64.json` records the build commit, the resolved `runtimeLock`, and the validation report. It records the selected catalog id, SHA-256, and size under `wine.artifact`. `just combine` merges this fragment into `provenance.json`.
 
-The archive has no DXMT, no `winemetal.so`, no `wine64`, no `Arknights` link, and no `WINEPRELOADERAPPNAME`. Patches `0012` and `0013` provide `WINEPRELOADERAPPNAME` once the external build picks them up. `scripts/targets/arm64_assemble.py` adds `Wine/bin/wine64`, `Wine/bin/Arknights`, the DXMT payload, and the WineMetal modules outside the signed `Arknights.app` bundle. The wrapper renames riverfog's `wine.app` to `Arknights.app`. macOS labels the game process in the Dock with the bundle folder name, so the rename shows the game name instead of `wine`. The wrapper also repoints every symlink that named the old bundle.
+The archive has no DXMT, no `winemetal.so`, no `wine64`, no `Arknights` link, and no `WINEPRELOADERAPPNAME`. Patches `0016` and `0017` provide `WINEPRELOADERAPPNAME` once the external build picks them up. `scripts/targets/arm64_assemble.py` adds `Wine/bin/wine64`, `Wine/bin/Arknights`, the DXMT payload, and the WineMetal modules outside the signed `Arknights.app` bundle. The wrapper renames riverfog's `wine.app` to `Arknights.app`. macOS labels the game process in the Dock with the bundle folder name, so the rename shows the game name instead of `wine`. The wrapper also repoints every symlink that named the old bundle.
 
 ## DXMT
 

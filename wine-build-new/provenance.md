@@ -37,7 +37,7 @@ The canonical copy of each patch is in [README.md](README.md#canonical-copies).
 - `0011-winemac-command-q-quit.patch` is an original change for this repository. It ports the
   x86 Command-Q change in `patches/wine/0011-winemac-command-q-quit.patch` to Wine 11.18.
   See [Command-Q provenance](../patches/wine/provenance.md#0011-command-q).
-- `0012-ntdll-name-the-macos-loader-link-after-the-application.patch` ports WineCX CW HACK
+- `0016-ntdll-name-the-macos-loader-link-after-the-application.patch` ports WineCX CW HACK
   22144 from WineCX `a54b8240683e92bf4c15cb1ba6bf92a9539bd768`. It differs from WineCX
   in that it creates only a symlink, omits the preloader branch, and names the link
   after the program argument. It reuses a cached link only when the link targets exactly
@@ -46,14 +46,18 @@ The canonical copy of each patch is in [README.md](README.md#canonical-copies).
   `reexec_loader`. Source files in Wine: `dlls/ntdll/unix/loader.c`,
   `dlls/ntdll/unix/process.c`, `dlls/ntdll/unix/unix_private.h`. The default-on gate
   `LMISXH_AKMOCL_LOADER_LINK` turns off the link and the extra re-exec.
-- `0013-winemac-name-the-application-menu-after-the-program.patch` is adapted from WineCX
+- `0017-winemac-name-the-application-menu-after-the-program.patch` is adapted from WineCX
   CW HACK 13438 from the same WineCX commit. WineCX rewrites the loader Info.plist,
   which fails on arm64, so winemac reads `WINEPRELOADERAPPNAME` instead, unless
   `LMISXH_AKMOCL_LOADER_LINK` is off. Source file
   in Wine: `dlls/winemac.drv/cocoa_app.m`.
-- `0014-ntdll-promote-cx-unix-environment-variables.patch` ports WineCX CW HACK 24717
+- `0018-ntdll-promote-cx-unix-environment-variables.patch` ports WineCX CW HACK 24717
   from the same WineCX commit. It differs from WineCX in the empty-name check and
   ignores entries without `=`. Source file in Wine: `dlls/ntdll/unix/process.c`.
+- `0019-winemac-squircle-app-icon.patch` is an original change for this repository. It ports
+  x86 patch `0019`. See
+  [Dock provenance](../patches/wine/provenance.md#0019-squircle-icon). Source files in Wine:
+  `dlls/winemac.drv/cocoa_app.m`.
 - `fex/0001-arm64ec-restore-carried-eflags.patch` applies to FEX commit
   `14c92681f4d62cf84d901460e0358de09c8847a7` (`FEX-Emu/FEX`). The upstream author is not
   recorded in this repository. The FEX license is MIT; see

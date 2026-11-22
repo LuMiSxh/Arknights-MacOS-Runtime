@@ -1,0 +1,53 @@
+From: LuMiSxh
+Subject: [PATCH] winemac: draw the application icon as a squircle
+
+Wine publishes the executable's icon as a full-bleed square, so the Dock shows
+it without the macOS icon grid. Redraw it on a transparent 512-point canvas,
+inside the centered 412-point grid, with rounded corners. Gate:
+LMISXH_AKMOCL_SQUIRCLE_ICON (default on).
+
+diff --git a/dlls/winemac.drv/cocoa_app.m b/dlls/winemac.drv/cocoa_app.m
+--- a/dlls/winemac.drv/cocoa_app.m
++++ b/dlls/winemac.drv/cocoa_app.m
+@@ -303,6 +303,32 @@
+     }
+ 
+ @end
++
++/* Squircle application icon (LMISXH_AKMOCL_SQUIRCLE_ICON). The executable icon is
++ * a full-bleed square. Redraw it on a transparent 512 point canvas, inside the
++ * centered 412 point macOS icon grid, with rounded corners. The drawing handler
++ * runs at the backing scale of the Dock, so the result stays sharp on Retina. Any
++ * failure, or the gate turned off, publishes the original image. */
++static NSImage* lmisxh_akmocl_squircle_icon( NSImage* source )
++{
++    static const CGFloat canvas = 512.0, content = 412.0, radius = 0.2237 * 412.0;
++    NSImage* icon;
++
++    if (!source || !lmisxh_akmocl_flag( "LMISXH_AKMOCL_SQUIRCLE_ICON" )) return source;
++
++    icon = [NSImage imageWithSize:NSMakeSize(canvas, canvas) flipped:NO drawingHandler:^BOOL(NSRect dest)
++    {
++        NSRect box = NSMakeRect((canvas - content) / 2, (canvas - content) / 2, content, content);
++
++        [NSGraphicsContext saveGraphicsState];
++        [[NSBezierPath bezierPathWithRoundedRect:box xRadius:radius yRadius:radius] addClip];
++        [source drawInRect:box fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:1.0
++            respectFlipped:YES hints:@{NSImageHintInterpolation: @(NSImageInterpolationHigh)}];
++        [NSGraphicsContext restoreGraphicsState];
++        return YES;
++    }];
++    return icon ? icon : source;
++}
+ 
+ 
+ @interface WineApplicationController ()
+@@ -1486,7 +1512,7 @@
+                 nsimage = nil;
+         }
+ 
+-        self.applicationIcon = nsimage;
++        self.applicationIcon = lmisxh_akmocl_squircle_icon(nsimage);
+     }
+ 
+     - (void) handleCommandTab
