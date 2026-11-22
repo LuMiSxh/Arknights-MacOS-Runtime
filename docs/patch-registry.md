@@ -152,6 +152,34 @@ Remove a patch when the pinned WineCX supplies the behavior or the route is no l
 
 The patch changes one line in `dlls/winemac.drv/cocoa_app.m`. It sets the Quit item to the Command modifier only. Hide Others (Option-Command-H) and the other menu items keep their masks.
 
+## Dock
+
+- ID: `wine-winemac-squircle-app-icon`
+- File: `patches/wine/0016-winemac-squircle-app-icon.patch`
+- Component/base: WineCX <!-- pin:wine.commit|code -->`a54b8240683e92bf4c15cb1ba6bf92a9539bd768`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
+- Source/author: Original runtime change, runtime maintainers
+- License: LGPL-2.1-or-later (Wine)
+- Gate: `LMISXH_AKMOCL_SQUIRCLE_ICON` (default on: unset or exactly `1`)
+- Inactive behavior: Missing `0` or invalid values publish the full-bleed executable icon.
+- Automated gate: Hash, clean apply in lock order, `winemac.so` compile in the single x86_64 build
+- Manual gate: The Dock icon shows a rounded square inside the icon grid, sharp on a Retina display.
+- Removal: Drop when the client no longer needs a squircle icon
+
+The patch redraws the icon in `setApplicationIconFromCGImageArray:`. It uses a drawing handler on a 512-point canvas. The content is the centered 412-point square, clipped to a 92-point rounded rectangle.
+
+- ID: `wine-winemac-dock-identity-from-game`
+- File: `patches/wine/0017-winemac-dock-identity-from-game.patch`
+- Component/base: WineCX <!-- pin:wine.commit|code -->`a54b8240683e92bf4c15cb1ba6bf92a9539bd768`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
+- Source/author: Original runtime change, runtime maintainers
+- License: LGPL-2.1-or-later (Wine)
+- Gate: `LMISXH_AKMOCL_DOCK_IDENTITY` (default on: unset or exactly `1`); the override variables `LMISXH_AKMOCL_DOCK_NAME_OVERRIDE` and `LMISXH_AKMOCL_DOCK_ICON_OVERRIDE` follow it
+- Inactive behavior: Missing `0` or invalid values keep the loader name and the exit behavior of Wine.
+- Automated gate: Hash, clean apply in lock order, `winemac.so` compile in the single x86_64 build
+- Manual gate: `lsappinfo` shows the main window title as the name. The name override wins. The Dock tile is gone at exit and the recent apps list gains no `wine` entry.
+- Removal: Drop when LaunchServices offers a public display-name API, or when the client no longer needs a game name in the Dock
+
+The patch uses the private `_LSSetApplicationInformationItem` call, resolved with `dlsym`. If the call is missing, it logs one warning and does nothing. It sets the activation policy to Prohibited from an `atexit` handler. The main thread runs the change, and the exiting thread waits at most 250 ms.
+
 ## Fullscreen
 
 - ID: `wine-fullscreen-native-space`

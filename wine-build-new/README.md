@@ -20,7 +20,7 @@ The canonical copy of each patch is listed under [Canonical copies](#canonical-c
 
 ## What is in the export
 
-The workspace applies all fourteen patches at build time. The `LMISXH_AKMOCL_*` variables gate
+The workspace applies all sixteen patches at build time. The `LMISXH_AKMOCL_*` variables gate
 behavior at runtime; they do not select patches at build time.
 
 | Patch                                              | Runtime gate             | Need                  | Purpose                                                  |
@@ -39,8 +39,10 @@ behavior at runtime; they do not select patches at build time.
 | `0012-ntdll-name-the-macos-loader-link-after-the-application.patch` | opt-out `_LOADER_LINK` | ours, user-visible | Names the loader link and `WINEPRELOADERAPPNAME` after the program. |
 | `0013-winemac-name-the-application-menu-after-the-program.patch` | opt-out `_LOADER_LINK` | ours, user-visible | Shows `WINEPRELOADERAPPNAME` in the Hide and Quit menu items. |
 | `0014-ntdll-promote-cx-unix-environment-variables.patch` | none (always on) | launcher helper injection | Promotes `__CX_UNIX_<name>` to the child's Unix environment. |
+| `0015-winemac-squircle-app-icon.patch` | opt-out `_SQUIRCLE_ICON` | ours, user-visible | Draws the Dock icon as a rounded square on the macOS icon grid. |
+| `0016-winemac-dock-identity-from-game.patch` | opt-out `_DOCK_IDENTITY` | ours, user-visible | Names the Dock tile after the game window and leaves the Dock at exit. |
 
-`0001` to `0006` and `0011` to `0013` default on: unset or exactly `1` keeps the patch on. `0007`, `0008`, `0009`, and `0010` default off: only exactly `1` enables them. Any other value turns the patch off.
+`0001` to `0006`, `0011` to `0013`, `0015`, and `0016` default on: unset or exactly `1` keeps the patch on. `0007`, `0008`, `0009`, and `0010` default off: only exactly `1` enables them. Any other value turns the patch off.
 
 ### Why the ACE patches stay
 
@@ -103,7 +105,7 @@ path for both separate and in-place buffers.
 
 ## Gates and opt-outs
 
-`0001` to `0006` and `0011` to `0013` default on: unset or exactly `1` keeps the patch on.
+`0001` to `0006`, `0011` to `0013`, `0015`, and `0016` default on: unset or exactly `1` keeps the patch on.
 Any other value turns it off.
 
 `0012` and `0013` share the gate `LMISXH_AKMOCL_LOADER_LINK`. `0012` names the loader
@@ -111,6 +113,8 @@ link after the program, for direct starts and spawned processes, and sets
 `WINEPRELOADERAPPNAME`; `0013` reads that variable. With the gate off, `0012` starts no
 link and no extra re-exec, and `0013` keeps the upstream menu name.
 `0014` has no gate and does nothing unless the program sets a `__CX_UNIX_<name>` variable.
+`0016` also reads `LMISXH_AKMOCL_DOCK_NAME_OVERRIDE` (a Dock name that ignores window titles)
+and `LMISXH_AKMOCL_DOCK_ICON_OVERRIDE` (an image file that replaces the icon); both follow its gate.
 
 ```sh
 LMISXH_AKMOCL_EFLAGS=0          # Do not carry PF, AF and DF
@@ -121,6 +125,8 @@ LMISXH_AKMOCL_WINSOCK=0         # Do not implement SIO_ADDRESS_LIST_SORT
 LMISXH_AKMOCL_CEF=0             # Do not apply the Bilibili CEF descriptor
 LMISXH_AKMOCL_MENU=0            # Do not make Command+Q quit from the app menu
 LMISXH_AKMOCL_LOADER_LINK=0     # Do not name the loader link and app menu after the program
+LMISXH_AKMOCL_SQUIRCLE_ICON=0   # Keep the full-bleed executable icon
+LMISXH_AKMOCL_DOCK_IDENTITY=0   # Keep the loader name in the Dock; do not leave the Dock at exit
 ```
 
 `0007`, `0008`, `0009`, and `0010` default off. Only exactly `1` enables them:
@@ -245,6 +251,6 @@ Arknights client sets the opt-outs it needs. The CN and cursor patches still nee
 
 ## Validation
 
-- All fourteen Wine patches apply with `patch -p1 -F0` after the workspace's 72-patch queue.
+- All sixteen Wine patches apply with `patch -p1 -F0` after the workspace's 72-patch queue.
 - No Wine build, prefix, game launch, or ACE run was performed for this export.
 - ACE remains unverified. Complete the China update before judging an ACE result.

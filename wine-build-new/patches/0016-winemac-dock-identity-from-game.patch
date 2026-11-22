@@ -1,0 +1,214 @@
+diff --git a/dlls/winemac.drv/cocoa_app.m b/dlls/winemac.drv/cocoa_app.m
+--- a/dlls/winemac.drv/cocoa_app.m
++++ b/dlls/winemac.drv/cocoa_app.m
+@@ -45,7 +45,94 @@
+ // Available in macOS 10.12+
+ static NSString* const NSWindowWillStartDraggingNotification = @"NSWindowWillStartDraggingNotification";
+ static NSString* const NSWindowDidEndDraggingNotification = @"NSWindowDidEndDraggingNotification";
++
++/* Dock identity from the game (LMISXH_AKMOCL_DOCK_IDENTITY).
++ * macOS names the Dock tile after the loader binary, which is "wine". Publish the
++ * title of the main window instead. LMISXH_AKMOCL_DOCK_NAME_OVERRIDE fixes the name
++ * and LMISXH_AKMOCL_DOCK_ICON_OVERRIDE names an image file for the icon. At exit the
++ * process leaves the Dock, so macOS records no "wine" entry in the recent apps. */
++#include <dlfcn.h>
++
++static WineWindow* lmisxh_akmocl_dock_window;  /* main thread only; cleared in -dealloc */
++static dispatch_semaphore_t lmisxh_akmocl_dock_exit_done;
++
++static BOOL lmisxh_akmocl_dock_identity_enabled( void )
++{
++    const char *value = getenv( "LMISXH_AKMOCL_DOCK_IDENTITY" );
++
++    return !value || (value[0] == '1' && !value[1]);
++}
++
++static NSString* lmisxh_akmocl_dock_name_override( void )
++{
++    const char *value = getenv( "LMISXH_AKMOCL_DOCK_NAME_OVERRIDE" );
++
++    return value && value[0] ? [NSString stringWithUTF8String:value] : nil;
++}
++
++/* The display name is only reachable through the private LaunchServices call.
++ * Resolve it once and skip the feature when it is missing. */
++static void lmisxh_akmocl_set_dock_name( NSString* name )
++{
++    typedef OSStatus (*set_item_func)( int session, const void *asn, CFStringRef key, CFTypeRef value,
++                                       CFDictionaryRef *info );
++    typedef const void* (*get_asn_func)( void );
++    static set_item_func set_item;
++    static get_asn_func get_asn;
++    static CFStringRef *name_key;
++    static dispatch_once_t once;
++
++    dispatch_once(&once, ^{
++        set_item = (set_item_func)dlsym( RTLD_DEFAULT, "_LSSetApplicationInformationItem" );
++        get_asn = (get_asn_func)dlsym( RTLD_DEFAULT, "_LSGetCurrentApplicationASN" );
++        name_key = (CFStringRef *)dlsym( RTLD_DEFAULT, "_kLSDisplayNameKey" );
++        if (!set_item || !get_asn || !name_key)
++            WARN("LaunchServices display name API not found; the Dock keeps the loader name\n");
++    });
++    if (!set_item || !get_asn || !name_key || !*name_key) return;
++
++    /* kLSDefaultSessionID is -2. */
++    set_item( -2, get_asn(), *name_key, name, NULL );
++}
++
++static void lmisxh_akmocl_update_dock_name( NSString* name )
++{
++    if ([name length]) lmisxh_akmocl_set_dock_name( name );
++}
++
++static NSImage* lmisxh_akmocl_dock_icon_override( void )
++{
++    const char *path = getenv( "LMISXH_AKMOCL_DOCK_ICON_OVERRIDE" );
++    NSImage* image;
++
++    if (!path || !path[0]) return nil;
++    image = [[[NSImage alloc] initWithContentsOfFile:[NSString stringWithUTF8String:path]] autorelease];
++    if (!image || ![image isValid])
++    {
++        WARN("could not load the Dock icon override %s\n", path);
++        return nil;
++    }
++    return image;
++}
+ 
++/* Remove the Dock tile before the process ends. The Dock records a tile that is still
++ * present at exit as a recent app. The Wine thread that exits waits at most 250 ms. */
++static void lmisxh_akmocl_leave_dock_at_exit( void )
++{
++    if (!NSApp) return;
++    if (pthread_main_np())
++    {
++        [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
++        return;
++    }
++    dispatch_async(dispatch_get_main_queue(), ^{
++        [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
++        dispatch_semaphore_signal(lmisxh_akmocl_dock_exit_done);
++    });
++    if (dispatch_semaphore_wait(lmisxh_akmocl_dock_exit_done, dispatch_time(DISPATCH_TIME_NOW, 250 * NSEC_PER_MSEC)))
++        WARN("timed out leaving the Dock at exit\n");
++}
++
+ // Internal distributed notification to handle cooperative app activation in Sonoma.
+ static NSString* const WineAppWillActivateNotification = @"WineAppWillActivateNotification";
+ static NSString* const WineActivatingAppPIDKey = @"ActivatingAppPID";
+@@ -526,10 +613,49 @@
+             [NSApp setMainMenu:mainMenu];
+             [NSApp setWindowsMenu:submenu];
+ 
+-            [NSApp setApplicationIconImage:self.applicationIcon];
++            NSImage* dockIcon = lmisxh_akmocl_dock_identity_enabled() ? lmisxh_akmocl_dock_icon_override() : nil;
++            [NSApp setApplicationIconImage:dockIcon ? dockIcon : self.applicationIcon];
++            [self dockIdentityStart];
+         }
+     }
+ 
++    /* Called once the process has a Dock tile. */
++    - (void) dockIdentityStart
++    {
++        static dispatch_once_t once;
++        NSString* name;
++
++        if (!lmisxh_akmocl_dock_identity_enabled()) return;
++
++        dispatch_once(&once, ^{
++            lmisxh_akmocl_dock_exit_done = dispatch_semaphore_create(0);
++            if (atexit( lmisxh_akmocl_leave_dock_at_exit ))
++                WARN("could not register the Dock exit handler\n");
++        });
++
++        if ((name = lmisxh_akmocl_dock_name_override()))
++            lmisxh_akmocl_set_dock_name( name );
++    }
++
++    /* The Dock name is the title of the first visible, titled, unowned window. The
++       caller decides whether the window qualifies. */
++    - (void) dockIdentityConsiderWindow:(WineWindow*)window eligible:(BOOL)eligible
++    {
++        if (!lmisxh_akmocl_dock_identity_enabled() || lmisxh_akmocl_dock_name_override()) return;
++
++        if (!lmisxh_akmocl_dock_window)
++        {
++            if (!eligible) return;
++            lmisxh_akmocl_dock_window = window;
++        }
++        if (window == lmisxh_akmocl_dock_window)
++            lmisxh_akmocl_update_dock_name( [window title] );
++    }
++
++    - (void) dockIdentityForgetWindow:(WineWindow*)window
++    {
++        if (window == lmisxh_akmocl_dock_window) lmisxh_akmocl_dock_window = nil;
++    }
+     - (BOOL) waitUntilQueryDone:(bool*)done timeout:(NSDate*)timeout processEvents:(BOOL)processEvents
+     {
+         PerformRequest(NULL);
+diff --git a/dlls/winemac.drv/cocoa_app.h b/dlls/winemac.drv/cocoa_app.h
+--- a/dlls/winemac.drv/cocoa_app.h
++++ b/dlls/winemac.drv/cocoa_app.h
+@@ -110,6 +110,8 @@
+ 
+     + (WineApplicationController*) sharedController;
+ 
++    - (void) dockIdentityConsiderWindow:(WineWindow*)window eligible:(BOOL)eligible;
++    - (void) dockIdentityForgetWindow:(WineWindow*)window;
+     - (void) reassertCursorClipping;
+     - (CGFloat) housingInset;
+     - (BOOL) refreshHousingInset;
+diff --git a/dlls/winemac.drv/cocoa_window.m b/dlls/winemac.drv/cocoa_window.m
+--- a/dlls/winemac.drv/cocoa_window.m
++++ b/dlls/winemac.drv/cocoa_window.m
+@@ -962,6 +962,7 @@
+         [latentChildWindows release];
+         [latentParentWindow release];
+         [contentViewMaskLayer release];
++        [[WineApplicationController sharedController] dockIdentityForgetWindow:self];
+         [super dealloc];
+     }
+ 
+@@ -1156,6 +1157,8 @@
+ 
+             if ([[self title] length] == 0 && [title length] > 0)
+                 [self setTitle:title];
++            [[WineApplicationController sharedController] dockIdentityConsiderWindow:self
++                                                                        eligible:[self isDockIdentityCandidate]];
+         }
+ 
+         if (layeredChanged && newStyle == currentStyle)
+@@ -1177,6 +1180,14 @@
+         return [self wouldBeVisible] || [self isMiniaturized];
+     }
+ 
++    /* Dock identity (LMISXH_AKMOCL_DOCK_IDENTITY): a visible, titled window without a
++       parent can name the Dock tile. */
++    - (BOOL) isDockIdentityCandidate
++    {
++        return ([self styleMask] & NSWindowStyleMaskTitled) && !self.parentWindow &&
++               !self.latentParentWindow && [self isOrderedIn];
++    }
++
+     - (NSInteger) minimumLevelForActive:(BOOL)active
+     {
+         NSInteger level;
+@@ -1782,6 +1793,8 @@
+ 
+             if (![self isExcludedFromWindowsMenu])
+                 [NSApp addWindowsItem:self title:[self title] filename:NO];
++
++            [controller dockIdentityConsiderWindow:self eligible:[self isDockIdentityCandidate]];
+         }
+     }
+ 
+@@ -3444,6 +3457,8 @@
+         [window setTitle:titleString];
+         if ([window isOrderedIn] && ![window isExcludedFromWindowsMenu])
+             [NSApp changeWindowsItem:window title:titleString filename:NO];
++        [[WineApplicationController sharedController] dockIdentityConsiderWindow:window
++                                                                        eligible:[window isDockIdentityCandidate]];
+     });
+ }
+ }

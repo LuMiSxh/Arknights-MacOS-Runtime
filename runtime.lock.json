@@ -284,6 +284,30 @@
       "sha256": "92c9a211701924774b043ed1d13a4281e46fb68d33a1fdcd58916b6e72125f1d"
     },
     {
+      "id": "wine-winemac-squircle-app-icon",
+      "component": "wine",
+      "number": 16,
+      "gate": "LMISXH_AKMOCL_SQUIRCLE_ICON",
+      "default": true,
+      "targets": [
+        "rosetta-x86_64"
+      ],
+      "path": "patches/wine/0016-winemac-squircle-app-icon.patch",
+      "sha256": "05965d0897ae5a9c1aea8bfe55b91f9af6cb8bc62e96403d0bc2e210eb80d054"
+    },
+    {
+      "id": "wine-winemac-dock-identity-from-game",
+      "component": "wine",
+      "number": 17,
+      "gate": "LMISXH_AKMOCL_DOCK_IDENTITY",
+      "default": true,
+      "targets": [
+        "rosetta-x86_64"
+      ],
+      "path": "patches/wine/0017-winemac-dock-identity-from-game.patch",
+      "sha256": "f23f1f8e8e996dd4594c9a22748f2eb8ad8fccd5582681e33b9552701fb53e4f"
+    },
+    {
       "id": "dxmt-skip-release-present-statistics",
       "component": "dxmt",
       "number": 1,
