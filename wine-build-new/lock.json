@@ -8,8 +8,8 @@
     "export_branch": "main"
   },
   "base": {
-    "wine": "7b3fff76fa5178f6ce0141b2c776afa2a822f101",
-    "queue_before": 72
+    "wine": "9f8c4ae4d35c7ff4153267aba9618c026f5f5583",
+    "queue_before": 68
   },
   "application": "build-time",
   "gates": "runtime",
@@ -31,7 +31,7 @@
       {
         "order": 74,
         "path": "wine-build-new/patches/0002-ntdll-hybrid-thread-entry.patch",
-        "sha256": "c716a7c2df2fc51e283083bd2fb88c6dcaaf6a6ed72f30a90a827cf3d7039ab2",
+        "sha256": "84362ee6b9a8a0b2b60cec36494790d6635fc24768eaa63f6c566a19721dc920",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_HYBRID_THREAD"
       },
@@ -66,7 +66,7 @@
       {
         "order": 79,
         "path": "wine-build-new/patches/0007-win32u-winemac-bilibili-layered-child.patch",
-        "sha256": "5a16243b1307c6aa985eae9952d82401ed137e0095b5704fd8ca4a107275be2c",
+        "sha256": "84df7813dc238862bdad2e16a2e74febe7c392e0eb21ec5cb4807a650c3411ec",
         "modifier": "LMISXH_AKMOCL_CN",
         "default": "off"
       },
@@ -81,7 +81,7 @@
       {
         "order": 81,
         "path": "wine-build-new/patches/0009-winemac-native-fullscreen-space.patch",
-        "sha256": "85a3e513d8d7251ea26c0b945b5f201d02ed70d45a11cc12dfdb7e34ba0d2a57",
+        "sha256": "810cf5be6e22caac6a29c08ca9e626994e5332bdae481dbefa53cde5003837d6",
         "modifier": "LMISXH_AKMOCL_FULLSCREEN",
         "default": "off",
         "optional": true
@@ -105,7 +105,7 @@
       {
         "order": 84,
         "path": "wine-build-new/patches/0016-ntdll-name-the-macos-loader-link-after-the-application.patch",
-        "sha256": "50e992f4e11b652f57a41f8b212019f62aeffaa7facc61ab043ed8daddf3f8f3",
+        "sha256": "003e44c1dab45f9969d9f3cfa5a460cad428e4946a38af733f467f8033868f5f",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_LOADER_LINK"
       },
