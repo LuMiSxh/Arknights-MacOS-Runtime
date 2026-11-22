@@ -54,8 +54,8 @@ The canonical copy of each patch is in [README.md](README.md#canonical-copies).
 - `0018-ntdll-promote-cx-unix-environment-variables.patch` ports WineCX CW HACK 24717
   from the same WineCX commit. It differs from WineCX in the empty-name check and
   ignores entries without `=`. Source file in Wine: `dlls/ntdll/unix/process.c`.
-- `0019-winemac-squircle-app-icon.patch` and `0020-winemac-dock-icon-override-and-exit.patch` are
-  original changes for this repository. They port x86 patches `0019` and `0020`. See
+- `0019-winemac-squircle-app-icon.patch` is an original change for this repository. It ports
+  x86 patch `0019`. See
   [Dock provenance](../patches/wine/provenance.md#0019-squircle-icon). Source files in Wine:
   `dlls/winemac.drv/cocoa_app.m`.
 - `fex/0001-arm64ec-restore-carried-eflags.patch` applies to FEX commit

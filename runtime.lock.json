@@ -295,19 +295,7 @@
         "rosetta-x86_64"
       ],
       "path": "patches/wine/0019-winemac-squircle-app-icon.patch",
-      "sha256": "05965d0897ae5a9c1aea8bfe55b91f9af6cb8bc62e96403d0bc2e210eb80d054"
-    },
-    {
-      "id": "wine-winemac-dock-icon-override-and-exit",
-      "component": "wine",
-      "number": 20,
-      "gate": "LMISXH_AKMOCL_DOCK_IDENTITY",
-      "default": true,
-      "targets": [
-        "rosetta-x86_64"
-      ],
-      "path": "patches/wine/0020-winemac-dock-icon-override-and-exit.patch",
-      "sha256": "403fa549b5be2a4345c7de98d4f105beee837dfb4ac22ba95d29a0278d8d3937"
+      "sha256": "adb7ee4887e298e8862e05760b34f16a1df4a7eab05d82d75aafb9c4e746b2c6"
     },
     {
       "id": "dxmt-skip-release-present-statistics",

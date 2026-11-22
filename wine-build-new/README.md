@@ -40,9 +40,8 @@ behavior at runtime; they do not select patches at build time.
 | `0017-winemac-name-the-application-menu-after-the-program.patch` | opt-out `_LOADER_LINK` | ours, user-visible | Shows `WINEPRELOADERAPPNAME` in the Hide and Quit menu items. |
 | `0018-ntdll-promote-cx-unix-environment-variables.patch` | none (always on) | launcher helper injection | Promotes `__CX_UNIX_<name>` to the child's Unix environment. |
 | `0019-winemac-squircle-app-icon.patch` | opt-out `_SQUIRCLE_ICON` | ours, user-visible | Draws the Dock icon as a rounded square on the macOS icon grid. |
-| `0020-winemac-dock-icon-override-and-exit.patch` | opt-out `_DOCK_IDENTITY` | ours, user-visible | Applies the Dock icon override and leaves the Dock at exit. |
 
-`0001` to `0006`, `0011`, `0016`, `0017`, `0019`, and `0020` default on: unset or exactly `1` keeps the patch on. `0007`, `0008`, `0009`, and `0010` default off: only exactly `1` enables them. Any other value turns the patch off.
+`0001` to `0006`, `0011`, `0016`, `0017`, and `0019` default on: unset or exactly `1` keeps the patch on. `0007`, `0008`, `0009`, and `0010` default off: only exactly `1` enables them. Any other value turns the patch off.
 
 ### Why the ACE patches stay
 
@@ -105,7 +104,7 @@ path for both separate and in-place buffers.
 
 ## Gates and opt-outs
 
-`0001` to `0006`, `0011`, `0016`, `0017`, `0019`, and `0020` default on: unset or exactly `1` keeps the patch on.
+`0001` to `0006`, `0011`, `0016`, `0017`, and `0019` default on: unset or exactly `1` keeps the patch on.
 Any other value turns it off.
 
 `0016` and `0017` share the gate `LMISXH_AKMOCL_LOADER_LINK`. `0016` names the loader
@@ -113,7 +112,6 @@ link after the program, for direct starts and spawned processes, and sets
 `WINEPRELOADERAPPNAME`; `0017` reads that variable. With the gate off, `0016` starts no
 link and no extra re-exec, and `0017` keeps the upstream menu name.
 `0018` has no gate and does nothing unless the program sets a `__CX_UNIX_<name>` variable.
-`0020` also reads `LMISXH_AKMOCL_DOCK_ICON_OVERRIDE` (an image file that replaces the icon); it follows the same gate.
 
 ```sh
 LMISXH_AKMOCL_EFLAGS=0          # Do not carry PF, AF and DF
@@ -125,7 +123,6 @@ LMISXH_AKMOCL_CEF=0             # Do not apply the Bilibili CEF descriptor
 LMISXH_AKMOCL_MENU=0            # Do not make Command+Q quit from the app menu
 LMISXH_AKMOCL_LOADER_LINK=0     # Do not name the loader link and app menu after the program
 LMISXH_AKMOCL_SQUIRCLE_ICON=0   # Keep the full-bleed executable icon
-LMISXH_AKMOCL_DOCK_IDENTITY=0   # Keep the loader name in the Dock; do not leave the Dock at exit
 ```
 
 `0007`, `0008`, `0009`, and `0010` default off. Only exactly `1` enables them:
