@@ -49,6 +49,7 @@
     "wineDirectory": "Wine",
     "dxmtDirectory": "DXMT",
     "executables": [
+      "Wine/bin/Arknights",
       "Wine/bin/wine64",
       "Wine/bin/wineserver"
     ],
@@ -102,6 +103,7 @@
         "dxmtDirectory": "DXMT",
         "minimumMacOS": "26.0",
         "executables": [
+          "Wine/bin/Arknights",
           "Wine/bin/wine64",
           "Wine/bin/wineserver"
         ],
@@ -296,7 +298,7 @@
       "sha256": "05965d0897ae5a9c1aea8bfe55b91f9af6cb8bc62e96403d0bc2e210eb80d054"
     },
     {
-      "id": "wine-winemac-dock-identity-from-game",
+      "id": "wine-winemac-dock-icon-override-and-exit",
       "component": "wine",
       "number": 20,
       "gate": "LMISXH_AKMOCL_DOCK_IDENTITY",
@@ -304,8 +306,8 @@
       "targets": [
         "rosetta-x86_64"
       ],
-      "path": "patches/wine/0020-winemac-dock-identity-from-game.patch",
-      "sha256": "f23f1f8e8e996dd4594c9a22748f2eb8ad8fccd5582681e33b9552701fb53e4f"
+      "path": "patches/wine/0020-winemac-dock-icon-override-and-exit.patch",
+      "sha256": "403fa549b5be2a4345c7de98d4f105beee837dfb4ac22ba95d29a0278d8d3937"
     },
     {
       "id": "dxmt-skip-release-present-statistics",

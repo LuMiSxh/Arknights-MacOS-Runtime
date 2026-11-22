@@ -1,0 +1,80 @@
+diff --git a/dlls/winemac.drv/cocoa_app.m b/dlls/winemac.drv/cocoa_app.m
+--- a/dlls/winemac.drv/cocoa_app.m
++++ b/dlls/winemac.drv/cocoa_app.m
+@@ -46,6 +46,65 @@ static BOOL lmisxh_akmocl_flag( const char *name )
+ static NSString* const NSWindowWillStartDraggingNotification = @"NSWindowWillStartDraggingNotification";
+ static NSString* const NSWindowDidEndDraggingNotification = @"NSWindowDidEndDraggingNotification";
+ 
++/* Dock icon override and clean Dock exit (LMISXH_AKMOCL_DOCK_IDENTITY).
++ * LMISXH_AKMOCL_DOCK_ICON_OVERRIDE names an image file for the Dock icon. At exit the
++ * process leaves the Dock, so macOS records no "wine" entry in the recent apps. */
++static dispatch_semaphore_t lmisxh_akmocl_dock_exit_done;
++
++static BOOL lmisxh_akmocl_dock_identity_enabled( void )
++{
++    const char *value = getenv( "LMISXH_AKMOCL_DOCK_IDENTITY" );
++
++    return !value || (value[0] == '1' && !value[1]);
++}
++
++
++static NSImage* lmisxh_akmocl_dock_icon_override( void )
++{
++    const char *path = getenv( "LMISXH_AKMOCL_DOCK_ICON_OVERRIDE" );
++    NSImage* image;
++
++    if (!path || !path[0]) return nil;
++    image = [[[NSImage alloc] initWithContentsOfFile:[NSString stringWithUTF8String:path]] autorelease];
++    if (!image || ![image isValid])
++    {
++        WARN("could not load the Dock icon override %s\n", path);
++        return nil;
++    }
++    return image;
++}
++
++/* Remove the Dock tile before the process ends. The Dock records a tile that is still
++ * present at exit as a recent app. The Wine thread that exits waits at most 250 ms. */
++static void lmisxh_akmocl_leave_dock_at_exit( void )
++{
++    if (!NSApp) return;
++    if (pthread_main_np())
++    {
++        [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
++        return;
++    }
++    dispatch_async(dispatch_get_main_queue(), ^{
++        [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
++        dispatch_semaphore_signal(lmisxh_akmocl_dock_exit_done);
++    });
++    if (dispatch_semaphore_wait(lmisxh_akmocl_dock_exit_done, dispatch_time(DISPATCH_TIME_NOW, 250 * NSEC_PER_MSEC)))
++        WARN("timed out leaving the Dock at exit\n");
++}
++
++static void lmisxh_akmocl_register_dock_exit( void )
++{
++    static dispatch_once_t once;
++
++    if (!lmisxh_akmocl_dock_identity_enabled()) return;
++
++    dispatch_once(&once, ^{
++        lmisxh_akmocl_dock_exit_done = dispatch_semaphore_create(0);
++        if (atexit( lmisxh_akmocl_leave_dock_at_exit ))
++            WARN("could not register the Dock exit handler\n");
++    });
++}
++
+ // Internal distributed notification to handle cooperative app activation in Sonoma.
+ static NSString* const WineAppWillActivateNotification = @"WineAppWillActivateNotification";
+ static NSString* const WineActivatingAppPIDKey = @"ActivatingAppPID";
+@@ -554,7 +613,9 @@ - (void) transformProcessToForeground:(BOOL)activateIfTransformed
+             [NSApp setMainMenu:mainMenu];
+             [NSApp setWindowsMenu:submenu];
+ 
+-            [NSApp setApplicationIconImage:self.applicationIcon];
++            NSImage* dockIcon = lmisxh_akmocl_dock_identity_enabled() ? lmisxh_akmocl_dock_icon_override() : nil;
++            [NSApp setApplicationIconImage:dockIcon ? dockIcon : self.applicationIcon];
++            lmisxh_akmocl_register_dock_exit();
+         }
+     }
+ 

@@ -54,10 +54,10 @@ The canonical copy of each patch is in [README.md](README.md#canonical-copies).
 - `0018-ntdll-promote-cx-unix-environment-variables.patch` ports WineCX CW HACK 24717
   from the same WineCX commit. It differs from WineCX in the empty-name check and
   ignores entries without `=`. Source file in Wine: `dlls/ntdll/unix/process.c`.
-- `0019-winemac-squircle-app-icon.patch` and `0020-winemac-dock-identity-from-game.patch` are
+- `0019-winemac-squircle-app-icon.patch` and `0020-winemac-dock-icon-override-and-exit.patch` are
   original changes for this repository. They port x86 patches `0019` and `0020`. See
   [Dock provenance](../patches/wine/provenance.md#0019-squircle-icon). Source files in Wine:
-  `dlls/winemac.drv/cocoa_app.m`, `cocoa_app.h`, `cocoa_window.m`.
+  `dlls/winemac.drv/cocoa_app.m`.
 - `fex/0001-arm64ec-restore-carried-eflags.patch` applies to FEX commit
   `14c92681f4d62cf84d901460e0358de09c8847a7` (`FEX-Emu/FEX`). The upstream author is not
   recorded in this repository. The FEX license is MIT; see

@@ -167,18 +167,18 @@ The patch changes one line in `dlls/winemac.drv/cocoa_app.m`. It sets the Quit i
 
 The patch redraws the icon in `setApplicationIconFromCGImageArray:`. It uses a drawing handler on a 512-point canvas. The content is the centered 412-point square, clipped to a 92-point rounded rectangle.
 
-- ID: `wine-winemac-dock-identity-from-game`
-- File: `patches/wine/0020-winemac-dock-identity-from-game.patch`
+- ID: `wine-winemac-dock-icon-override-and-exit`
+- File: `patches/wine/0020-winemac-dock-icon-override-and-exit.patch`
 - Component/base: WineCX <!-- pin:wine.commit|code -->`a54b8240683e92bf4c15cb1ba6bf92a9539bd768`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Original runtime change, runtime maintainers
 - License: LGPL-2.1-or-later (Wine)
-- Gate: `LMISXH_AKMOCL_DOCK_IDENTITY` (default on: unset or exactly `1`); the override variables `LMISXH_AKMOCL_DOCK_NAME_OVERRIDE` and `LMISXH_AKMOCL_DOCK_ICON_OVERRIDE` follow it
-- Inactive behavior: Missing `0` or invalid values keep the loader name and the exit behavior of Wine.
+- Gate: `LMISXH_AKMOCL_DOCK_IDENTITY` (default on: unset or exactly `1`); `LMISXH_AKMOCL_DOCK_ICON_OVERRIDE` follows it
+- Inactive behavior: Missing `0` or invalid values keep the icon from the executable and the exit behavior of Wine.
 - Automated gate: Hash, clean apply in lock order, `winemac.so` compile in the single x86_64 build
-- Manual gate: `lsappinfo` shows the main window title as the name. The name override wins. The Dock tile is gone at exit and the recent apps list gains no `wine` entry.
-- Removal: Drop when LaunchServices offers a public display-name API, or when the client no longer needs a game name in the Dock
+- Manual gate: The icon override file replaces the Dock icon. The Dock tile is gone at exit and the recent apps list gains no `wine` entry.
+- Removal: Drop when the client no longer needs an icon override or a clean Dock exit
 
-The patch uses the private `_LSSetApplicationInformationItem` call, resolved with `dlsym`. If the call is missing, it logs one warning and does nothing. It sets the activation policy to Prohibited from an `atexit` handler. The main thread runs the change, and the exiting thread waits at most 250 ms.
+The patch sets the activation policy to Prohibited from an `atexit` handler. The main thread runs the change, and the exiting thread waits at most 250 ms. It does not set the Dock name: the Dock reads the name from the executable path at launch, and no later call changes it.
 
 ## Fullscreen
 

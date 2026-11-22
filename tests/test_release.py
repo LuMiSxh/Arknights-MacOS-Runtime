@@ -461,6 +461,7 @@ def _write_external_fixture(root: Path) -> None:
                     "dxmtDirectory": "DXMT",
                     "minimumMacOS": "26.0",
                     "executables": [
+                        "Wine/bin/Arknights",
                         "Wine/bin/wine64",
                         "Wine/bin/wineserver",
                     ],

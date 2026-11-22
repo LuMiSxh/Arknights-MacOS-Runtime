@@ -17,7 +17,7 @@ Since runtime 0.7.0:
 - Wine uses `--enable-archs=x86_64`: no `lib/wine/i386-windows`, no `DXMT/x32`.
 - Wine uses `--without-gstreamer --without-ffmpeg`: no GStreamer plugins, FFmpeg, or codec libraries.
 - The build derives the bundled library closure from the Mach-O references of the Wine unix modules.
-- `Wine/bin/wine64`, `wine`, and `wineloader` are symlinks to `lib/wine/x86_64-unix/wine`, the single loader.
+- `Wine/bin/wine64`, `wine`, and `wineloader` are symlinks to `lib/wine/x86_64-unix/wine`, the single loader. `Arknights` points at `wine64`.
 - `validate_runtime.py --require-64-bit-only` rejects the removed payloads in clean builds. Overlay candidates inherit them and are exempt.
 
 ## Runtime flags

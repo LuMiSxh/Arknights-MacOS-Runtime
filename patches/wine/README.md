@@ -28,7 +28,7 @@ A patch number names one patch in both lanes. A patch shared by both lanes keeps
 | 0014 | `0014-kernel32-ace-dispatcher-spoof.patch` | x86 dispatcher lookup spoof | `LMISXH_AKMOCL_ACE_DISPATCHER` | on | x86 only |
 | 0015 | `0015-macos-rosetta-ace-workarounds.patch` | Rosetta ACE privileged-instruction workarounds | `LMISXH_AKMOCL_ACE_ROSETTA` | on | x86 only |
 | 0019 | `0019-winemac-squircle-app-icon.patch` | Squircle Dock icon on the macOS icon grid | `LMISXH_AKMOCL_SQUIRCLE_ICON` | on | x86, ARM |
-| 0020 | `0020-winemac-dock-identity-from-game.patch` | Dock name and icon from the game, clean Dock exit | `LMISXH_AKMOCL_DOCK_IDENTITY` | on | x86, ARM |
+| 0020 | `0020-winemac-dock-icon-override-and-exit.patch` | Dock icon override and clean Dock exit | `LMISXH_AKMOCL_DOCK_IDENTITY` | on | x86, ARM |
 
 `0007` and `0008` share the `LMISXH_AKMOCL_CN` gate. `0013` to `0015` are the x86
 ACE routes; the ARM export carries its own ACE copies. The ACE routes target the
@@ -201,26 +201,24 @@ handler renders the icon, so it stays sharp on Retina displays. If the redraw
 fails, winemac publishes the original icon. `LMISXH_AKMOCL_DOCK_ICON_OVERRIDE`
 from `0020` bypasses this patch.
 
-### 0020 Dock identity
+### 0020 Dock icon override and exit
 
-Replaces the identity that the client injected into the game process. It is
-independent of `0019`.
+Replaces the icon override and exit handling that the client injected into the
+game process. It is independent of `0019`.
 
-1. The Dock name is the title of the first visible, titled window that has no
-   parent. The name follows later title changes of that window. Empty titles are
-   ignored. The patch sets the name with the private LaunchServices call
-   `_LSSetApplicationInformationItem`, which it resolves with `dlsym`. If the
-   call is missing, the patch logs one warning and keeps the loader name.
-2. `LMISXH_AKMOCL_DOCK_NAME_OVERRIDE` with a non-empty value fixes the Dock name
-   from startup. Window titles no longer change it.
-3. `LMISXH_AKMOCL_DOCK_ICON_OVERRIDE` names an image file. When the file loads,
+1. `LMISXH_AKMOCL_DOCK_ICON_OVERRIDE` names an image file. When the file loads,
    winemac publishes it unchanged, without `0019`. Otherwise winemac logs a
    warning and uses the executable icon.
-4. At process exit, an `atexit` handler sets the activation policy to Prohibited
+2. At process exit, an `atexit` handler sets the activation policy to Prohibited
    on the main thread. The exiting thread waits at most 250 ms. The Dock tile
    leaves first, so macOS keeps no entry for the loader binary in the recent apps.
 
-The two override variables belong to the same gate. `LMISXH_AKMOCL_DOCK_IDENTITY=0`
-turns off all four parts.
+The patch does not name the Dock tile. macOS fixes the name from the executable
+path at launch, and no LaunchServices or AppKit call changes it afterwards.
+The launcher link `Wine/bin/Arknights` (x86) and the `Arknights.app` loader bundle
+(ARM64) provide the name.
+
+`LMISXH_AKMOCL_DOCK_ICON_OVERRIDE` belongs to the same gate.
+`LMISXH_AKMOCL_DOCK_IDENTITY=0` turns off both parts.
 
 See [provenance.md](provenance.md) for sources, authors, and licenses.

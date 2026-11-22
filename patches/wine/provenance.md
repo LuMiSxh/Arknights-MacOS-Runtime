@@ -179,8 +179,7 @@ An original change for this repository. It replaces the icon bridge that the
 client injected into the game process. The corner radius follows the macOS icon
 shape. The yaagl pull request 771 (`native/DockIconBridge.m`) is prior art.
 
-## 0020 Dock identity
+## 0020 Dock icon override and exit
 
 An original change for this repository. It replaces the activation-policy and
-name handling of the injected client bridge. It uses the private LaunchServices
-display-name call that CrossOver and other launchers also use.
+icon handling of the injected client bridge.

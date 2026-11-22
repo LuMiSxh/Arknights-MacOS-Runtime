@@ -131,8 +131,8 @@
       },
       {
         "order": 88,
-        "path": "wine-build-new/patches/0020-winemac-dock-identity-from-game.patch",
-        "sha256": "8164bd3813238c2dc229fac45b8ef38188fdaf18b0ef79e7e9e637cd5403717b",
+        "path": "wine-build-new/patches/0020-winemac-dock-icon-override-and-exit.patch",
+        "sha256": "e1bc4253bbf626a937e1ba0c089954e7ebae483e132fe2e4b2bf84dfee85b10b",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_DOCK_IDENTITY"
       }

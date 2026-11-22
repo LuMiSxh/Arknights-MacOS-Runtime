@@ -270,6 +270,9 @@ def prepare_base(root: Path, *, clean_release: bool) -> Path:
         candidate.mkdir(parents=True)
     else:
         clone_tree(root / "base" / "Libraries", candidate)
+        launcher = candidate / "Wine" / "bin" / "Arknights"
+        if not launcher.exists() and not launcher.is_symlink():
+            launcher.symlink_to("wine64")
     return candidate
 
 
@@ -301,6 +304,9 @@ def install_clean_wine(root: Path, candidate: Path, wine_install: Path) -> None:
         link = candidate / "Wine/bin" / name
         link.unlink(missing_ok=True)
         link.symlink_to("../lib/wine/x86_64-unix/wine")
+    launcher = candidate / "Wine/bin" / "Arknights"
+    launcher.unlink(missing_ok=True)
+    launcher.symlink_to("wine64")
     base_library = root / "base/Libraries/Wine/lib/libMoltenVK.dylib"
     if not base_library.is_file():
         raise BuildError(
