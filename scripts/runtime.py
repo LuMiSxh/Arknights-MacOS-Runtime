@@ -21,6 +21,7 @@ else:
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCK_PATH = ROOT / "runtime.lock.json"
+ARM_LOCK_PATH = ROOT / "wine-build-new" / "lock.json"
 BUILD_ROOT = ROOT / ".build"
 SCHEMA_VERSION = 3
 ARCHIVE_SCHEMA_VERSION = 2
@@ -507,6 +508,55 @@ def fetch_base(*, target: str | None = None) -> Path:
     return path
 
 
+WINE_PATCH_FILE = re.compile(r"(\d{4})-(.+)\.patch")
+
+
+def validate_wine_patch_parity(
+    runtime_lock: Path = LOCK_PATH, arm_lock: Path = ARM_LOCK_PATH
+) -> None:
+    """Require each Wine patch to keep one number and one name in both lanes."""
+    runtime = _read_lock_object(runtime_lock)
+    arm = _read_lock_object(arm_lock)
+    lanes = {
+        "x86_64": [
+            patch["path"]
+            for patch in runtime.get("patches", [])
+            if patch.get("component") == "wine"
+        ],
+        "arm64": [patch["path"] for patch in arm.get("wine", {}).get("patches", [])],
+    }
+    numbers_by_name: dict[str, set[int]] = {}
+    names_by_number: dict[int, set[str]] = {}
+    for lane, paths in lanes.items():
+        for path in paths:
+            match = WINE_PATCH_FILE.fullmatch(PurePosixPath(path).name)
+            if match is None:
+                raise LockError(
+                    f"{lane} Wine patch {path} must be named NNNN-name.patch"
+                )
+            number, name = int(match[1]), match[2]
+            numbers_by_name.setdefault(name, set()).add(number)
+            names_by_number.setdefault(number, set()).add(name)
+    for name, numbers in numbers_by_name.items():
+        if len(numbers) > 1:
+            raise LockError(
+                f"{name} has different Wine patch numbers across lanes: {sorted(numbers)}"
+            )
+    for number, names in names_by_number.items():
+        if len(names) > 1:
+            raise LockError(
+                f"Wine patch number {number:04d} names different patches across lanes: "
+                f"{sorted(names)}"
+            )
+
+
+def _read_lock_object(path: Path) -> dict[str, Any]:
+    try:
+        return _require_mapping(json.loads(path.read_text(encoding="utf-8")), str(path))
+    except (OSError, json.JSONDecodeError) as error:
+        raise LockError(f"cannot read {path}: {error}") from error
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -534,6 +584,7 @@ def main() -> int:
     try:
         if arguments.command == "validate-lock":
             lock = load_lock(target=arguments.target)
+            validate_wine_patch_parity()
             if arguments.target is None:
                 success("Validated runtime.lock.json")
             else:

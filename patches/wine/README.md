@@ -10,6 +10,8 @@ A default-on gate is on when the variable is unset or exactly `1`. Any other val
 including `0`, `false`, an empty string, or a typo, turns the patch off.
 A default-off gate is on only for exactly `1`.
 
+A patch number names one patch in both lanes. A patch shared by both lanes keeps its number and file name in `patches/wine/` and `wine-build-new/patches/`. A lane-only patch takes the next unused number in both lanes and leaves a gap in the other lane. Never reuse a number. Gaps mark lane-only patches: `0012` to `0015` are x86 only, and `0016` to `0018` are ARM only.
+
 | Number | File | Purpose | Gate variable | Default | Targets |
 | ------ | ---- | ------- | ------------- | ------- | ------- |
 | 0003 | `0003-ntoskrnl-arknights-ace-imports.patch` | ACE kernel imports and process metadata | `LMISXH_AKMOCL_ACE_IMPORTS` | on | x86, ARM |
@@ -25,8 +27,8 @@ A default-off gate is on only for exactly `1`.
 | 0013 | `0013-ntdll-ace-qpc-relative-wait.patch` | ACE QPC relative wait | `LMISXH_AKMOCL_ACE_TIMING` | on | x86 only |
 | 0014 | `0014-kernel32-ace-dispatcher-spoof.patch` | x86 dispatcher lookup spoof | `LMISXH_AKMOCL_ACE_DISPATCHER` | on | x86 only |
 | 0015 | `0015-macos-rosetta-ace-workarounds.patch` | Rosetta ACE privileged-instruction workarounds | `LMISXH_AKMOCL_ACE_ROSETTA` | on | x86 only |
-| 0016 | `0016-winemac-squircle-app-icon.patch` | Squircle Dock icon on the macOS icon grid | `LMISXH_AKMOCL_SQUIRCLE_ICON` | on | x86, ARM (`0015`) |
-| 0017 | `0017-winemac-dock-identity-from-game.patch` | Dock name and icon from the game, clean Dock exit | `LMISXH_AKMOCL_DOCK_IDENTITY` | on | x86, ARM (`0016`) |
+| 0019 | `0019-winemac-squircle-app-icon.patch` | Squircle Dock icon on the macOS icon grid | `LMISXH_AKMOCL_SQUIRCLE_ICON` | on | x86, ARM |
+| 0020 | `0020-winemac-dock-identity-from-game.patch` | Dock name and icon from the game, clean Dock exit | `LMISXH_AKMOCL_DOCK_IDENTITY` | on | x86, ARM |
 
 `0007` and `0008` share the `LMISXH_AKMOCL_CN` gate. `0013` to `0015` are the x86
 ACE routes; the ARM export carries its own ACE copies. The ACE routes target the
@@ -190,19 +192,19 @@ Patch order for the ACE routes is `0003`, `0013`, `0014`, then `0015`.
 Validate the inactive and enabled routes in an isolated prefix: launcher startup,
 ACE initialization, gameplay, and clean shutdown.
 
-### 0016 Squircle icon
+### 0019 Squircle icon
 
 Redraws the application icon that Wine extracts from the executable. The icon
 sits on a transparent 512-point canvas, inside the centered 412-point macOS icon
 grid, clipped to a rounded rectangle with a radius of 92 points. A drawing
 handler renders the icon, so it stays sharp on Retina displays. If the redraw
 fails, winemac publishes the original icon. `LMISXH_AKMOCL_DOCK_ICON_OVERRIDE`
-from `0017` bypasses this patch.
+from `0020` bypasses this patch.
 
-### 0017 Dock identity
+### 0020 Dock identity
 
 Replaces the identity that the client injected into the game process. It is
-independent of `0016`.
+independent of `0019`.
 
 1. The Dock name is the title of the first visible, titled window that has no
    parent. The name follows later title changes of that window. Empty titles are
@@ -212,7 +214,7 @@ independent of `0016`.
 2. `LMISXH_AKMOCL_DOCK_NAME_OVERRIDE` with a non-empty value fixes the Dock name
    from startup. Window titles no longer change it.
 3. `LMISXH_AKMOCL_DOCK_ICON_OVERRIDE` names an image file. When the file loads,
-   winemac publishes it unchanged, without `0016`. Otherwise winemac logs a
+   winemac publishes it unchanged, without `0019`. Otherwise winemac logs a
    warning and uses the executable icon.
 4. At process exit, an `atexit` handler sets the activation policy to Prohibited
    on the main thread. The exiting thread waits at most 250 ms. The Dock tile

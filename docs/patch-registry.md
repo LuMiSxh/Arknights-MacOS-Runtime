@@ -155,7 +155,7 @@ The patch changes one line in `dlls/winemac.drv/cocoa_app.m`. It sets the Quit i
 ## Dock
 
 - ID: `wine-winemac-squircle-app-icon`
-- File: `patches/wine/0016-winemac-squircle-app-icon.patch`
+- File: `patches/wine/0019-winemac-squircle-app-icon.patch`
 - Component/base: WineCX <!-- pin:wine.commit|code -->`a54b8240683e92bf4c15cb1ba6bf92a9539bd768`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Original runtime change, runtime maintainers
 - License: LGPL-2.1-or-later (Wine)
@@ -168,7 +168,7 @@ The patch changes one line in `dlls/winemac.drv/cocoa_app.m`. It sets the Quit i
 The patch redraws the icon in `setApplicationIconFromCGImageArray:`. It uses a drawing handler on a 512-point canvas. The content is the centered 412-point square, clipped to a 92-point rounded rectangle.
 
 - ID: `wine-winemac-dock-identity-from-game`
-- File: `patches/wine/0017-winemac-dock-identity-from-game.patch`
+- File: `patches/wine/0020-winemac-dock-identity-from-game.patch`
 - Component/base: WineCX <!-- pin:wine.commit|code -->`a54b8240683e92bf4c15cb1ba6bf92a9539bd768`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Original runtime change, runtime maintainers
 - License: LGPL-2.1-or-later (Wine)

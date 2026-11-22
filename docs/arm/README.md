@@ -40,7 +40,7 @@ wine/                       # lowercase
 
 `provenance-arm64.json` records the build commit, the resolved `runtimeLock`, and the validation report. It records the selected catalog id, SHA-256, and size under `wine.artifact`. `just combine` merges this fragment into `provenance.json`.
 
-The archive has no DXMT, no `winemetal.so`, no `wine64`, and no `WINEPRELOADERAPPNAME`. Patches `0012` and `0013` provide `WINEPRELOADERAPPNAME` once the external build picks them up. `scripts/targets/arm64_assemble.py` adds `Wine/bin/wine64`, the DXMT payload, and the WineMetal modules outside the signed `wine.app` bundle. The Dock name and icon come from the winemac patches `0015` and `0016`, not from the bundle name.
+The archive has no DXMT, no `winemetal.so`, no `wine64`, and no `WINEPRELOADERAPPNAME`. Patches `0016` and `0017` provide `WINEPRELOADERAPPNAME` once the external build picks them up. `scripts/targets/arm64_assemble.py` adds `Wine/bin/wine64`, the DXMT payload, and the WineMetal modules outside the signed `wine.app` bundle. The Dock name and icon come from the winemac patches `0019` and `0020`, not from the bundle name.
 
 ## DXMT
 

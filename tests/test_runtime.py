@@ -12,6 +12,7 @@ from scripts.runtime import (
     LockError,
     load_lock,
     prepare,
+    validate_wine_patch_parity,
 )
 
 
@@ -175,6 +176,44 @@ class RuntimeLockTests(unittest.TestCase):
 
         with self.assertRaisesRegex(LockError, "runtime-relative"):
             load_lock(self.write_lock(), repository_root=self.root)
+
+
+class WinePatchParityTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary_directory.name)
+
+    def tearDown(self) -> None:
+        self.temporary_directory.cleanup()
+
+    def test_rejects_a_wine_patch_number_that_differs_between_lanes(self) -> None:
+        cases = {
+            "same name, different number": (
+                "patches/wine/0019-winemac-squircle-app-icon.patch",
+                "wine-build-new/patches/0015-winemac-squircle-app-icon.patch",
+                "winemac-squircle-app-icon has different",
+            ),
+            "same number, different name": (
+                "patches/wine/0016-winecoreaudio-default-output.patch",
+                "wine-build-new/patches/0016-ntdll-name-the-macos-loader-link.patch",
+                "Wine patch number 0016 names different",
+            ),
+        }
+        for case, (x86_path, arm_path, message) in cases.items():
+            with self.subTest(case):
+                runtime_lock = self.root / "runtime.lock.json"
+                arm_lock = self.root / "lock.json"
+                runtime_lock.write_text(
+                    json.dumps({"patches": [{"component": "wine", "path": x86_path}]}),
+                    encoding="utf-8",
+                )
+                arm_lock.write_text(
+                    json.dumps({"wine": {"patches": [{"path": arm_path}]}}),
+                    encoding="utf-8",
+                )
+
+                with self.assertRaisesRegex(LockError, message):
+                    validate_wine_patch_parity(runtime_lock, arm_lock)
 
 
 if __name__ == "__main__":

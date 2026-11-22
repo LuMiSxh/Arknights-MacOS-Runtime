@@ -173,13 +173,13 @@ The x86 copies live in this directory. The ARM copies live in
 numbers, names, gates, and gate semantics. Edit the copy for its target, then
 rebase.
 
-## 0016 Squircle icon
+## 0019 Squircle icon
 
 An original change for this repository. It replaces the icon bridge that the
 client injected into the game process. The corner radius follows the macOS icon
 shape. The yaagl pull request 771 (`native/DockIconBridge.m`) is prior art.
 
-## 0017 Dock identity
+## 0020 Dock identity
 
 An original change for this repository. It replaces the activation-policy and
 name handling of the injected client bridge. It uses the private LaunchServices

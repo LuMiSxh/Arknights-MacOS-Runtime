@@ -20,7 +20,7 @@ This repository owns the exact WineCX, DXMT, dependency, and patch inputs of the
 
 ## Baseline
 
-- The x86_64 lane uses dappermint runtime <!-- pin:base.version -->4.7.3<!-- /pin --> with WineCX <!-- pin:wine.version -->11.17<!-- /pin -->. One build applies every Wine patch (`0003`–`0015`) and the DXMT patch (`0001`).
+- The x86_64 lane uses dappermint runtime <!-- pin:base.version -->4.7.3<!-- /pin --> with WineCX <!-- pin:wine.version -->11.17<!-- /pin -->. One build applies every Wine patch (`0003`–`0015`, `0019`, `0020`) and the DXMT patch (`0001`).
 - The clean x86_64 release tree contains newly built 64-bit Wine and DXMT (no GStreamer/FFmpeg) and the pinned Nix library closure.
 - The x86_64 MoltenVK library comes from the third-party base archive, which a SHA-256 hash pins.
 - The native ARM64 lane is external. It ships the `wine-11-18-arm64-v5` Wine tree from [wine-build-new](https://github.com/riverfog7/wine-build-new) and builds DXMT for ARM64EC. It requires macOS 26.0 or newer.

@@ -104,34 +104,34 @@
       },
       {
         "order": 84,
-        "path": "wine-build-new/patches/0012-ntdll-name-the-macos-loader-link-after-the-application.patch",
+        "path": "wine-build-new/patches/0016-ntdll-name-the-macos-loader-link-after-the-application.patch",
         "sha256": "50e992f4e11b652f57a41f8b212019f62aeffaa7facc61ab043ed8daddf3f8f3",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_LOADER_LINK"
       },
       {
         "order": 85,
-        "path": "wine-build-new/patches/0013-winemac-name-the-application-menu-after-the-program.patch",
+        "path": "wine-build-new/patches/0017-winemac-name-the-application-menu-after-the-program.patch",
         "sha256": "6fe4fe66ce5da8ca73bdd9363609200803f5546d65d8c0ee5912f9fefcef9819",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_LOADER_LINK"
       },
       {
         "order": 86,
-        "path": "wine-build-new/patches/0014-ntdll-promote-cx-unix-environment-variables.patch",
+        "path": "wine-build-new/patches/0018-ntdll-promote-cx-unix-environment-variables.patch",
         "sha256": "ace719f64a9af466504fa36d87e30a82b1b0e9cdc6137aa192c8c99dd60c9703",
         "default": "on"
       },
       {
         "order": 87,
-        "path": "wine-build-new/patches/0015-winemac-squircle-app-icon.patch",
+        "path": "wine-build-new/patches/0019-winemac-squircle-app-icon.patch",
         "sha256": "ab55d02620ec88fc44a863d972b4c3f43a672e4de25569ecd093c6099e4259ad",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_SQUIRCLE_ICON"
       },
       {
         "order": 88,
-        "path": "wine-build-new/patches/0016-winemac-dock-identity-from-game.patch",
+        "path": "wine-build-new/patches/0020-winemac-dock-identity-from-game.patch",
         "sha256": "8164bd3813238c2dc229fac45b8ef38188fdaf18b0ef79e7e9e637cd5403717b",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_DOCK_IDENTITY"
@@ -156,7 +156,7 @@
     "LMISXH_AKMOCL_WINSOCK": "Implement SIO_ADDRESS_LIST_SORT.",
     "LMISXH_AKMOCL_CEF": "Apply the Bilibili CEF 80.1.15 descriptor.",
     "LMISXH_AKMOCL_MENU": "Make Command+Q quit from the app menu.",
-    "LMISXH_AKMOCL_LOADER_LINK": "Name the loader link and the application menu after the program (0012 and 0013).",
+    "LMISXH_AKMOCL_LOADER_LINK": "Name the loader link and the application menu after the program (0016 and 0017).",
     "LMISXH_AKMOCL_SQUIRCLE_ICON": "Draw the Dock icon as a rounded square on the macOS icon grid.",
     "LMISXH_AKMOCL_DOCK_IDENTITY": "Name the Dock tile after the game window and leave the Dock at exit."
   },
