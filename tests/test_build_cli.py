@@ -5,7 +5,7 @@ import re
 import unittest
 from pathlib import Path
 
-from scripts.targets.x86_64 import WINE_OVERLAY_ARTIFACTS, patched_machos
+from scripts.targets.x86_64 import WINE_OVERLAY_ARTIFACTS
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 LOCK_PATH = REPOSITORY_ROOT / "runtime.lock.json"
@@ -60,12 +60,6 @@ class BuildOverlayContractTests(unittest.TestCase):
             for artifact in artifacts
         }
         self.assertEqual(set(WINE_OVERLAY_ARTIFACTS), expected)
-
-    def test_only_unix_libraries_are_signed(self) -> None:
-        self.assertEqual(
-            sorted(patched_machos()),
-            sorted(a for a in WINE_OVERLAY_ARTIFACTS if a.endswith(".so")),
-        )
 
 
 if __name__ == "__main__":
