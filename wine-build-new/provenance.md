@@ -12,7 +12,7 @@ The canonical copy of each patch is in [README.md](README.md#canonical-copies).
   as `0001`. Source file in Wine: `dlls/ntdll/signal_arm64ec.c`.
 - `0003-ntoskrnl-arknights-ace-imports.patch` is a reduced copy of the ntoskrnl surface in
   [patches/wine/provenance.md#0003-ace-imports](../patches/wine/provenance.md#0003-ace-imports).
-  It adds three exports that Wine 11.18 lacks.
+  It adds three exports that Wine 11.22 lacks.
 - `0004-userenv-appcontainer-apis.patch` is an original change for this repository. It is
   derived from the client's scoped `RuntimeSupport/Vuplex/UserenvCompat.c`. See
   [AppContainer provenance](../patches/wine/provenance.md#0004-appcontainer).
@@ -35,7 +35,7 @@ The canonical copy of each patch is in [README.md](README.md#canonical-copies).
   It was prompted by a user report. See
   [hardware cursor provenance](../patches/wine/provenance.md#0010-hardware-cursor).
 - `0011-winemac-command-q-quit.patch` is an original change for this repository. It ports the
-  x86 Command-Q change in `patches/wine/0011-winemac-command-q-quit.patch` to Wine 11.18.
+  x86 Command-Q change in `patches/wine/0011-winemac-command-q-quit.patch` to Wine 11.22.
   See [Command-Q provenance](../patches/wine/provenance.md#0011-command-q).
 - `0016-ntdll-name-the-macos-loader-link-after-the-application.patch` ports WineCX CW HACK
   22144 from WineCX `a54b8240683e92bf4c15cb1ba6bf92a9539bd768`. It differs from WineCX
@@ -63,6 +63,6 @@ The canonical copy of each patch is in [README.md](README.md#canonical-copies).
   recorded in this repository. The FEX license is MIT; see
   [LICENSES/notices/fex.txt](../LICENSES/notices/fex.txt).
 
-Wine base for the export: upstream Wine 11.18, commit `7b3fff76fa5178f6ce0141b2c776afa2a822f101`.
+Wine base for the export: upstream Wine 11.22, commit `9f8c4ae4d35c7ff4153267aba9618c026f5f5583`.
 
 License of the Wine patches: LGPL-2.1-or-later (Wine).

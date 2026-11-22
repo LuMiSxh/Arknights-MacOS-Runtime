@@ -1,11 +1,17 @@
+
+
+Rebased for Wine 11.22 by riverfog7; original authorship retained.
+Source: ../../../third-party/arknights-macos-runtime/wine-build-new/patches/0002-ntdll-hybrid-thread-entry.patch (pinned source retained in third-party).
+
+---
 diff --git a/dlls/ntdll/signal_arm64ec.c b/dlls/ntdll/signal_arm64ec.c
-index 9f3a0c4..3252a83 100644
+index 397838cac4756940fdbb4e8c0a8bf6364a250b79..29f2a5d22afd90ac050a190217f49e80b2339c43 100644
 --- a/dlls/ntdll/signal_arm64ec.c
 +++ b/dlls/ntdll/signal_arm64ec.c
-@@ -2118,6 +2118,103 @@ void __attribute__((naked)) RtlUserThreadStart( PRTL_THREAD_START_ROUTINE entry,
+@@ -2185,6 +2185,103 @@ void __attribute__((naked)) RtlUserThreadStart( PRTL_THREAD_START_ROUTINE entry,
  }
-
-
+ 
+ 
 +static BOOL lmisxh_akmocl_hybrid_thread_enabled(void)
 +{
 +    static LONG state = -1;
@@ -106,11 +112,11 @@ index 9f3a0c4..3252a83 100644
  /******************************************************************
   *		LdrInitializeThunk (NTDLL.@)
   */
-@@ -2136,6 +2218,7 @@ void WINAPI LdrInitializeThunk( CONTEXT *arm_context, ULONG_PTR unk2, ULONG_PTR
-
-     context_arm_to_x64( &context, (ARM64_NT_CONTEXT *)arm_context );
-     loader_init( &context.AMD64_Context, (void **)&context.X0 );
-+    context.X0 = fixup_native_thread_entry( context.X0 );
-     TRACE_(relay)( "\1Starting thread proc %p (arg=%p)\n", (void *)context.X0, (void *)context.X1 );
-     NtContinue( &context.AMD64_Context, TRUE );
+@@ -2203,6 +2300,7 @@ void WINAPI LdrInitializeThunk( CONTEXT *arm_context, ULONG_PTR unk2, ULONG_PTR
+ 
+     init_xcontext( &context, (ARM64_NT_CONTEXT *)arm_context );
+     loader_init( &context.c.AMD64_Context, (void **)&context.c.X0 );
++    context.c.X0 = fixup_native_thread_entry( context.c.X0 );
+     TRACE_(relay)( "\1Starting thread proc %p (arg=%p)\n", (void *)context.c.X0, (void *)context.c.X1 );
+     NtContinue( &context.c.AMD64_Context, TRUE );
  }

@@ -4,7 +4,7 @@ This directory is the Arknights patch export for the signed ARM64 runtime built 
 [wine-build-new](https://github.com/riverfog7/wine-build-new). That workspace consumes this
 repository as a submodule at `third-party/arknights-macos-runtime`.
 
-The workspace builds upstream Wine 11.18 with a 72-patch Hadron and Endfield queue. The
+The workspace builds upstream Wine 11.22 with a 96-patch Hadron and Endfield queue. The
 patches here are rebased against that queue, not against this repository's WineCX 11.17
 tree. The workspace links each patch individually from `wine-build-new/patches/` into
 `patches/wine/arknights-macos-runtime/`, matching its other third-party patch families.
@@ -53,7 +53,7 @@ runtime proves they are unnecessary. Drop criteria:
 - `0002`: ACE initializes without a hybrid-thread entry fault.
 - `0001`: ACE initializes without a context-flag failure.
 
-Wine 11.18 does not contain the three `0003` exports. The Endfield queue adds other ACE
+Wine 11.22 does not contain the three `0003` exports. The Endfield queue adds other ACE
 imports but not these three. No ACE import dump was available for this audit.
 
 ### Why `0004` and `0005` stay
@@ -166,7 +166,7 @@ The FEX port no longer needs an entry.
 | Item        | Value                                                                  |
 | ----------- | ---------------------------------------------------------------------- |
 | Workspace   | [wine-build-new](https://github.com/riverfog7/wine-build-new), branch `arknights-arm64` |
-| Wine        | Upstream 11.18, commit `7b3fff76fa5178f6ce0141b2c776afa2a822f101`     |
+| Wine        | Upstream 11.22, commit `9f8c4ae4d35c7ff4153267aba9618c026f5f5583`     |
 | FEX         | Commit `14c92681f4d62cf84d901460e0358de09c8847a7`                      |
 | Hadron      | Commit `6f401bcfcf4c1cbf7fbd724974fc8d3562262b1c`                      |
 | Endfield    | Commit `568afd1a32e25e40170eb7484f6790d1e1d370fd`                      |
@@ -196,7 +196,7 @@ Edit the canonical copy, then rebase it into `wine-build-new/patches/`. Where th
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | FEX lookup-cache eager commit                 | Not needed. The workspace FEX `local/0009` commits the L1 window in the constructor, after a cache clear, and when the window grows.                        |
 | Mono skip                                     | Not needed. The workspace ships no Wine Mono, the entitlement removes the low-4 GB constraint, and `WINEDLLOVERRIDES=mscoree=d` covers a fresh prefix.     |
-| ACE imports (`0003`)                          | Kept until an ACE run. Wine 11.18 lacks the exports, but no Arknights ACE import dump was available.                                                         |
+| ACE imports (`0003`)                          | Kept until an ACE run. Wine 11.22 lacks the exports, but no Arknights ACE import dump was available.                                                         |
 | Hybrid thread entry (`0002`)                  | Kept until an ACE run. The reference fix is an EA overlay case, not ACE.                                                                                     |
 | AF/DF context (`0001`)                        | Kept until an ACE run. FEX rebuilds emulated flags, but native ARM64EC context handling still drops them.                                                    |
 | AppContainer (`0004`)                         | Kept. It replaces a per-game `userenv.dll` shim and covers all clients.                                                                                      |
@@ -240,7 +240,7 @@ Arknights client sets the opt-outs it needs. The CN and cursor patches still nee
 ## Updating the export
 
 1. Change the canonical patch (see [Canonical copies](#canonical-copies)).
-2. Rebase it onto the workspace queue in a Wine 11.18 checkout.
+2. Rebase it onto the workspace queue in a Wine 11.22 checkout.
 3. Run the full queue. Every patch must apply with `-F0`.
 4. Replace the file under `wine-build-new/patches/`.
 5. Update the gate or provenance in this file when the contract changes.
