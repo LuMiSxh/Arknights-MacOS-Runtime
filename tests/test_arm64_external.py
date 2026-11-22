@@ -440,36 +440,12 @@ def test_assemble_moves_the_wine_tree_and_adds_links(tmp_path):
     )
 
     assert (layout / "Wine/bin/wine64").is_symlink()
-    assert (layout / "Wine/bin/Arknights").is_symlink()
     assert os.readlink(layout / "Wine/bin/wine64") == "wine"
-    assert os.readlink(layout / "Wine/bin/Arknights") == "wine64"
     assert (layout / "DXMT/x64/d3d11.dll").is_file()
     assert (layout / "Wine/lib/wine/aarch64-unix/winemetal.so").is_file()
     assert (layout / "Wine/lib/wine/aarch64-windows/winemetal.dll").is_file()
     assert (tmp_path / "Licenses/external/fex-wine/LICENSE").is_file()
     assert (tmp_path / "NOTICE.md").is_file()
-
-
-def test_assemble_renames_the_loader_bundle_and_repoints_its_links(tmp_path):
-    wine_root, dxmt_root = _build_external_trees(tmp_path)
-
-    layout = assemble(
-        wine_root,
-        dxmt_root,
-        tmp_path / "Libraries",
-        archive_root=tmp_path,
-        interface=_interface(),
-    )
-
-    wine = layout / "Wine"
-    loader = layout / "Wine/lib/wine/aarch64-unix/Arknights.app/Contents/MacOS/wine"
-    assert loader.read_bytes() == b"wine loader"
-    assert not (wine / "lib/wine/aarch64-unix/wine.app").exists()
-    assert (wine / "bin/wine").resolve() == loader.resolve()
-    assert (wine / "lib/wine/aarch64-unix/wine").resolve() == loader.resolve()
-    targets = [os.readlink(path) for path in wine.rglob("*") if path.is_symlink()]
-    assert targets
-    assert not any("wine.app" in target for target in targets)
 
 
 def test_assemble_clears_the_wine_dos_stub(tmp_path):

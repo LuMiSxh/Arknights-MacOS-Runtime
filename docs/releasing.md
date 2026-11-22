@@ -63,7 +63,7 @@ The ARM64 lane ships an external Wine tree and builds DXMT in the workflow. The 
 1. Dispatch **Runtime Build** as described above. Optionally enter `arm64_release_id`. Leave it empty to use the newest ARM64 release.
 2. The workflow selects the release id and takes the SHA-256 from the catalog, fetches the artifact, verifies it, and extracts it. The lock pin is the last verified baseline. The catalog and archive URLs never appear in output, assets, or provenance.
 3. `scripts/targets/arm64_dxmt.py` builds DXMT from `sources.dxmt` for ARM64EC with `MACOSX_DEPLOYMENT_TARGET=26.0`. It needs the fetched Wine artifact, so the lane fetches Wine first.
-4. `scripts/targets/arm64_assemble.py` repacks the client tree as `Libraries/Wine`, `Libraries/DXMT`, `Licenses/`, and `NOTICE.md`. The signed loader bundle is renamed to `Arknights.app`. It keeps its Developer ID signature.
+4. `scripts/targets/arm64_assemble.py` repacks the client tree as `Libraries/Wine`, `Libraries/DXMT`, `Licenses/`, and `NOTICE.md`. The signed `wine.app` loader bundle keeps its name and its Developer ID signature.
 5. `scripts/build.py release --target native-arm64 --version 0.9.0` validates the tree and runs the release gates. The gate requires `inheritedMachOAboveTarget` to be `0`. Check the validation report before you publish.
 6. The release is normal, not a prerelease. Its notes name the selected catalog release.
 7. The release assets are, for each lane, the runtime archive and its `.sha256`, and the corresponding source archive and its `.sha256`. The release also has `provenance.json` and `THIRD-PARTY-NOTICES.txt`. The ARM64 source archive contains `wine-build-new`, `runtime.lock.json`, and `docs/arm/README.md`.

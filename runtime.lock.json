@@ -49,7 +49,6 @@
     "wineDirectory": "Wine",
     "dxmtDirectory": "DXMT",
     "executables": [
-      "Wine/bin/Arknights",
       "Wine/bin/wine64",
       "Wine/bin/wineserver"
     ],
@@ -103,7 +102,6 @@
         "dxmtDirectory": "DXMT",
         "minimumMacOS": "26.0",
         "executables": [
-          "Wine/bin/Arknights",
           "Wine/bin/wine64",
           "Wine/bin/wineserver"
         ],
