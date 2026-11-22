@@ -30,7 +30,7 @@ def run_command(command: list[str]) -> str | None:
 def collect_toolchain(run: Runner = run_command) -> dict[str, Any]:
     """Collect brew, Xcode, SDK, and macOS versions. Missing values read `unavailable`."""
 
-    brew: dict[str, str] = {name: UNAVAILABLE for name in BREW_FORMULAE}
+    brew: dict[str, str] = dict.fromkeys(BREW_FORMULAE, UNAVAILABLE)
     listing = run(["brew", "list", "--versions", *BREW_FORMULAE])
     for line in (listing or "").splitlines():
         name, _, versions = line.partition(" ")

@@ -88,9 +88,10 @@ def build_environment(
     nixpkgs = f"github:NixOS/nixpkgs/{nixpkgs_revision}"
     builder.environment["MACOSX_DEPLOYMENT_TARGET"] = str(lock["deploymentTarget"])
 
-    tool_paths: list[Path] = []
-    for attribute in ("bison", "flex", "pkg-config"):
-        tool_paths.append(nix_build(builder, f"{nixpkgs}#{attribute}"))
+    tool_paths = [
+        nix_build(builder, f"{nixpkgs}#{attribute}")
+        for attribute in ("bison", "flex", "pkg-config")
+    ]
 
     outputs = nix_package_outputs(builder, nixpkgs, "x86_64-darwin", NIX_PACKAGES)
 
