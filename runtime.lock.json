@@ -295,7 +295,7 @@
         "rosetta-x86_64"
       ],
       "path": "patches/wine/0019-winemac-squircle-app-icon.patch",
-      "sha256": "adb7ee4887e298e8862e05760b34f16a1df4a7eab05d82d75aafb9c4e746b2c6"
+      "sha256": "5eee86c4eeeaf47056cf2b852f39307f3b1a66bb38cd5da9d90da14c2de0b713"
     },
     {
       "id": "dxmt-skip-release-present-statistics",

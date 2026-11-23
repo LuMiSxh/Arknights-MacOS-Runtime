@@ -195,7 +195,9 @@ ACE initialization, gameplay, and clean shutdown.
 
 Redraws the application icon that Wine extracts from the executable. The icon
 sits on a transparent 512-point canvas, inside the centered 412-point macOS icon
-grid, clipped to a rounded rectangle with a radius of 92 points. A drawing
+grid, clipped to a rounded rectangle with a radius of 92 points. The icon keeps its
+aspect ratio: it fits proportionally inside the grid square and stays centered.
+A drawing
 handler renders the icon, so it stays sharp on Retina displays. If the redraw
 fails, winemac publishes the original icon.
 

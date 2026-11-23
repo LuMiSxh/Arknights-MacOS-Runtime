@@ -9,30 +9,39 @@ LMISXH_AKMOCL_SQUIRCLE_ICON (default on).
 diff --git a/dlls/winemac.drv/cocoa_app.m b/dlls/winemac.drv/cocoa_app.m
 --- a/dlls/winemac.drv/cocoa_app.m
 +++ b/dlls/winemac.drv/cocoa_app.m
-@@ -291,6 +291,32 @@
+@@ -291,6 +291,41 @@
      }
  
  @end
 +
 +/* Squircle application icon (LMISXH_AKMOCL_SQUIRCLE_ICON). The executable icon is
-+ * a full-bleed square. Redraw it on a transparent 512 point canvas, inside the
-+ * centered 412 point macOS icon grid, with rounded corners. The drawing handler
-+ * runs at the backing scale of the Dock, so the result stays sharp on Retina. Any
-+ * failure, or the gate turned off, publishes the original image. */
++ * a full-bleed image. Redraw it on a transparent 512 point canvas, inside the
++ * centered 412 point macOS icon grid, with rounded corners. The source keeps its
++ * aspect ratio: it is fit proportionally into the grid box and centered. The
++ * drawing handler runs at the backing scale of the Dock, so the result stays sharp
++ * on Retina. Any failure, or the gate turned off, publishes the original image. */
 +static NSImage* lmisxh_akmocl_squircle_icon( NSImage* source )
 +{
 +    static const CGFloat canvas = 512.0, content = 412.0, radius = 0.2237 * 412.0;
 +    NSImage* icon;
++    NSSize size;
++    CGFloat scale;
 +
 +    if (!source || !lmisxh_akmocl_flag( "LMISXH_AKMOCL_SQUIRCLE_ICON" )) return source;
++
++    size = source.size;
++    if (!(size.width > 0 && size.height > 0)) return source;
++    scale = MIN(content / size.width, content / size.height);
 +
 +    icon = [NSImage imageWithSize:NSMakeSize(canvas, canvas) flipped:NO drawingHandler:^BOOL(NSRect dest)
 +    {
 +        NSRect box = NSMakeRect((canvas - content) / 2, (canvas - content) / 2, content, content);
++        NSRect fit = NSMakeRect(NSMidX(box) - size.width * scale / 2, NSMidY(box) - size.height * scale / 2,
++                                size.width * scale, size.height * scale);
 +
 +        [NSGraphicsContext saveGraphicsState];
 +        [[NSBezierPath bezierPathWithRoundedRect:box xRadius:radius yRadius:radius] addClip];
-+        [source drawInRect:box fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:1.0
++        [source drawInRect:fit fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:1.0
 +            respectFlipped:YES hints:@{NSImageHintInterpolation: @(NSImageInterpolationHigh)}];
 +        [NSGraphicsContext restoreGraphicsState];
 +        return YES;
@@ -42,7 +51,7 @@ diff --git a/dlls/winemac.drv/cocoa_app.m b/dlls/winemac.drv/cocoa_app.m
  
  
  @interface WineApplicationController ()
-@@ -1382,7 +1408,7 @@
+@@ -1382,7 +1417,7 @@
                  nsimage = nil;
          }
  
