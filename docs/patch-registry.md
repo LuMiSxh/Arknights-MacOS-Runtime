@@ -165,7 +165,7 @@ The patch changes one line in `dlls/winemac.drv/cocoa_app.m`. It sets the Quit i
 - Manual gate: The Dock icon shows a rounded square inside the icon grid, sharp on a Retina display.
 - Removal: Drop when the client no longer needs a squircle icon
 
-The patch redraws the icon in `setApplicationIconFromCGImageArray:`. It uses a drawing handler on a 512-point canvas. The content is the centered 412-point square, clipped to a 92-point rounded rectangle.
+The patch redraws the icon in `setApplicationIconFromCGImageArray:`. It uses a drawing handler on a 512-point canvas. The content is the centered 412-point square, clipped to a 92-point rounded rectangle. The source icon fits proportionally inside that square and stays centered, so a rectangular icon keeps its aspect ratio.
 
 ## Fullscreen
 

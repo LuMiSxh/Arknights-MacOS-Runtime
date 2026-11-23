@@ -125,7 +125,7 @@
       {
         "order": 87,
         "path": "wine-build-new/patches/0019-winemac-squircle-app-icon.patch",
-        "sha256": "f21d1af5b51bcea50c79fb4c001ff7d1550a8cb5a378f3cde563e63a0fe20d1e",
+        "sha256": "20004baedb71c7c5d8e5580c7ba97f380b05d53cc10699c0743c702f6260c561",
         "default": "on",
         "opt_out": "LMISXH_AKMOCL_SQUIRCLE_ICON"
       }
