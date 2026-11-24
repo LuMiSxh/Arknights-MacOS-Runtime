@@ -3,19 +3,28 @@
 """Checksums, archives, and verified downloads that every runtime lane shares."""
 
 import hashlib
+import lzma
+import os
+import re
+import stat
 import tarfile
 import urllib.request
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Iterator, Sequence
 from pathlib import Path, PurePosixPath
 
 from .console import Progress
 
 CHUNK_SIZE = 1024 * 1024
 DOWNLOAD_TIMEOUT_SECONDS = 60
+ARCHIVE_PRESET = 9 | lzma.PRESET_EXTREME
+DIRECTORY_MODE = 0o755
+SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+CHECKSUMS_NAME = "SHA256SUMS"
+EXCLUDED_NAMES = frozenset((".git", "__pycache__"))
 
 
 class ArtifactError(RuntimeError):
-    """A download or archive does not match its declared size or SHA-256."""
+    """A download, archive, or checksum does not match its declared size or SHA-256."""
 
 
 def sha256(path: Path) -> str:
@@ -28,30 +37,166 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _keep(info: tarfile.TarInfo) -> tarfile.TarInfo | None:
-    """Leave version-control and bytecode caches out of every archive."""
+def read_checksum(checksum: Path, artifact_name: str) -> str:
+    """Return the SHA-256 that a `.sha256` file records for `artifact_name`."""
 
-    parts = PurePosixPath(info.name).parts
-    if ".git" in parts or "__pycache__" in parts:
-        return None
+    lines = [
+        line.strip()
+        for line in checksum.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    if len(lines) != 1:
+        raise ArtifactError(f"{checksum.name} must contain one record")
+    fields = lines[0].split(maxsplit=1)
+    if len(fields) != 2 or SHA256_PATTERN.fullmatch(fields[0]) is None:
+        raise ArtifactError(f"{checksum.name} has invalid syntax")
+    named = fields[1].removeprefix("*")
+    if named != artifact_name:
+        raise ArtifactError(
+            f"{checksum.name} names {named!r}, expected {artifact_name!r}"
+        )
+    return fields[0]
+
+
+def verify_checksum(artifact: Path, checksum: Path) -> str:
+    """Return the SHA-256 of `artifact` after it matches a legacy `.sha256` sidecar."""
+
+    expected = read_checksum(checksum, artifact.name)
+    actual = sha256(artifact)
+    if actual != expected:
+        raise ArtifactError(
+            f"{artifact.name} SHA-256 does not match its checksum: {actual} != {expected}"
+        )
+    return actual
+
+
+def write_checksums(directory: Path, *, exclude: Collection[str] = ()) -> Path:
+    """Write `SHA256SUMS` for every file in `directory` except the excluded names.
+
+    Each line is `<hex>  <name>`, sorted by name, so `shasum -a 256 -c` accepts it.
+    """
+
+    names = sorted(
+        path.name
+        for path in directory.iterdir()
+        if path.is_file() and path.name != CHECKSUMS_NAME and path.name not in exclude
+    )
+    path = directory / CHECKSUMS_NAME
+    path.write_text(
+        "".join(f"{sha256(directory / name)}  {name}\n" for name in names),
+        encoding="utf-8",
+    )
+    return path
+
+
+def read_checksums(path: Path) -> dict[str, str]:
+    """Return the name to SHA-256 map of a `SHA256SUMS` file."""
+
+    sums: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        digest, separator, name = line.partition("  ")
+        if not separator or SHA256_PATTERN.fullmatch(digest) is None or not name:
+            raise ArtifactError(f"{path.name} has invalid syntax: {line!r}")
+        sums[name] = digest
+    return sums
+
+
+def verify_listed(artifact: Path, checksums: Path) -> str:
+    """Return the SHA-256 of `artifact` after `SHA256SUMS` lists the same digest."""
+
+    expected = read_checksums(checksums).get(artifact.name)
+    if expected is None:
+        raise ArtifactError(f"{checksums.name} does not list {artifact.name}")
+    actual = sha256(artifact)
+    if actual != expected:
+        raise ArtifactError(
+            f"{artifact.name} SHA-256 does not match {checksums.name}: "
+            f"{actual} != {expected}"
+        )
+    return actual
+
+
+def _walk(source: Path, name: str) -> Iterator[tuple[str, Path]]:
+    if EXCLUDED_NAMES.intersection(PurePosixPath(name).parts):
+        return
+    yield name, source
+    if stat.S_ISDIR(os.lstat(source).st_mode):
+        for child in sorted(source.iterdir()):
+            yield from _walk(child, f"{name}/{child.name}")
+
+
+def _members(entries: Sequence[tuple[Path, str]]) -> dict[str, Path | None]:
+    """Return every member by archive name. Parents that no entry names map to None."""
+
+    members: dict[str, Path | None] = {}
+    for source, arcname in entries:
+        for name, path in _walk(source, arcname):
+            if name in members:
+                raise ArtifactError(f"duplicate archive member: {name}")
+            members[name] = path
+    for name in list(members):
+        for parent in PurePosixPath(name).parents:
+            if str(parent) != ".":
+                members.setdefault(str(parent), None)
+    return members
+
+
+def _info(
+    name: str, source: Path | None, hard_links: set[tuple[int, int]]
+) -> tarfile.TarInfo:
+    info = tarfile.TarInfo(name)
+    info.mtime = 0
+    info.uid = info.gid = 0
+    info.uname = info.gname = ""
+    if source is None:
+        info.type = tarfile.DIRTYPE
+        info.mode = DIRECTORY_MODE
+        return info
+    status = os.lstat(source)
+    if stat.S_ISLNK(status.st_mode):
+        info.type = tarfile.SYMTYPE
+        info.linkname = os.readlink(source)
+        info.mode = 0o777
+    elif stat.S_ISDIR(status.st_mode):
+        info.type = tarfile.DIRTYPE
+        info.mode = DIRECTORY_MODE
+    elif stat.S_ISREG(status.st_mode):
+        if status.st_nlink > 1:
+            key = (status.st_dev, status.st_ino)
+            if key in hard_links:
+                raise ArtifactError(f"hard links are not allowed: {source}")
+            hard_links.add(key)
+        info.type = tarfile.REGTYPE
+        info.size = status.st_size
+        info.mode = 0o755 if status.st_mode & 0o111 else 0o644
+    else:
+        raise ArtifactError(f"unsupported file type: {source}")
     return info
 
 
 def write_archive(
     directory: Path, tar_name: str, entries: Sequence[tuple[Path, str]]
 ) -> Path:
-    """Write `directory/tar_name` from (source, archive name) pairs.
+    """Write `directory/tar_name` from (source, archive name) pairs and return its path.
 
-    The shasum-compatible checksum goes beside it as `<tar_name>.sha256`.
+    Each source is added with everything below it. The output is deterministic: members
+    are sorted by name, with mtime 0, uid and gid 0, and empty owner names. Modes are 0755
+    for directories and executable files, and 0644 for other files. Hard links, devices,
+    and FIFOs are rejected. The xz stream has a CRC64 check.
     """
 
+    members = _members(entries)
     path = directory / tar_name
-    with tarfile.open(path, "w:gz") as tar:
-        for source, arcname in entries:
-            tar.add(source, arcname=arcname, filter=_keep)
-    (directory / f"{tar_name}.sha256").write_text(
-        f"{sha256(path)}  {tar_name}\n", encoding="utf-8"
-    )
+    hard_links: set[tuple[int, int]] = set()
+    with tarfile.open(path, "w:xz", preset=ARCHIVE_PRESET) as tar:
+        for name in sorted(members):
+            source = members[name]
+            info = _info(name, source, hard_links)
+            if source is not None and info.isreg():
+                with source.open("rb") as content:
+                    tar.addfile(info, content)
+            else:
+                tar.addfile(info)
     return path
 
 

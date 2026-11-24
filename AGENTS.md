@@ -13,25 +13,29 @@
 
 ## Commands
 
-| Task                     | Command              |
-| ------------------------ | -------------------- |
-| Fast checks              | `just check`         |
-| Validate lock            | `just validate`      |
-| Monitor source pins      | `just monitor`       |
-| Prepare pinned sources   | `just prepare`       |
-| Build candidate runtime  | `just build`         |
-| Build release runtime    | `just build-release` |
-| Combine lane outputs     | `just combine`       |
-| Verify artifact          | `just verify`        |
+| Task                     | Command                                       |
+| ------------------------ | --------------------------------------------- |
+| Fast checks              | `just check`                                  |
+| Validate lock            | `just validate`                               |
+| Update, check, export pins | `just pins update\|check\|export`           |
+| Monitor source pins      | `just monitor`                                |
+| Prepare pinned sources   | `just prepare [lane]`                         |
+| Build candidate runtime  | `just build [lane] [version]`                 |
+| Build release runtime    | `just build LANE VERSION release`             |
+| Combine lane outputs     | `just combine VERSION DIR...`                 |
+| Write deltas, manifests, checksums | `just deltas VERSION DIR`           |
+| Verify artifact          | `just verify [path]`                          |
+
+Every script runs through one command line: `uv run --locked --no-dev -m scripts GROUP COMMAND`. Run it with `--help` to list the commands. Scripts import each other as `from scripts.x import …`.
 
 ## Conventions
 
-- `runtime.lock.json` is the sole source of source pins, patch order, archive paths, and deployment target. The native ARM64 artifact comes from the external catalog; the lane verifies its SHA-256 and records the selection in its provenance fragment. When the selected release differs from the lock pin, the fetch writes the new release id and SHA-256 to the lock; when it matches, it enforces the locked SHA-256.
+- `runtime.lock.json` is the sole source of source pins, patch order, archive paths, and deployment target. The native ARM64 artifact comes from the external catalog; the lane fetches exactly the release that the lock pins, verifies its SHA-256, and records it in its provenance fragment. A build never writes the lock. A SHA-256 change under the same release id fails the build until `just pins update --only wine-arm64` re-pins it.
 - Use full commits and SHA-256 hashes; reject floating refs and unverified downloads.
 - Keep generated sources, downloads, reports, and artifacts under `.build/`; never commit binaries.
 - Run Python through the root `pyproject.toml` and `uv.lock` with `uv run --locked`; keep runtime orchestration standard-library-only.
 - Preserve upstream patch authorship, source links, trailers, and licenses in `docs/patch-registry.md`.
-- A patch number names one patch in both lanes. A shared patch keeps its number and file name in `patches/wine/` and `wine-build-new/patches/`. A lane-only patch takes the next unused number in both lanes and leaves a gap in the other lane. Never reuse a number. `scripts/runtime.py validate-lock` enforces this.
+- A patch number names one patch in both lanes. A shared patch keeps its number and file name in `patches/wine/` and `wine-build-new/patches/`. A lane-only patch takes the next unused number in both lanes and leaves a gap in the other lane. Never reuse a number. `just validate` enforces this.
 - Each patch has one documented gate, `LMISXH_AKMOCL_<NAME>`. A default-on gate is on when the
   variable is unset or exactly `1`; any other value turns it off. A default-off gate is on only for
   exactly `1`. The `_CN` and `_CURSOR` gates default off.

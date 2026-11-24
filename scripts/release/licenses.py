@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --locked --no-dev
 # SPDX-License-Identifier: MPL-2.0
 
 """Validate the license index and assemble the license files of the runtime archive.
@@ -12,16 +11,12 @@ import argparse
 import json
 import re
 import shutil
-import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-if str(REPOSITORY_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPOSITORY_ROOT))
-
 from scripts.lib.console import error, success, warning
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 LICENSES_DIRECTORY = "LICENSES"
 INDEX_NAME = "index.json"
 ARCHIVE_LICENSES_DIRECTORY = "Licenses"
@@ -280,7 +275,7 @@ def validate_index(
     if index.get("schemaVersion") != SCHEMA_VERSION:
         problems.append(f"schemaVersion must be {SCHEMA_VERSION}")
     nixpkgs_commit = (index.get("nixpkgs") or {}).get("commit")
-    locked_commit = _lock_entry(lock, "build.nixpkgs.commit")
+    locked_commit = _lock_entry(lock, "shared.nixpkgs.commit")
     if nixpkgs_commit != locked_commit:
         problems.append("nixpkgs commit does not match runtime.lock.json")
     components = index.get("components")
@@ -547,7 +542,7 @@ def generate(
     return shipped
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     command = commands.add_parser("generate", help="validate and assemble the files")
@@ -571,7 +566,7 @@ def main() -> int:
         action="store_true",
         help="fail on components with status unverified",
     )
-    arguments = parser.parse_args()
+    arguments = parser.parse_args(argv)
     if not arguments.check and arguments.output is None:
         parser.error("generate needs --output unless --check is set")
     try:
@@ -595,7 +590,3 @@ def main() -> int:
             return 1
     success(f"{len(shipped['components'])} components checked")
     return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

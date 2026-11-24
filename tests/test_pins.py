@@ -3,12 +3,15 @@
 
 import base64
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
-from scripts.release import pins
+from scripts import pins
+from scripts.pins import cli, mentions, resolve
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 NEW_WINE = "a" * 40
@@ -110,7 +113,7 @@ class ResolutionTests(unittest.TestCase):
         del routes["/repos/dappermint/Whisky/releases"][1]["assets"][0]["digest"]
 
         with self.assertRaisesRegex(pins.PinError, "no sha256 digest"):
-            pins.resolve_base(make_fetch(routes))
+            resolve.resolve_base(make_fetch(routes))
 
 
 class PinsTestCase(unittest.TestCase):
@@ -124,7 +127,7 @@ class PinsTestCase(unittest.TestCase):
         (self.root / "runtime.lock.json").write_text(
             json.dumps(self.lock, indent=2) + "\n"
         )
-        old = pins.pins_from_lock(self.lock)
+        old = mentions.pins_from_lock(self.lock)
         (self.root / "notice.txt").write_text(
             f"Wine {old['wine.version']} at {old['wine.commit']}\n"
             f"Pinned build {old['dxmt.build']} is not release {old['dxmt.tag']}.\n"
@@ -140,11 +143,11 @@ class PinsTestCase(unittest.TestCase):
         self,
         runner: RecordingRunner | None = None,
         *,
-        only: tuple[str, ...] = pins.COMPONENTS,
+        only: tuple[str, ...] = resolve.COMPONENTS,
         dry_run: bool = False,
         routes: dict[str, Any] | None = None,
-    ) -> pins.UpdateResult:
-        return pins.run_update(
+    ) -> cli.UpdateResult:
+        return cli.run_update(
             self.root,
             only,
             dry_run=dry_run,
@@ -157,7 +160,7 @@ class PinsTestCase(unittest.TestCase):
         return json.loads((self.root / "runtime.lock.json").read_text("utf-8"))
 
     def check(self) -> list[str]:
-        return pins.run_check(self.root, ALLOWLIST)
+        return mentions.run_check(self.root, ALLOWLIST)
 
 
 class UpdateTests(PinsTestCase):
@@ -165,10 +168,11 @@ class UpdateTests(PinsTestCase):
         result = self.update()
 
         lock = self.lock_on_disk()
-        self.assertEqual(lock["sources"]["wine"]["commit"], NEW_WINE)
-        self.assertEqual(lock["sources"]["dxmt"]["version"], "0.81-12-gbbbbbbb")
-        self.assertEqual(lock["baseArtifact"]["recipe"]["commit"], NEW_RECIPE)
-        self.assertEqual(lock["build"]["nixpkgs"]["commit"], NEW_NIXPKGS)
+        lane = lock["lanes"]["rosetta-x86_64"]
+        self.assertEqual(lane["sources"]["wine"]["commit"], NEW_WINE)
+        self.assertEqual(lane["sources"]["dxmt"]["version"], "0.81-12-gbbbbbbb")
+        self.assertEqual(lane["base"]["recipe"]["commit"], NEW_RECIPE)
+        self.assertEqual(lock["shared"]["nixpkgs"]["commit"], NEW_NIXPKGS)
         self.assertEqual(
             (self.root / "notice.txt").read_text(),
             f"Wine 11.19 at {NEW_WINE}\nPinned build 0.81-12 is not release 0.80.\n",
@@ -188,8 +192,10 @@ class UpdateTests(PinsTestCase):
         result = self.update(runner)
 
         lock = self.lock_on_disk()
-        self.assertEqual(lock["sources"]["wine"], self.lock["sources"]["wine"])
-        self.assertEqual(lock["sources"]["dxmt"]["commit"], NEW_DXMT)
+        lane = lock["lanes"]["rosetta-x86_64"]
+        original = self.lock["lanes"]["rosetta-x86_64"]
+        self.assertEqual(lane["sources"]["wine"], original["sources"]["wine"])
+        self.assertEqual(lane["sources"]["dxmt"]["commit"], NEW_DXMT)
         kept = next(o for o in result.outcomes if o.component == "wine")
         self.assertEqual(kept.status, "kept")
         self.assertIn("wine-hardware-cursor-suppression", kept.reason)
@@ -205,13 +211,51 @@ class UpdateTests(PinsTestCase):
 
         self.assertEqual(snapshot(self.root), before)
 
+    def test_wine_arm64_moves_to_the_newest_catalog_release(self) -> None:
+        catalog = json.dumps(
+            {
+                "releases": [
+                    {
+                        "id": "wine-11-18-arm64-v4",
+                        "arch": "arm64",
+                        "published_at": "2026-11-07T12:14:35Z",
+                        "sha256": "1" * 64,
+                    },
+                    {
+                        "id": "wine-11-18-arm64-v6",
+                        "arch": "arm64",
+                        "published_at": "2026-11-07T12:14:35Z",
+                        "sha256": "2" * 64,
+                    },
+                    {"id": "other-x86", "arch": "x86_64", "sha256": "3" * 64},
+                ]
+            }
+        ).encode()
+
+        with mock.patch.dict(
+            os.environ, {"ARM64_RUNTIME_CATALOG_URL": "https://c.example/"}
+        ):
+            result = cli.run_update(
+                self.root,
+                ("wine-arm64",),
+                dry_run=False,
+                fetch=make_fetch({}),
+                fetch_catalog=lambda url: catalog,
+                allowlist=ALLOWLIST,
+            )
+
+        artifact = self.lock_on_disk()["lanes"]["native-arm64"]["artifact"]
+        self.assertEqual(artifact["release"], "wine-11-18-arm64-v6")
+        self.assertEqual(artifact["sha256"], "2" * 64)
+        self.assertEqual([o.status for o in result.outcomes], ["updated"])
+
 
 class CheckTests(PinsTestCase):
     def test_current_state_passes(self) -> None:
         self.assertEqual(self.check(), [])
 
     def test_stale_marker_is_reported(self) -> None:
-        current = pins.pins_from_lock(self.lock)["wine.version"]
+        current = mentions.pins_from_lock(self.lock)["wine.version"]
         self.page.write_text(self.page.read_text().replace(current, "0.0"))
 
         self.assertEqual(self.check(), ["docs/page.md:1: pin:wine.version is stale"])

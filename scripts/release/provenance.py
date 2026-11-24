@@ -11,9 +11,10 @@ import re
 from pathlib import Path
 from typing import Any
 
+from scripts.lanes import Target
 from scripts.lib.artifact import sha256
-from scripts.runtime import LockError, load_lock
-from scripts.targets import Target
+from scripts.lock.model import ARCHIVE_SCHEMA_VERSION, LockError
+from scripts.lock.parse import load_lock
 
 LOCK_FILE_NAME = "runtime.lock.json"
 COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
@@ -30,12 +31,40 @@ def runtime_lock_provenance(repository_root: Path, target: str) -> dict[str, Any
     if lock_path.is_symlink() or not lock_path.is_file():
         raise ProvenanceInputError(f"runtime lock is not a regular file: {lock_path}")
     try:
-        lock = load_lock(lock_path, repository_root=repository_root, target=target)
+        lane = load_lock(lock_path, repository_root=repository_root).lane(target)
+        document = json.loads(lock_path.read_text(encoding="utf-8"))
     except (LockError, OSError) as error:
         raise ProvenanceInputError(
             f"runtime lock validation failed: {error}"
         ) from error
-    return {"path": LOCK_FILE_NAME, "sha256": sha256(lock_path), "contents": lock}
+    return {
+        "path": LOCK_FILE_NAME,
+        "sha256": sha256(lock_path),
+        "contents": _lane_contents(document, lane.name),
+    }
+
+
+def _lane_contents(document: dict[str, Any], target: str) -> dict[str, Any]:
+    """Return the lane view that the release verifier and the client read."""
+
+    lane = document["lanes"][target]
+    return {
+        "archiveSchemaVersion": ARCHIVE_SCHEMA_VERSION,
+        "target": target,
+        "buildMode": lane["build"],
+        "deploymentTarget": lane["minimumMacOS"],
+        "features": lane["interface"]["features"],
+        "interface": lane["interface"],
+        "patches": [
+            {
+                "id": patch["id"],
+                "component": patch["component"],
+                "number": patch["number"],
+            }
+            for patch in document["patches"]
+            if target in patch["files"]
+        ],
+    }
 
 
 def validation_provenance(

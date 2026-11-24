@@ -13,6 +13,9 @@ from scripts.build_common import NATIVE_ARM64_TARGET
 ROSETTA_X86_64_TARGET = "rosetta-x86_64"
 REQUIRED_TARGETS = (ROSETTA_X86_64_TARGET, NATIVE_ARM64_TARGET)
 WINE_SOURCES = frozenset(("built", "external"))
+ARCHIVE_SUFFIX = ".tar.xz"
+LEGACY_ARCHIVE_SUFFIX = ".tar.gz"
+RUNTIME_ROOT = "Runtime"
 
 
 @dataclass(frozen=True)
@@ -47,12 +50,32 @@ def release_tag(version: str) -> str:
     return f"v{version}"
 
 
-def runtime_archive_name(version: str, arch: str) -> str:
-    return f"Arknights-MacOS-Runtime-{release_tag(version)}-{arch}.tar.gz"
+def runtime_archive_name(arch: str) -> str:
+    return f"runtime-{arch}{ARCHIVE_SUFFIX}"
 
 
-def source_archive_name(version: str, arch: str) -> str:
-    return f"Arknights-MacOS-Runtime-{release_tag(version)}-{arch}-source.tar.gz"
+def manifest_name(arch: str) -> str:
+    return f"runtime-{arch}.json"
+
+
+def source_archive_name(arch: str) -> str:
+    return f"source-{arch}{ARCHIVE_SUFFIX}"
+
+
+def delta_archive_name(arch: str, source: str) -> str:
+    """Return the name of the delta from the bare version `source` to this release."""
+
+    return f"runtime-{arch}-from-{source}.delta{ARCHIVE_SUFFIX}"
+
+
+def legacy_runtime_archive_stem(version: str, arch: str) -> str:
+    """Return the stem of the asset names before archive schema 3, as in `...-v1.0.1-arm64`.
+
+    Those releases published `<stem>.tar.gz` with a `.sha256` sidecar. Only the delta
+    builder reads them, to fetch the previous release.
+    """
+
+    return f"Arknights-MacOS-Runtime-{release_tag(version)}-{arch}"
 
 
 def provenance_name(arch: str) -> str:
@@ -60,7 +83,7 @@ def provenance_name(arch: str) -> str:
 
 
 def inventory_name(arch: str) -> str:
-    return f"runtime-component-inventory-{arch}.tsv"
+    return f"inventory-{arch}.tsv"
 
 
 def notices_name(arch: str) -> str:

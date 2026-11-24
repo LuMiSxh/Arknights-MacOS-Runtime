@@ -5,6 +5,9 @@ requires-python = ">=3.14"
 dependencies = []
 
 [dependency-groups]
+deltas = [
+    "bsdiff4==1.4.4",
+]
 dev = [
     "actionlint-py==1.7.12.25",
     "pytest==9.2.0",

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from scripts.targets.x86_64 import wine_configure_command
+from scripts.lanes.x86_64 import wine_configure_command
 
 WINE_SOURCE = Path("/src/wine")
 

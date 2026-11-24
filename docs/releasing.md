@@ -4,7 +4,7 @@ Nothing publishes automatically. One workflow, **Runtime Build**, builds the run
 
 A build is promotable only after source and patch checks, a clean build, archive validation, complete corresponding source and licenses, and the manual compatibility checks.
 
-Before a release, move the upstream pins with `just update-pins`. See [updating pins](updating-pins.md).
+Before a release, move the upstream pins with `just pins update`. See [updating pins](updating-pins.md).
 
 ## Lanes
 
@@ -22,7 +22,7 @@ The client pins the release archive URL and SHA-256 in its `runtime.json`. There
 | `version`          | Bare SemVer, such as `1.0.0-rc1`. Do not add `+x86`, `+arm`, or a leading `v`. |
 | `channel`          | `candidate` (default) or `release`.                                         |
 | `target`           | `both` (default), `rosetta-x86_64`, or `native-arm64`.                      |
-| `arm64_release_id` | Optional catalog release id for the ARM64 lane. Empty selects the newest.    |
+
 
 The workflow has these jobs:
 
@@ -32,6 +32,7 @@ The workflow has these jobs:
 | `build-x86_64` | `target` is `both` or `rosetta-x86_64` | Builds the x86_64 lane on `xcode-27`.                                                  |
 | `build-arm64` | `target` is `both` or `native-arm64`   | Builds the ARM64 lane on `macos-26` in the `release-arm64` environment.                |
 | `combine`     | `release` channel              | Verifies the lane outputs and writes one `provenance.json` and one `THIRD-PARTY-NOTICES.txt`. |
+| `deltas`      | `release` channel              | Writes delta archives from recent releases. Best effort: a failure does not block `publish`. |
 | `publish`     | `release` channel              | Attests the assets, creates the tag, and creates the draft release.                           |
 
 Every lane job has read-only permissions and uploads its output as the artifact `runtime-<target>`. The artifact keeps for 3 days. The `release-arm64` environment and its secret reach only the ARM64 lane job.
@@ -58,26 +59,38 @@ A candidate creates no tag and no release. The x86_64 lane runs from any branch.
 
 The ARM64 lane ships an external Wine tree and builds DXMT in the workflow. The catalog URL is the only secret. Store it as the repository secret `ARM64_RUNTIME_CATALOG_URL`. The `release-arm64` environment scopes the ARM64 lane job; restrict it to `main`, `release/*`, and `version-*`. Candidates of this lane also use that environment, so dispatch them from an allowed branch.
 
-`toolchain.llvmMingw` in `runtime.lock.json` pins the llvm-mingw release URL and SHA-256. The repository variables `LLVM_MINGW_URL` and `LLVM_MINGW_SHA256` apply only when the lock has no pin. They are public build inputs, not secrets.
+`shared.toolchain.llvmMingw` in `runtime.lock.json` pins the llvm-mingw release URL and SHA-256. The repository variables `LLVM_MINGW_URL` and `LLVM_MINGW_SHA256` apply only when the lock has no pin. They are public build inputs, not secrets.
 
-1. Dispatch **Runtime Build** as described above. Optionally enter `arm64_release_id`. Leave it empty to use the newest ARM64 release.
-2. The workflow selects the release id and takes the SHA-256 from the catalog, fetches the artifact, verifies it, and extracts it. The lock pin is the last verified baseline. The catalog and archive URLs never appear in output, assets, or provenance.
-3. `scripts/targets/arm64_dxmt.py` builds DXMT from `sources.dxmt` for ARM64EC with `MACOSX_DEPLOYMENT_TARGET=26.0`. It needs the fetched Wine artifact, so the lane fetches Wine first.
-4. `scripts/targets/arm64_assemble.py` repacks the client tree as `Libraries/Wine`, `Libraries/DXMT`, `Licenses/`, and `NOTICE.md`. The signed loader bundle is renamed to `Arknights.app`. It keeps its Developer ID signature.
-5. `scripts/build.py release --target native-arm64 --version 0.9.0` validates the tree and runs the release gates. The gate requires `inheritedMachOAboveTarget` to be `0`. Check the validation report before you publish.
+1. To use a newer catalog release, run `just pins update --only wine-arm64` and commit the lock. Then dispatch **Runtime Build** as described above.
+2. The workflow fetches the release that the lock pins, verifies its SHA-256, and extracts it. A SHA-256 change under the same id fails the build until you re-pin. The catalog and archive URLs never appear in output, assets, or provenance.
+3. `scripts/lanes/arm64_dxmt.py` builds DXMT from `lanes.native-arm64.sources.dxmt` for ARM64EC with `MACOSX_DEPLOYMENT_TARGET=26.0`. It needs the fetched Wine artifact, so the lane fetches Wine first.
+4. `scripts/lanes/arm64_assemble.py` repacks the client tree as `Libraries/Wine`, `Libraries/DXMT`, `Licenses/`, and `NOTICE.md`. The signed loader bundle is renamed to `Arknights.app`. It keeps its Developer ID signature.
+5. `just build native-arm64 0.9.0 release` validates the tree and runs the release gates. The gate requires `inheritedMachOAboveTarget` to be `0`. Check the validation report before you publish.
 6. The release is normal, not a prerelease. Its notes name the selected catalog release.
-7. The release assets are, for each lane, the runtime archive and its `.sha256`, and the corresponding source archive and its `.sha256`. The release also has `provenance.json` and `THIRD-PARTY-NOTICES.txt`. The ARM64 source archive contains `wine-build-new`, `runtime.lock.json`, and `docs/arm/README.md`.
+7. The release assets are, for each lane, the runtime archive, the runtime manifest, the inventory, and the corresponding source archive. The runtime archive is `.tar.xz` with one `Runtime/` root (archive schema 3). Delta archives are described in [Deltas](#deltas). The release also has `provenance.json`, `THIRD-PARTY-NOTICES.txt`, and one `SHA256SUMS` for all assets. [The runtime format](runtime-format.md) lists the exact names. The ARM64 source archive contains `wine-build-new`, `runtime.lock.json`, and `docs/arm/README.md`.
 8. Inspect and test those exact assets. Publish the unchanged draft only after the source, notice, and manual compatibility review.
 
 The release notes and `provenance.json` credit `https://github.com/riverfog7/wine-build-new`. The release notes name the selected catalog release. `provenance.json` records its id, SHA-256, and size under the `native-arm64` entry's `wine.artifact` field. The ARM runtime archive and corresponding source archive form one immutable versioned contract. The client pins the archive URL and SHA-256.
+
+## Deltas
+
+The `deltas` job writes delta archives for the `release` channel. A delta turns an installed runtime of an earlier release into the new one.
+
+1. The job takes the three newest published releases before the new one. Drafts and prereleases never serve as sources.
+2. It downloads each source runtime archive and checks it against `SHA256SUMS`. Releases before archive schema 3 use the old asset names and a `.sha256` file; the job falls back to those.
+3. It applies each delta again and compares the result with the new runtime tree. A delta that does not match is removed.
+4. A failed source logs a warning and is skipped. The release still publishes its full archives.
+5. The same job then writes `runtime-<arch>.json` for each lane, with the deltas that exist, and `SHA256SUMS`. The `publish` job needs this job to succeed.
+
+The asset names are `runtime-<arch>-from-<from>.delta.tar.xz`. The format is in [the runtime format](runtime-format.md). To build deltas locally, run `just deltas <version> <directory>` with an authenticated `gh`. The directory must hold the combined release.
 
 ## Verify build provenance
 
 The `publish` job creates a build provenance attestation for every release asset. The attestation links each asset to this repository, the workflow, and the built commit.
 
-1. Download a release asset, for example `Arknights-MacOS-Runtime-v0.7.0-x86_64.tar.gz`.
+1. Download a release asset, for example `runtime-x86_64.tar.xz`.
 2. Install the GitHub CLI.
-3. Run `gh attestation verify Arknights-MacOS-Runtime-v0.7.0-x86_64.tar.gz --repo LuMiSxh/Arknights-MacOS-Runtime`.
+3. Run `gh attestation verify runtime-x86_64.tar.xz --repo LuMiSxh/Arknights-MacOS-Runtime`.
 4. Trust the asset only if the command succeeds.
 
 The `provenance.json` asset merges one fragment per lane. Each fragment records the build commit, the resolved runtime lock, the validation report, the Wine and DXMT repository and commit, the archive hashes, and the build toolchain. The toolchain lists the Homebrew packages, Xcode, and macOS SDK of the build host. The build does not pin these tools.

@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --locked --no-dev
 # SPDX-License-Identifier: MPL-2.0
 
 """Build the pinned DXMT source for ARM64EC at the lock deployment target.
@@ -16,7 +15,6 @@ import re
 import shutil
 import struct
 from pathlib import Path
-from typing import Any
 
 from scripts.build_common import (
     WINE_CONFIGURE_FLAGS,
@@ -27,8 +25,9 @@ from scripts.build_common import (
     is_macho,
     logical_cpu_count,
 )
-from scripts.targets import Target
-from scripts.targets.dxmt import build_dxmt
+from scripts.lanes import Target
+from scripts.lanes.dxmt import build_dxmt
+from scripts.lock.model import Lane
 
 WINE_SOURCE_DIRECTORY = "wine-build-source"
 DXMT_SOURCE_DIRECTORY = "dxmt-source"
@@ -71,10 +70,10 @@ def parse_version(value: str) -> tuple[int, int]:
         raise BuildError(f"invalid deployment target: {value}") from problem
 
 
-def deployment_target(lock: dict[str, Any], environment: dict[str, str]) -> str:
-    """Return the lock deployment target and reject an inconsistent environment."""
+def deployment_target(lane: Lane, environment: dict[str, str]) -> str:
+    """Return the lane minimum macOS and reject an inconsistent environment."""
 
-    deployment = str(lock["deploymentTarget"])
+    deployment = lane.minimum_macos
     requested = environment.get("MACOSX_DEPLOYMENT_TARGET", deployment)
     if requested != deployment:
         raise BuildError(
@@ -283,11 +282,11 @@ def stage_winemac_so(build: Path, wine_install: Path) -> None:
 
 
 def _build_minimal_wine(
-    builder: Builder, lock: dict[str, Any], root: Path, deployment: str
+    builder: Builder, lane: Lane, root: Path, deployment: str
 ) -> Path:
     source = root / WINE_SOURCE_DIRECTORY
-    wine = lock["sources"]["wine"]
-    _clone_pinned(builder, wine["repository"], wine["commit"], source)
+    wine = lane.sources["wine"]
+    _clone_pinned(builder, wine.repository, wine.commit, source)
     build = root / WINE_BUILD_DIRECTORY
     sdk = _sdk_path(builder)
     _configure_wine(builder, source, build, deployment, sdk)
@@ -306,19 +305,17 @@ def _build_minimal_wine(
     return build
 
 
-def build_dxmt_arm64(
-    builder: Builder, target: Target, lock: dict[str, Any], root: Path
-) -> Path:
+def build_dxmt_arm64(builder: Builder, target: Target, lane: Lane, root: Path) -> Path:
     """Build the ARM64EC DXMT payload under `root` and return its install tree."""
 
     _prepare_toolchain(builder)
-    deployment = deployment_target(lock, builder.environment)
+    deployment = deployment_target(lane, builder.environment)
     llvm = _resolve_llvm(builder, None)
     _resolve_llvm_mingw(builder, None)
-    wine_build = _build_minimal_wine(builder, lock, root, deployment)
-    dxmt = lock["sources"]["dxmt"]
+    wine_build = _build_minimal_wine(builder, lane, root, deployment)
+    dxmt = lane.sources["dxmt"]
     source = root / DXMT_SOURCE_DIRECTORY
-    _clone_pinned(builder, dxmt["repository"], dxmt["commit"], source)
+    _clone_pinned(builder, dxmt.repository, dxmt.commit, source)
     builder.run("git", "submodule", "update", "--init", "--recursive", cwd=source)
     install = build_dxmt(
         builder,

@@ -5,15 +5,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.lib.artifact import sha256, write_archive
-from scripts.release.combine import CombineError, combine
-from scripts.targets import (
+from scripts.lanes import (
     inventory_name,
     notices_name,
     provenance_name,
     runtime_archive_name,
     source_archive_name,
 )
+from scripts.lib.artifact import sha256, write_archive
+from scripts.release.combine import CombineError, combine
 
 VERSION = "0.9.0"
 
@@ -23,18 +23,18 @@ def _write_lane(directory: Path, target: str, arch: str) -> None:
 
     directory.mkdir(parents=True)
     content = directory / "content"
-    (content / "Libraries").mkdir(parents=True)
-    (content / "Libraries" / "marker").write_bytes(arch.encode())
+    (content / "Runtime").mkdir(parents=True)
+    (content / "Runtime" / "marker").write_bytes(arch.encode())
     runtime = write_archive(
         directory,
-        runtime_archive_name(VERSION, arch),
-        [(content / "Libraries", "Libraries")],
+        runtime_archive_name(arch),
+        [(content / "Runtime", "Runtime")],
     )
     source = directory / "source.txt"
     source.write_bytes(b"source")
     corresponding = write_archive(
         directory,
-        source_archive_name(VERSION, arch),
+        source_archive_name(arch),
         [(source, "source.txt")],
     )
     (directory / inventory_name(arch)).write_text(
@@ -97,7 +97,7 @@ class CombineTests(unittest.TestCase):
         self.assertIn("===== rosetta-x86_64 (x86_64) =====", notices)
 
     def test_rejects_an_archive_that_differs_from_its_fragment(self) -> None:
-        archive = self.x86 / runtime_archive_name(VERSION, "x86_64")
+        archive = self.x86 / runtime_archive_name("x86_64")
         archive.write_bytes(b"tampered")
 
         with self.assertRaisesRegex(CombineError, "SHA-256 does not match"):

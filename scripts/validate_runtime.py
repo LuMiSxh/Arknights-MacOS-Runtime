@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --locked --no-dev
 # SPDX-License-Identifier: MPL-2.0
 
 """Read-only structural and Mach-O validation for an Arknights MacOS Runtime candidate."""
@@ -13,13 +12,10 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-if __package__:
-    from .lib.console import error, success, warning
-    from .runtime import BUILD_ROOT, LOCK_PATH, load_lock
-else:
-    from lib.console import error, success, warning
-    from runtime import BUILD_ROOT, LOCK_PATH, load_lock
-
+from scripts.lib.console import error, success, warning
+from scripts.lock.model import LOCK_PATH
+from scripts.lock.parse import load_lock
+from scripts.lock.sources import BUILD_ROOT
 
 MINOS_PATTERN = re.compile(r"\bminos\s+([0-9]+(?:\.[0-9]+){1,2})")
 LEGACY_PAYLOADS = (
@@ -286,7 +282,7 @@ def validate_macho_targets(
     return checked, inherited
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("runtime", type=Path)
     parser.add_argument("--baseline", type=Path)
@@ -299,18 +295,15 @@ def main() -> int:
         action="store_true",
         help="reject i386, DXMT x32, GStreamer, and FFmpeg payloads (clean builds)",
     )
-    arguments = parser.parse_args()
-    lock = load_lock(LOCK_PATH, target=arguments.target)
-    if arguments.require_64_bit_only and lock["buildMode"] == "external":
+    arguments = parser.parse_args(argv)
+    lane = load_lock(LOCK_PATH).lane(arguments.target)
+    if arguments.require_64_bit_only and lane.build == "external":
         error(
             "external targets keep the i386 WoW64 payload; "
             "do not pass --require-64-bit-only"
         )
         return 1
-    required_paths = [
-        *lock["interface"]["executables"],
-        *lock["interface"]["requiredFiles"],
-    ]
+    required_paths = list(lane.interface.staged_paths())
     try:
         validate_structure(arguments.runtime, required_paths)
         if arguments.require_64_bit_only:
@@ -318,14 +311,14 @@ def main() -> int:
         architecture_count = validate_required_architectures(
             arguments.runtime, required_paths
         )
-        validate_metalfx_support(arguments.runtime, lock["features"])
+        validate_metalfx_support(arguments.runtime, lane.interface.features)
         # The external ARM64 Wine tree is built upstream and sometimes ships binaries
         # with a newer minimum macOS; report them without blocking the release.
         macho_count, inherited_count = validate_macho_targets(
             arguments.runtime,
-            lock["deploymentTarget"],
+            lane.minimum_macos,
             arguments.baseline,
-            warn_newer=lock["buildMode"] == "external",
+            warn_newer=lane.build == "external",
         )
     except (
         RuntimeValidationError,
@@ -342,9 +335,9 @@ def main() -> int:
         json.dumps(
             {
                 "runtime": str(arguments.runtime.resolve()),
-                "target": lock["target"],
-                "deploymentTarget": lock["deploymentTarget"],
-                "minimumMacOS": lock["interface"].get("minimumMacOS"),
+                "target": lane.name,
+                "deploymentTarget": lane.minimum_macos,
+                "minimumMacOS": lane.minimum_macos,
                 "requiredArchitecturesChecked": architecture_count,
                 "machoFilesChecked": macho_count,
                 "inheritedMachOAboveTarget": inherited_count,
@@ -359,7 +352,3 @@ def main() -> int:
     success(f"Validated {macho_count} Mach-O files")
     print(report)
     return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

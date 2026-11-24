@@ -2,7 +2,7 @@
 
 [`runtime.lock.json`](../runtime.lock.json) holds the machine-readable ordered registry. Before release, each entry must name its upstream source, author, license, gate, inactive behavior, test, and removal condition. The entries document provenance. They do not replace the corresponding-source, notice, and redistribution review that a runtime binary requires.
 
-The ACE, CEF, and CN patches target WineCX <!-- pin:wine.commit|code -->`a54b8240683e92bf4c15cb1ba6bf92a9539bd768`<!-- /pin --> and keep Wine's LGPL-2.1-or-later license. The native ARM64 lane is built externally in [wine-build-new](https://github.com/riverfog7/wine-build-new), so its patches are in [`wine-build-new/`](../wine-build-new/) and not in this registry.
+The ACE, CEF, and CN patches target WineCX <!-- pin:wine.commit|code -->`a54b8240683e92bf4c15cb1ba6bf92a9539bd768`<!-- /pin --> and keep Wine's LGPL-2.1-or-later license. The native ARM64 lane is built externally in [wine-build-new](https://github.com/riverfog7/wine-build-new), its patch files are in [`wine-build-new/`](../wine-build-new/). Each entry in the lock names the lanes that carry it in `files`. The six native ARM64 patches without a section appear at the end of this page.
 
 ## Audio
 
@@ -187,3 +187,14 @@ The patch enters the Space with a deferred `toggleFullScreen:` call. It never ch
 On a Mac with a camera housing, the patch moves the origin of Wine below the housing of the primary screen. A screen other than the primary one only trims its own housing rows at the top, so its monitor, work rectangle, and display modes exclude them. The origin does not move for that screen, and no pointer or window position of it needs a conversion. The Cocoa to Win32 flip, the raw Quartz pointer positions, the monitor and work rectangles, the desktop rectangle, and the height of every display mode of the main display all use the housing height. The main thread reads the housing height and rounds it to whole points once. It publishes the value to all threads, and posts a display change again when the value moves. AppKit reports the housing height in whole points of the current mode. The patch latches the share of the screen height per display from the initial display mode of the prefix, and a mode that Wine sets never changes it. The housing rows of every mode, of the current mode, and of the monitor are the latched share times the height, rounded up. The current mode does not change the result, so a saved mode keeps its height and still matches after a mode switch, also in a Retina mode. A display that leaves the screen list loses its latch. A process that starts while the desktop is not in its initial mode uses the share of the current mode. A request with the full mode height also matches. The mode that CoreGraphics selects does not change. This geometry follows the gate in every process of the prefix, including the notice helper. The housing height is zero on other screens, so they keep their geometry. The patch logs a warning when the Space content rectangle differs from the monitor of Wine.
 
 The patch turns the feature off for the whole process when the program is `PlatformProcess.exe` or `PlatformProcess.original.helper.exe`, because the notice helper inherits the gate. This check does not depend on `LMISXH_AKMOCL_CN`.
+
+## Native ARM64 patches without a section
+
+The `native-arm64` lane carries these patches. The release verifier checks that this page names each one:
+
+- `fex-arm64ec-restore-carried-eflags`
+- `wine-ntdll-carry-eflags-af-df`
+- `wine-ntdll-hybrid-thread-entry`
+- `wine-ntdll-name-the-macos-loader-link-after-the-application`
+- `wine-winemac-name-the-application-menu-after-the-program`
+- `wine-ntdll-promote-cx-unix-environment-variables`

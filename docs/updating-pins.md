@@ -25,7 +25,7 @@ The runtime pins four upstream inputs in [`runtime.lock.json`](../runtime.lock.j
 | Wine | Tip of the highest `wine11<N>` branch of `dappermint/winecx`. The version comes from the `VERSION` file at that commit. |
 | DXMT | Head of the default branch of `3Shain/dxmt`. The version has the `git describe` form `<tag>-<commits>-g<sha>`. |
 | Base archive | Newest `dappermint/Whisky` release with a `Libraries.tar.gz` asset. The hash comes from the digest of the asset. The recipe commit is the commit of the tag `runtime-<release tag>` in `dappermint/winecx-gptk`. |
-| nixpkgs | Tip of the channel branch `NIXPKGS_CHANNEL` in `scripts/release/pins.py`. The channel is `nixos-25.05`, because the DXMT build needs `llvmPackages_15`, which later releases removed. |
+| nixpkgs | Tip of the channel branch `NIXPKGS_CHANNEL` in `scripts/pins/resolve.py`. The channel is `nixos-25.05`, because the DXMT build needs `llvmPackages_15`, which later releases removed. |
 
 ## Known-bad pins
 
@@ -48,10 +48,11 @@ A newer nixpkgs channel is a manual decision. Change the constant, then review t
 ## Update the pins
 
 1. Set `GITHUB_TOKEN` or `GH_TOKEN` to avoid the API rate limit. The command also works without a token.
-2. Run `just update-pins --dry-run`. The command resolves the new state and writes nothing.
+2. Run `just pins update --dry-run`. The command resolves the new state and writes nothing.
 3. Read the summary table. Each row shows the old pin, the new pin, and the status.
-4. Run `just update-pins`.
-5. To update one component, run `just update-pins --only wine`. The values of `--only` are `wine`, `dxmt`, `base`, and `nixpkgs`.
+4. Run `just pins update`.
+5. To update one component, run `just pins update --only wine`. The values of `--only` are `wine`, `dxmt`, `base`, `nixpkgs`, and `wine-arm64`.
+6. The default run skips `wine-arm64`. It needs the catalog URL in `ARM64_RUNTIME_CATALOG_URL`. Run `just pins update --only wine-arm64` to pin the newest ARM64 catalog release.
 
 The command stops with no changes when it cannot resolve the base archive or its recipe commit. It also stops when the API gives no digest for the asset.
 
@@ -68,19 +69,19 @@ To move a kept pin, port the failed patch to the new commit. Then run the update
 1. Read the output of `just check`. The update already runs the lock validation and the license check.
 2. Review the gates in [`patch-registry.md`](patch-registry.md) for the new commits.
 3. Review the license statements for DXMT and Wine when the upstream license can change.
-4. The MoltenVK and Wine Gecko entries in `baseProvenance` do not change by themselves. Update them by hand if the new base archive changes them.
+4. The MoltenVK and Wine Gecko entries in `lanes.rosetta-x86_64.base.provenance` do not change by themselves. Update them by hand if the new base archive changes them.
 5. Dispatch the release workflow. See [`releasing.md`](releasing.md).
 6. Update the client pin with the update command of the client repository.
 
 ## Check the mentions
 
-Run `just check`. It runs `scripts/release/pins.py check`, which works offline. The check fails when a marker or an allowlisted file disagrees with the lock. The CI check workflow runs the same command.
+Run `just check`. It runs `just pins check`, which works offline. The check fails when a marker or an allowlisted file disagrees with the lock. The CI check workflow runs the same command.
 
 ## Add a marker
 
 1. Choose a key from the list below.
 2. Write the marker around the value. Use `|code` to put the value in a code span. Put the marker outside the backticks of the text.
-3. Run `just update-pins --dry-run`. Then run `just check`.
+3. Run `just pins update --dry-run`. Then run `just check`.
 
 ```markdown
 Wine <!-- pin:wine.version -->11.17<!-- /pin -->
@@ -104,7 +105,7 @@ Use `<!-- pin-block:table -->` and `<!-- /pin-block -->` on their own lines for 
 
 ## Add a file that is not Markdown
 
-1. Open `ALLOWLIST` in `scripts/release/pins.py`.
+1. Open `ALLOWLIST` in `scripts/pins/mentions.py`.
 2. Add the path and the keys that the file states.
 3. Run `just check`. The check fails when the file lacks the value of a key.
 

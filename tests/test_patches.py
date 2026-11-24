@@ -24,13 +24,24 @@ GATE_RIDERS = {
 }
 
 
+LANE = "rosetta-x86_64"
+
+
 def _wine_patches() -> list[dict]:
     lock = json.loads((REPOSITORY_ROOT / "runtime.lock.json").read_text("utf-8"))
-    return [patch for patch in lock["patches"] if patch["component"] == "wine"]
+    return [
+        patch
+        for patch in lock["patches"]
+        if patch["component"] == "wine" and LANE in patch["files"]
+    ]
+
+
+def _path(patch: dict) -> str:
+    return patch["files"][LANE]["path"]
 
 
 def _patch_text(patch: dict) -> str:
-    return (REPOSITORY_ROOT / patch["path"]).read_text(encoding="utf-8")
+    return (REPOSITORY_ROOT / _path(patch)).read_text(encoding="utf-8")
 
 
 def test_every_wine_patch_checks_its_lock_gate() -> None:
@@ -40,15 +51,15 @@ def test_every_wine_patch_checks_its_lock_gate() -> None:
 
         if gate not in text:
             owner_id = GATE_RIDERS.get(patch["id"])
-            assert owner_id is not None, f"{patch['path']} does not check {gate}"
+            assert owner_id is not None, f"{_path(patch)} does not check {gate}"
             owner = next(entry for entry in _wine_patches() if entry["id"] == owner_id)
             text = _patch_text(owner)
 
         if patch["default"]:
             assert _UNSET_MEANS_ON.search(text), (
-                f"{patch['path']} does not treat an unset {gate} as enabled"
+                f"{_path(patch)} does not treat an unset {gate} as enabled"
             )
         else:
             assert _EXACTLY_ONE.search(text), (
-                f'{patch["path"]} does not require {gate} to be exactly "1"'
+                f'{_path(patch)} does not require {gate} to be exactly "1"'
             )

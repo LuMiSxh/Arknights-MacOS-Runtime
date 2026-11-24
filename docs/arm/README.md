@@ -6,15 +6,16 @@ The x86_64 lane stays the default until the game passes the compatibility checks
 
 ## Catalog and pin generation
 
-The **Runtime Build** workflow reads the catalog URL from the repository secret `ARM64_RUNTIME_CATALOG_URL`. It selects the newest ARM64 release by default, or the `arm64_release_id` passed to the manual dispatch.
+The **Runtime Build** workflow reads the catalog URL from the repository secret `ARM64_RUNTIME_CATALOG_URL`. It fetches exactly the release that `lanes.native-arm64.artifact` in [`runtime.lock.json`](../../runtime.lock.json) pins. The build never writes the lock.
 
-- When the selected release matches the lock pin, the fetch enforces the locked SHA-256.
-- When the selected release differs, the fetch downloads it, verifies the catalog SHA-256 and size, and writes the new release id and SHA-256 to [`runtime.lock.json`](../../runtime.lock.json). Downstream steps verify against the lock.
+- The fetch verifies the catalog SHA-256 and size against the lock.
 - A missing pinned release or a SHA-256 disagreement fails the fetch.
+- The catalog sometimes rebuilds a release under the same id. In that case, review the new archive and run `just pins update --only wine-arm64`.
+- To move to a newer catalog release, run the same command. It writes the newest release id and SHA-256 to the lock. It needs `ARM64_RUNTIME_CATALOG_URL` in the environment.
 
 The catalog and archive URLs never appear in output, assets, or provenance.
 
-The lock declares `native-arm64` with `buildMode: external`. `scripts/runtime.py prepare --target native-arm64` refuses the target.
+The lock declares `native-arm64` with `build: external`. `uv run --locked --no-dev -m scripts.lock prepare --target native-arm64` refuses the target.
 
 ## Shipped artifact
 
@@ -40,11 +41,11 @@ wine/                       # lowercase
 
 `provenance-arm64.json` records the build commit, the resolved `runtimeLock`, and the validation report. It records the selected catalog id, SHA-256, and size under `wine.artifact`. `just combine` merges this fragment into `provenance.json`.
 
-The archive has no DXMT, no `winemetal.so`, no `wine64`, no `Arknights` link, and no `WINEPRELOADERAPPNAME`. Patches `0016` and `0017` provide `WINEPRELOADERAPPNAME` once the external build picks them up. `scripts/targets/arm64_assemble.py` adds `Wine/bin/wine64`, `Wine/bin/Arknights`, the DXMT payload, and the WineMetal modules outside the signed `Arknights.app` bundle. The wrapper renames riverfog's `wine.app` to `Arknights.app`. macOS labels the game process in the Dock with the bundle folder name, so the rename shows the game name instead of `wine`. The wrapper also repoints every symlink that named the old bundle.
+The archive has no DXMT, no `winemetal.so`, no `wine64`, no `Arknights` link, and no `WINEPRELOADERAPPNAME`. Patches `0016` and `0017` provide `WINEPRELOADERAPPNAME` once the external build picks them up. `scripts/lanes/arm64_assemble.py` adds `Wine/bin/wine64`, `Wine/bin/Arknights`, the DXMT payload, and the WineMetal modules outside the signed `Arknights.app` bundle. The wrapper renames riverfog's `wine.app` to `Arknights.app`. macOS labels the game process in the Dock with the bundle folder name, so the rename shows the game name instead of `wine`. The wrapper also repoints every symlink that named the old bundle.
 
 ## DXMT
 
-The release workflow builds DXMT from `sources.dxmt` at commit `647b0020ba5764e5593b12407afd76964fa11e20` with `MACOSX_DEPLOYMENT_TARGET=26.0`. It also builds a minimal Wine tree from `sources.wine` for the import libraries. That build tree is a build dependency and is never shipped. The macOS driver `winemac.so` comes from the external tree. The old external `dxmt-experimental-v1` artifact is not used.
+The release workflow builds DXMT from `lanes.native-arm64.sources.dxmt` at commit `647b0020ba5764e5593b12407afd76964fa11e20` with `MACOSX_DEPLOYMENT_TARGET=26.0`. It also builds a minimal Wine tree from `lanes.native-arm64.sources.wine` for the import libraries. That build tree is a build dependency and is never shipped. The macOS driver `winemac.so` comes from the external tree. The old external `dxmt-experimental-v1` artifact is not used.
 
 ## Entitlements and window chrome
 

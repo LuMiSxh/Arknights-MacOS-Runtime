@@ -10,6 +10,14 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from scripts.lanes import (
+    RUNTIME_ROOT,
+    Target,
+    notices_name,
+    provenance_name,
+    runtime_archive_name,
+    source_archive_name,
+)
 from scripts.lib.artifact import write_archive
 from scripts.release.licenses import third_party_notices
 from scripts.release.provenance import (
@@ -20,13 +28,28 @@ from scripts.release.provenance import (
 )
 from scripts.release.toolchain import collect_toolchain
 from scripts.release.verify import verify_release
-from scripts.targets import (
-    Target,
-    notices_name,
-    provenance_name,
-    runtime_archive_name,
-    source_archive_name,
-)
+
+
+def install_entries(content_root: Path) -> list[tuple[Path, str]]:
+    """Map the staged tree to the members of the installed runtime root.
+
+    The children of `Libraries/Wine` become children of `Runtime/`. Every other staged
+    library directory keeps its name, such as `DXMT/`. `Licenses/` and `NOTICE.md` are
+    included when the lane has them.
+    """
+
+    libraries = content_root / "Libraries"
+    entries: list[tuple[Path, str]] = []
+    for child in sorted(libraries.iterdir()):
+        if child.name == "Wine":
+            for grandchild in sorted(child.iterdir()):
+                entries.append((grandchild, f"{RUNTIME_ROOT}/{grandchild.name}"))
+        else:
+            entries.append((child, f"{RUNTIME_ROOT}/{child.name}"))
+    for name in ("Licenses", "NOTICE.md"):
+        if (content_root / name).exists():
+            entries.append((content_root / name, f"{RUNTIME_ROOT}/{name}"))
+    return entries
 
 
 def package_runtime(
@@ -37,7 +60,6 @@ def package_runtime(
     release: bool,
     output: Path,
     content_root: Path,
-    members: tuple[str, ...],
     source_entries: Sequence[tuple[Path, str]],
     source_root: Path,
     inventory: Path,
@@ -55,11 +77,11 @@ def package_runtime(
     output.mkdir(parents=True, exist_ok=True)
     runtime_archive = write_archive(
         output,
-        runtime_archive_name(version, target.arch),
-        [(content_root / member, member) for member in members],
+        runtime_archive_name(target.arch),
+        install_entries(content_root),
     )
     source_archive = write_archive(
-        output, source_archive_name(version, target.arch), source_entries
+        output, source_archive_name(target.arch), source_entries
     )
     (output / notices_name(target.arch)).write_text(
         third_party_notices(repository_root, inventory, target.name),
@@ -72,10 +94,8 @@ def package_runtime(
             version=version,
             commit=source_commit,
             archive=runtime_archive,
-            checksum=runtime_archive.with_name(f"{runtime_archive.name}.sha256"),
             source_root=source_root,
             source_archive=source_archive,
-            source_checksum=source_archive.with_name(f"{source_archive.name}.sha256"),
             validation_report=validation_report,
             component_inventory=inventory,
             target=target.name,

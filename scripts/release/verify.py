@@ -9,7 +9,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from scripts.build_common import NATIVE_ARM64_TARGET
-from scripts.lib.artifact import sha256
+from scripts.lanes import RUNTIME_ROOT
 from scripts.release.licenses import (
     ARCHIVE_LICENSES_DIRECTORY,
     ARCHIVE_NOTICE,
@@ -26,7 +26,8 @@ from scripts.release.provenance import (
 
 SEMVER_CORE_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 IDENTIFIER_PATTERN = re.compile(r"^[0-9A-Za-z-]+$")
-SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+ARCHIVE_NOTICE_PATH = f"{RUNTIME_ROOT}/{ARCHIVE_NOTICE}"
+ARCHIVE_LICENSES_PATH = f"{RUNTIME_ROOT}/{ARCHIVE_LICENSES_DIRECTORY}"
 NOTICE_FILES = (
     "LICENSE",
     "LICENSES/Wine-LGPL-2.1.txt",
@@ -123,43 +124,11 @@ def _regular_file(path: Path, description: str) -> Path:
     return path
 
 
-def _sha256(path: Path) -> str:
-    return sha256(_regular_file(path, "file"))
-
-
-def _verify_checksum(artifact: Path, checksum: Path, description: str) -> str:
-    artifact = _regular_file(artifact, description)
-    checksum = _regular_file(checksum, f"{description} checksum")
-    lines = [
-        line.strip()
-        for line in checksum.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
-    if len(lines) != 1:
-        raise ReleaseValidationError(f"{description} checksum must contain one record")
-    fields = lines[0].split(maxsplit=1)
-    if len(fields) != 2 or SHA256_PATTERN.fullmatch(fields[0]) is None:
-        raise ReleaseValidationError(f"{description} checksum has invalid syntax")
-    referenced_name = fields[1].removeprefix("*")
-    if referenced_name != artifact.name:
-        raise ReleaseValidationError(
-            f"{description} checksum names {referenced_name!r}, expected {artifact.name!r}"
-        )
-    actual = _sha256(artifact)
-    if actual != fields[0]:
-        raise ReleaseValidationError(
-            f"{description} checksum mismatch: {actual} != {fields[0]}"
-        )
-    return actual
-
-
-def _validate_source_archive(
-    path: Path, checksum: Path, members: tuple[str, ...]
-) -> str:
-    digest = _verify_checksum(path, checksum, "corresponding-source archive")
+def _validate_source_archive(path: Path, members: tuple[str, ...]) -> None:
+    _regular_file(path, "corresponding-source archive")
     found: set[str] = set()
     try:
-        with tarfile.open(path, mode="r:gz") as archive:
+        with tarfile.open(path, mode="r:xz") as archive:
             for member in archive.getmembers():
                 member_path = PurePosixPath(member.name)
                 if member_path.is_absolute() or ".." in member_path.parts:
@@ -184,7 +153,6 @@ def _validate_source_archive(
         raise ReleaseValidationError(
             "corresponding-source archive is missing: " + ", ".join(missing)
         )
-    return digest
 
 
 def _validate_archive_licenses(
@@ -195,12 +163,12 @@ def _validate_archive_licenses(
     Return the text of the archive notice."""
 
     try:
-        with tarfile.open(archive, mode="r:gz") as tar:
+        with tarfile.open(archive, mode="r:xz") as tar:
             regular = {
                 member.name: member for member in tar.getmembers() if member.isfile()
             }
-            prefix = ARCHIVE_LICENSES_DIRECTORY
-            for name in (ARCHIVE_NOTICE, f"{prefix}/{INDEX_NAME}"):
+            prefix = ARCHIVE_LICENSES_PATH
+            for name in (ARCHIVE_NOTICE_PATH, f"{prefix}/{INDEX_NAME}"):
                 if name not in regular:
                     raise ReleaseValidationError(
                         f"runtime archive is missing a regular file: {name}"
@@ -225,7 +193,7 @@ def _validate_archive_licenses(
                         raise ReleaseValidationError(
                             f"runtime archive is missing a license file: {prefix}/{relative}"
                         )
-            return _member_text(tar, regular[ARCHIVE_NOTICE])
+            return _member_text(tar, regular[ARCHIVE_NOTICE_PATH])
     except (OSError, tarfile.TarError, ValueError, AttributeError) as error:
         if isinstance(error, ReleaseValidationError):
             raise
@@ -240,11 +208,11 @@ def _validate_external_archive_licenses(
     """Require the minimal external notice set in the runtime archive."""
 
     try:
-        with tarfile.open(archive, mode="r:gz") as tar:
+        with tarfile.open(archive, mode="r:xz") as tar:
             regular = {member.name for member in tar.getmembers() if member.isfile()}
             for name in (
-                ARCHIVE_NOTICE,
-                *(f"{ARCHIVE_LICENSES_DIRECTORY}/{file}" for file in notice_files),
+                ARCHIVE_NOTICE_PATH,
+                *(f"{ARCHIVE_LICENSES_PATH}/{file}" for file in notice_files),
             ):
                 if name not in regular:
                     raise ReleaseValidationError(
@@ -305,10 +273,8 @@ def verify_release(
     version: str,
     commit: str,
     archive: Path,
-    checksum: Path,
     source_root: Path,
     source_archive: Path,
-    source_checksum: Path,
     validation_report: Path,
     component_inventory: Path,
     target: str = DEFAULT_TARGET,
@@ -354,10 +320,8 @@ def verify_release(
     except ProvenanceInputError as error:
         raise ReleaseValidationError(str(error)) from error
     _validate_source_directories(source_root, TARGET_SOURCE_DIRECTORIES[target])
-    _verify_checksum(archive, checksum, "runtime archive")
-    _validate_source_archive(
-        source_archive, source_checksum, TARGET_SOURCE_ARCHIVE_MEMBERS[target]
-    )
+    _regular_file(archive, "runtime archive")
+    _validate_source_archive(source_archive, TARGET_SOURCE_ARCHIVE_MEMBERS[target])
     if external:
         _validate_external_archive_licenses(archive, EXTERNAL_NOTICE_FILES)
     else:

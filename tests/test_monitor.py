@@ -2,10 +2,10 @@
 
 import unittest
 
+from scripts.lock.model import SourcePin
 from scripts.monitor import (
     probe_sources,
 )
-from scripts.runtime import SourcePin
 
 
 class SourceMonitorTests(unittest.TestCase):

@@ -5,7 +5,7 @@ import re
 import unittest
 from pathlib import Path
 
-from scripts.targets.x86_64 import WINE_OVERLAY_ARTIFACTS
+from scripts.lanes.x86_64 import WINE_OVERLAY_ARTIFACTS
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 LOCK_PATH = REPOSITORY_ROOT / "runtime.lock.json"
@@ -27,14 +27,18 @@ MODULE_ARTIFACTS = {
 }
 
 
+LANE = "rosetta-x86_64"
+
+
 def _patched_modules() -> set[str]:
     """Return the dll and driver directories that the locked wine patches touch."""
     lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
     modules: set[str] = set()
     for patch in lock["patches"]:
-        if patch["component"] != "wine":
+        if patch["component"] != "wine" or LANE not in patch["files"]:
             continue
-        text = (REPOSITORY_ROOT / patch["path"]).read_text(encoding="utf-8")
+        path = patch["files"][LANE]["path"]
+        text = (REPOSITORY_ROOT / path).read_text(encoding="utf-8")
         for path in re.findall(r"^\+\+\+ b/(\S+)$", text, re.MULTILINE):
             if path.startswith("include/"):
                 # Headers are compiled into the consuming modules, which are listed.

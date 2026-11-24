@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --locked --no-dev
 # SPDX-License-Identifier: MPL-2.0
 
 """Shared helpers for every runtime build lane."""
@@ -13,12 +12,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 
-if __package__:
-    from .lib.console import info
-else:
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from lib.console import info
-
+from scripts.lib.console import info
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -50,7 +44,7 @@ NATIVE_ARM64_TARGET = "native-arm64"
 WINE_BUILD_NEW_REPOSITORY = "https://github.com/riverfog7/wine-build-new"
 
 
-VALIDATE_CLI = ROOT / "scripts" / "validate_runtime.py"
+VALIDATE_COMMAND = (sys.executable, "-m", "scripts", "validate-runtime")
 
 
 ARCHIVE_BUNDLED_LIBRARIES = ("libfreetype.6.dylib", "libgnutls.30.dylib")

@@ -5,7 +5,7 @@ import struct
 import pytest
 
 from scripts.build_common import BuildError
-from scripts.targets.arm64_dxmt import (
+from scripts.lanes.arm64_dxmt import (
     LC_BUILD_VERSION,
     MINIMAL_WINE_TARGETS,
     reject_macho_above,
@@ -13,7 +13,7 @@ from scripts.targets.arm64_dxmt import (
     verify_dxmt_install,
     verify_minimal_wine_outputs,
 )
-from scripts.targets.dxmt import reject_metal_above
+from scripts.lanes.dxmt import reject_metal_above
 
 
 def _macho(command: int, version: tuple[int, int]) -> bytes:
