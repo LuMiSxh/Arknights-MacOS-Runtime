@@ -1,6 +1,6 @@
 # Updating pins
 
-The runtime pins four upstream inputs in [`runtime.lock.json`](../runtime.lock.json): Wine, DXMT, the base archive, and nixpkgs. One command moves all pins to the newest upstream state. It also rewrites every mention of a pin in the repository.
+The `rosetta-x86_64` lane pins four upstream inputs in [`runtime.lock.json`](../runtime.lock.json): Wine, DXMT, the base archive, and nixpkgs. The `native-arm64` lane pins a catalog release instead of a base archive, and its own Wine, FEX, and DXMT sources. One command moves the Wine, DXMT, base, and nixpkgs pins; `--only wine-arm64` moves the catalog release. It also rewrites every mention of a pin in the repository.
 
 ## Current pins
 
