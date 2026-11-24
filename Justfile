@@ -14,7 +14,7 @@ check:
     {{ uv }} -m scripts.lock validate
     {{ uv }} -m scripts.lock export --check
     {{ uv }} scripts/release/licenses.py generate --check
-    {{ uv }} scripts/release/pins.py check
+    {{ uv }} -m scripts.pins check
     {{ uv_dev }} actionlint
     git diff --check
 
@@ -22,7 +22,7 @@ validate:
     {{ uv }} -m scripts.lock validate
 
 update-pins *args:
-    {{ uv }} scripts/release/pins.py update {{ args }}
+    {{ uv }} -m scripts.pins update {{ args }}
 
 monitor:
     {{ uv }} scripts/monitor.py --output .build/reports/source-monitor.json

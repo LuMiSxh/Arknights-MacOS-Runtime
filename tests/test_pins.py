@@ -8,7 +8,8 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-from scripts.release import pins
+from scripts import pins
+from scripts.pins import cli, mentions, resolve
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 NEW_WINE = "a" * 40
@@ -110,7 +111,7 @@ class ResolutionTests(unittest.TestCase):
         del routes["/repos/dappermint/Whisky/releases"][1]["assets"][0]["digest"]
 
         with self.assertRaisesRegex(pins.PinError, "no sha256 digest"):
-            pins.resolve_base(make_fetch(routes))
+            resolve.resolve_base(make_fetch(routes))
 
 
 class PinsTestCase(unittest.TestCase):
@@ -124,7 +125,7 @@ class PinsTestCase(unittest.TestCase):
         (self.root / "runtime.lock.json").write_text(
             json.dumps(self.lock, indent=2) + "\n"
         )
-        old = pins.pins_from_lock(self.lock)
+        old = mentions.pins_from_lock(self.lock)
         (self.root / "notice.txt").write_text(
             f"Wine {old['wine.version']} at {old['wine.commit']}\n"
             f"Pinned build {old['dxmt.build']} is not release {old['dxmt.tag']}.\n"
@@ -140,11 +141,11 @@ class PinsTestCase(unittest.TestCase):
         self,
         runner: RecordingRunner | None = None,
         *,
-        only: tuple[str, ...] = pins.COMPONENTS,
+        only: tuple[str, ...] = resolve.COMPONENTS,
         dry_run: bool = False,
         routes: dict[str, Any] | None = None,
-    ) -> pins.UpdateResult:
-        return pins.run_update(
+    ) -> cli.UpdateResult:
+        return cli.run_update(
             self.root,
             only,
             dry_run=dry_run,
@@ -157,7 +158,7 @@ class PinsTestCase(unittest.TestCase):
         return json.loads((self.root / "runtime.lock.json").read_text("utf-8"))
 
     def check(self) -> list[str]:
-        return pins.run_check(self.root, ALLOWLIST)
+        return mentions.run_check(self.root, ALLOWLIST)
 
 
 class UpdateTests(PinsTestCase):
@@ -214,7 +215,7 @@ class CheckTests(PinsTestCase):
         self.assertEqual(self.check(), [])
 
     def test_stale_marker_is_reported(self) -> None:
-        current = pins.pins_from_lock(self.lock)["wine.version"]
+        current = mentions.pins_from_lock(self.lock)["wine.version"]
         self.page.write_text(self.page.read_text().replace(current, "0.0"))
 
         self.assertEqual(self.check(), ["docs/page.md:1: pin:wine.version is stale"])

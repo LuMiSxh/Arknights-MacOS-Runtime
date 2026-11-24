@@ -40,7 +40,7 @@ The launcher selects the remaining flags from the profile of the active client. 
 
 ## Runtime lock
 
-`runtime.lock.json` is schema 4. The package `scripts/lock/` loads and validates it into typed values. Most scripts read it through that package. `pins.py` and `licenses.py` still edit or read the raw JSON. The file has four parts:
+`runtime.lock.json` is schema 4. The package `scripts/lock/` loads and validates it into typed values. Most scripts read it through that package. The package `scripts/pins/` and `licenses.py` still edit or read the raw JSON. The file has four parts:
 
 - `shared`: the llvm-mingw toolchain and the nixpkgs pin that every lane uses.
 - `lanes`: one entry per lane, with its build mode, minimum macOS, pinned sources, and interface. A `build` lane pins a `base` archive. An `external` lane pins an `artifact`.

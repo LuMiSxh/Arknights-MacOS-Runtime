@@ -24,7 +24,7 @@ from scripts.lib.artifact import ArtifactError, fetch_verified
 from scripts.lib.console import info, success, warning
 from scripts.lock.model import Lane, LockError
 from scripts.lock.parse import load_lock
-from scripts.release.pins import write_artifact_pin
+from scripts.pins.resolve import write_artifact_pin
 
 # The catalog URL is a secret. It is never logged, so a leaked catalog or archive
 # location stays out of CI output.
