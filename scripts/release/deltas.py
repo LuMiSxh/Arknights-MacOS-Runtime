@@ -11,6 +11,7 @@ kept. A source that fails is logged and skipped, because deltas are best effort.
 import argparse
 import hashlib
 import json
+import multiprocessing
 import os
 import posixpath
 import shutil
@@ -393,7 +394,10 @@ def write_delta(
     source = tree_entries(source_root)
     target = tree_entries(target_root)
     changed = [path for path in target if _patchable(source.get(path), target[path])]
-    with ProcessPoolExecutor(max_workers=PATCH_WORKERS) as pool:
+    # spawn keeps the pool off the forkserver socket, which the offline test harness blocks.
+    with ProcessPoolExecutor(
+        max_workers=PATCH_WORKERS, mp_context=multiprocessing.get_context("spawn")
+    ) as pool:
         futures = {
             pool.submit(_patch_file, source_root / path, target_root / path): path
             for path in changed
