@@ -14,7 +14,7 @@ The canonical copy of each patch is listed under [Canonical copies](#canonical-c
 
 | Path        | Content                                                   |
 | ----------- | --------------------------------------------------------- |
-| `patches/`  | Fourteen Wine patches, applied after the 72-patch queue   |
+| `patches/`  | Fifteen Wine patches, applied after the workspace queue   |
 | `fex/`      | The paired FEX context patch for Wine patch `0001`        |
 | `lock.json` | Machine-readable list of paths, hashes, and runtime gates |
 

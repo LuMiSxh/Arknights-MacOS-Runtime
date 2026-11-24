@@ -96,9 +96,9 @@ Add a regional descriptor only with reverse-engineering evidence for its complet
 - Component/base: WineCX <!-- pin:wine.commit|code -->`a54b8240683e92bf4c15cb1ba6bf92a9539bd768`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Original change for this repository.
 - License: LGPL-2.1-or-later (Wine)
-- Gate: None. Applies to the `rosetta-x86_64` target.
-- Inactive behavior: Not applicable; the ioctl exists in the target.
-- Automated gate: Hash, clean `git apply --check`, and an x86_64 build.
+- Gate: `LMISXH_AKMOCL_WINSOCK` (default on: unset or exactly `1`). Both lanes carry it.
+- Inactive behavior: The ioctl returns `WSAEOPNOTSUPP`, Wine's normal route.
+- Automated gate: Hash, clean `git apply --check`, and a build of each lane.
 - Manual gate: Chromium asynchronous DNS uses the runtime resolver without `--disable-features=AsyncDns`.
 - Removal: Drop when WineCX implements `SIO_ADDRESS_LIST_SORT`.
 
@@ -111,9 +111,9 @@ Chromium's asynchronous DNS resolver calls `WSAIoctl(SIO_ADDRESS_LIST_SORT)` to 
 - Component/base: WineCX <!-- pin:wine.commit|code -->`a54b8240683e92bf4c15cb1ba6bf92a9539bd768`<!-- /pin --> (Wine <!-- pin:wine.version -->11.17<!-- /pin -->)
 - Source/author: Original change for this repository, derived from the client's scoped `UserenvCompat.c`.
 - License: LGPL-2.1-or-later (Wine)
-- Gate: None. Applies to the `rosetta-x86_64` target.
-- Inactive behavior: Not applicable; the exports exist in the target.
-- Automated gate: Hash, clean `git apply --check`, and an x86_64 build.
+- Gate: `LMISXH_AKMOCL_APPCONTAINER` (default on: unset or exactly `1`). Both lanes carry it.
+- Inactive behavior: The AppContainer exports return `E_NOTIMPL`; the `kernelbase` stubs stay.
+- Automated gate: Hash, clean `git apply --check`, and a build of each lane.
 - Manual gate: Chromium's sandbox loads the AppContainer functions without a process-local `userenv.dll`.
 - Removal: Drop when WineCX implements the remaining AppContainer surface.
 

@@ -150,7 +150,7 @@ the final `newPos` differs from `newSize`, or diff or extra bytes are left over.
 
 ## Client application
 
-1. The pin lists deltas per lane as `{ "from", "url", "sha256", "sizeBytes" }`. The client builds each `url` from the manifest `name`.
+1. The pin lists deltas per lane as `{ "from", "url", "sha256", "sizeBytes" }`. The pin script builds each `url` from the manifest `name`; the client uses the pinned `url`.
    The client uses a delta only when `from` equals the installed version.
 2. It downloads and verifies the delta like a full archive, then extracts it with the archive path rules.
 3. It clones the installed root into staging, checks every `keep` and `patch` source hash, applies the entries,

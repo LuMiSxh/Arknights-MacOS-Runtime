@@ -8,10 +8,10 @@ The x86_64 lane stays the default until the game passes the compatibility checks
 
 The **Runtime Build** workflow reads the catalog URL from the repository secret `ARM64_RUNTIME_CATALOG_URL`. It fetches exactly the release that `lanes.native-arm64.artifact` in [`runtime.lock.json`](../../runtime.lock.json) pins. The build never writes the lock.
 
-- The fetch verifies the catalog SHA-256 and size against the lock.
-- A missing pinned release or a SHA-256 disagreement fails the fetch.
+- The fetch verifies the downloaded archive against the lock's SHA-256. The catalog's own digest and size are advisory.
+- A missing pinned release, or an archive that differs from the lock, fails the fetch.
 - The catalog sometimes rebuilds a release under the same id. In that case, review the new archive and run `just pins update --only wine-arm64`.
-- To move to a newer catalog release, run the same command. It writes the newest release id and SHA-256 to the lock. It needs `ARM64_RUNTIME_CATALOG_URL` in the environment.
+- To move to a newer catalog release, run the same command. It downloads the archive, hashes the bytes, and writes that id and SHA-256 to the lock. Add `--release ID` to pin a named release instead of the newest one. It needs `ARM64_RUNTIME_CATALOG_URL` in the environment.
 
 The catalog and archive URLs never appear in output, assets, or provenance.
 
@@ -19,11 +19,11 @@ The lock declares `native-arm64` with `build: external`. `uv run --locked --no-d
 
 ## Shipped artifact
 
+`lanes.native-arm64.artifact` in [`runtime.lock.json`](../../runtime.lock.json) pins the catalog release and its SHA-256.
+
 | Field         | Value                                                                  |
 | ------------- | ---------------------------------------------------------------------- |
-| Release       | `wine-11-18-arm64-v5`                                                  |
-| SHA-256       | `3008b2d45cbe1653ebdd4a0704de790ecc5668a580a84b3db42140fd5c1af31b`     |
-| Wine source   | Upstream Wine 11.18, commit `7b3fff76fa5178f6ce0141b2c776afa2a822f101` |
+| Wine source   | Upstream Wine 11.22, commit `9f8c4ae4d35c7ff4153267aba9618c026f5f5583` |
 | Minimum macOS | 26.0                                                                   |
 | Builder       | [wine-build-new](https://github.com/riverfog7/wine-build-new)          |
 
@@ -63,7 +63,7 @@ The window server selects the window design from the main executable's `LC_BUILD
 
 ## Patch export
 
-The Arknights patches for the signed runtime live in [`wine-build-new/`](../../wine-build-new/). That export has its own layout, gate table, canonical copies, and workspace audit. Its [README](../../wine-build-new/README.md) and [provenance](../../wine-build-new/provenance.md) are the only copies. The export applies fourteen Wine patches and one paired FEX patch after the workspace's 72-patch queue.
+The Arknights patches for the signed runtime live in [`wine-build-new/`](../../wine-build-new/). That export has its own layout, gate table, canonical copies, and workspace audit. Its [README](../../wine-build-new/README.md) and [provenance](../../wine-build-new/provenance.md) are the only copies. The export applies fifteen Wine patches and one paired FEX patch after the workspace's Wine 11.22 queue.
 
 ## Consumer contract
 

@@ -75,6 +75,8 @@ def run_update(
     dry_run: bool,
     fetch: Fetch,
     fetch_catalog: Callable[[str], bytes] | None = None,
+    fetch_archive: Callable[[str, Path], None] | None = None,
+    release_id: str | None = None,
     run: Runner = run_process,
     allowlist: dict[str, tuple[str, ...]] = ALLOWLIST,
 ) -> UpdateResult:
@@ -88,7 +90,9 @@ def run_update(
         if component not in only:
             continue
         if component == "wine-arm64":
-            state = resolve_wine_arm64(fetch_catalog)
+            state = resolve_wine_arm64(
+                fetch_catalog, release_id=release_id, fetch_archive=fetch_archive
+            )
         else:
             state = RESOLVERS[component](fetch)
         trial = copy.deepcopy(old_lock)
@@ -188,6 +192,11 @@ def main(argv: list[str] | None = None, fetch: Fetch = github_fetch) -> int:
         default=",".join(COMPONENTS),
         help=f"comma-separated components of {', '.join(ALL_COMPONENTS)}",
     )
+    update.add_argument(
+        "--release",
+        metavar="ID",
+        help="arm64 catalog release id to pin instead of the newest one",
+    )
     commands.add_parser("check", help="verify that all mentions agree with the lock")
     export = commands.add_parser("export", help="write wine-build-new/lock.json")
     export.add_argument(
@@ -215,7 +224,15 @@ def main(argv: list[str] | None = None, fetch: Fetch = github_fetch) -> int:
             parser.error(
                 f"--only takes {', '.join(ALL_COMPONENTS)}; got {unknown or 'nothing'}"
             )
-        result = run_update(ROOT, only, dry_run=arguments.dry_run, fetch=fetch)
+        if arguments.release and "wine-arm64" not in only:
+            parser.error("--release needs --only wine-arm64")
+        result = run_update(
+            ROOT,
+            only,
+            dry_run=arguments.dry_run,
+            fetch=fetch,
+            release_id=arguments.release,
+        )
     except (PinError, GitHubError) as failure:
         error(str(failure))
         error("Nothing was written.")

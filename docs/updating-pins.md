@@ -1,6 +1,6 @@
 # Updating pins
 
-The runtime pins four upstream inputs in [`runtime.lock.json`](../runtime.lock.json): Wine, DXMT, the base archive, and nixpkgs. One command moves all pins to the newest upstream state. It also rewrites every mention of a pin in the repository.
+The `rosetta-x86_64` lane pins four upstream inputs in [`runtime.lock.json`](../runtime.lock.json): Wine, DXMT, the base archive, and nixpkgs. The `native-arm64` lane pins a catalog release instead of a base archive, and its own Wine, FEX, and DXMT sources. One command moves the Wine, DXMT, base, and nixpkgs pins; `--only wine-arm64` moves the catalog release. It also rewrites every mention of a pin in the repository.
 
 ## Current pins
 
@@ -27,22 +27,6 @@ The runtime pins four upstream inputs in [`runtime.lock.json`](../runtime.lock.j
 | Base archive | Newest `dappermint/Whisky` release with a `Libraries.tar.gz` asset. The hash comes from the digest of the asset. The recipe commit is the commit of the tag `runtime-<release tag>` in `dappermint/winecx-gptk`. |
 | nixpkgs | Tip of the channel branch `NIXPKGS_CHANNEL` in `scripts/pins/resolve.py`. The channel is `nixos-25.05`, because the DXMT build needs `llvmPackages_15`, which later releases removed. |
 
-## Known-bad pins
-
-Do not use these pins. Patches that show the defects are in `docs/known-bad-pins/winecx-1119/`.
-
-| Pin | Result |
-| --- | --- |
-| Wine `wine1119` of `dappermint/winecx`, commit `b1417d2` (11.19) | Wine does not run on macOS x86_64 under Rosetta. The last working pin is `e0aa380` (11.17). |
-
-The 11.19 merge has three defects:
-
-1. `start_main_thread` calls `dbg_init()` before the PEB exists. This writes to address `0x2000` and the process dies with SIGBUS.
-2. The `WINE_TOP_DOWN` reserve is missing from `loader/main.c` and from the link flags. Wine then scans the mapped system area in 64 KB steps and does not start for hours.
-3. `load_main_exe` runs before the first TEB exists, so `peb` is NULL in `virtual_map_image`. The CW HACK 22939 line dereferences it and the process loops on faults.
-
-Patches 0002 to 0004 in the known-bad folder fix the three defects. The runtime was not verified with them. Before you try `wine1119` again, check that a clean prefix starts and runs `regedit`.
-
 A newer nixpkgs channel is a manual decision. Change the constant, then review the library closure.
 
 ## Update the pins
@@ -52,7 +36,7 @@ A newer nixpkgs channel is a manual decision. Change the constant, then review t
 3. Read the summary table. Each row shows the old pin, the new pin, and the status.
 4. Run `just pins update`.
 5. To update one component, run `just pins update --only wine`. The values of `--only` are `wine`, `dxmt`, `base`, `nixpkgs`, and `wine-arm64`.
-6. The default run skips `wine-arm64`. It needs the catalog URL in `ARM64_RUNTIME_CATALOG_URL`. Run `just pins update --only wine-arm64` to pin the newest ARM64 catalog release.
+6. The default run skips `wine-arm64`. It needs the catalog URL in `ARM64_RUNTIME_CATALOG_URL`. Run `just pins update --only wine-arm64` to pin the newest ARM64 catalog release. The command downloads the archive and pins the SHA-256 of the bytes it received, because the catalog digest is only a hint. Add `--release ID` to pin a named release instead of the newest one.
 
 The command stops with no changes when it cannot resolve the base archive or its recipe commit. It also stops when the API gives no digest for the asset.
 

@@ -166,31 +166,34 @@ def test_fetch_rejects_a_non_arm64_release(tmp_path, monkeypatch):
         )
 
 
-def test_fetch_rejects_a_catalog_sha_mismatch(tmp_path, monkeypatch):
+def test_fetch_accepts_a_stale_catalog_digest(tmp_path, monkeypatch):
     archive = b"fake wine archive"
-    monkeypatch.setenv(
-        "ARM64_RUNTIME_CATALOG_URL", "https://catalog.example/catalog.json"
-    )
+    catalog_url = "https://catalog.example/catalog.json"
+    archive_url = "https://download.example/archive.tar.xz"
     catalog = _catalog(
         {
             "id": RELEASE_ID,
             "arch": "arm64",
             "sha256": "0" * 64,
-            "url": "https://download.example/archive.tar.xz",
+            "url": archive_url,
         }
     )
+    monkeypatch.setenv("ARM64_RUNTIME_CATALOG_URL", catalog_url)
+    responses = {catalog_url: catalog, archive_url: archive}
 
-    with pytest.raises(FetchError, match="pins update --only wine-arm64"):
-        fetch_selected_release(
-            "ARM64_RUNTIME_CATALOG_URL",
-            RELEASE_ID,
-            tmp_path / "wine.tar.xz",
-            expected_sha256=_sha256(archive),
-            fetch=lambda url: catalog,
-        )
+    release, path = fetch_selected_release(
+        "ARM64_RUNTIME_CATALOG_URL",
+        RELEASE_ID,
+        tmp_path / "wine.tar.xz",
+        expected_sha256=_sha256(archive),
+        fetch=responses.__getitem__,
+    )
+
+    assert release["id"] == RELEASE_ID
+    assert path.read_bytes() == archive
 
 
-def test_fetch_rejects_a_size_mismatch(tmp_path, monkeypatch):
+def test_fetch_ignores_the_catalog_size(tmp_path, monkeypatch):
     archive = b"fake wine archive"
     catalog_url = "https://catalog.example/catalog.json"
     archive_url = "https://download.example/archive.tar.xz"
@@ -206,14 +209,15 @@ def test_fetch_rejects_a_size_mismatch(tmp_path, monkeypatch):
     monkeypatch.setenv("ARM64_RUNTIME_CATALOG_URL", catalog_url)
     responses = {catalog_url: catalog, archive_url: archive}
 
-    with pytest.raises(FetchError, match="size"):
-        fetch_selected_release(
-            "ARM64_RUNTIME_CATALOG_URL",
-            RELEASE_ID,
-            tmp_path / "wine.tar.xz",
-            expected_sha256=_sha256(archive),
-            fetch=responses.__getitem__,
-        )
+    _, path = fetch_selected_release(
+        "ARM64_RUNTIME_CATALOG_URL",
+        RELEASE_ID,
+        tmp_path / "wine.tar.xz",
+        expected_sha256=_sha256(archive),
+        fetch=responses.__getitem__,
+    )
+
+    assert path.read_bytes() == archive
 
 
 def test_fetch_rejects_an_archive_sha_mismatch(tmp_path, monkeypatch):
@@ -300,16 +304,60 @@ def test_fetch_target_takes_exactly_the_locked_release(tmp_path, monkeypatch):
     assert path.read_bytes() == locked
 
 
-def test_fetch_target_fails_when_the_catalog_rebuilt_the_locked_release(
+def test_fetch_picks_the_newest_entry_when_the_catalog_repeats_an_id(
     tmp_path, monkeypatch
 ):
+    older = b"older archive"
+    newer = b"newer archive"
     catalog_url = "https://catalog.example/catalog.json"
-    rebuilt = _release(b"rebuilt archive")
+    older_url = "https://download.example/older.tar.xz"
+    newer_url = "https://download.example/newer.tar.xz"
+    catalog = json.dumps(
+        {
+            "releases": [
+                {
+                    "id": RELEASE_ID,
+                    "arch": "arm64",
+                    "published_at": "2026-11-07T12:14:35Z",
+                    "sha256": _sha256(older),
+                    "url": older_url,
+                },
+                {
+                    "id": RELEASE_ID,
+                    "arch": "arm64",
+                    "published_at": "2026-11-08T12:14:35Z",
+                    "sha256": _sha256(newer),
+                    "url": newer_url,
+                },
+            ]
+        }
+    ).encode()
     monkeypatch.setenv("ARM64_RUNTIME_CATALOG_URL", catalog_url)
-    monkeypatch.setattr(fetch_external, "_urlopen_bytes", lambda url: _catalog(rebuilt))
+    responses = {catalog_url: catalog, older_url: older, newer_url: newer}
 
-    with pytest.raises(FetchError, match="re-pin with `just pins update"):
-        fetch_external.fetch_target(_lane(), tmp_path / "incoming")
+    _, path = fetch_selected_release(
+        "ARM64_RUNTIME_CATALOG_URL",
+        RELEASE_ID,
+        tmp_path / "wine.tar.xz",
+        _sha256(newer),
+        fetch=responses.__getitem__,
+    )
+
+    assert path.read_bytes() == newer
+
+
+def test_fetch_target_rejects_bytes_that_differ_from_the_lock(tmp_path, monkeypatch):
+    rebuilt = b"rebuilt archive"
+    catalog_url = "https://catalog.example/catalog.json"
+    archive_url = "https://download.example/archive.tar.xz"
+    catalog = _catalog(_release(rebuilt))
+    monkeypatch.setenv("ARM64_RUNTIME_CATALOG_URL", catalog_url)
+    responses = {catalog_url: catalog, archive_url: rebuilt}
+
+    with pytest.raises(FetchError, match="SHA-256"):
+        fetch_external.fetch_target(
+            _lane(), tmp_path / "incoming", fetch=responses.__getitem__
+        )
 
     assert not (tmp_path / "incoming" / "wine.tar.xz").exists()
 

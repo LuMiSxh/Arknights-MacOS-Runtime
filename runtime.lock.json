@@ -88,8 +88,8 @@
       "sources": {
         "wine": {
           "repository": "https://gitlab.winehq.org/wine/wine.git",
-          "commit": "7b3fff76fa5178f6ce0141b2c776afa2a822f101",
-          "version": "11.18"
+          "commit": "9f8c4ae4d35c7ff4153267aba9618c026f5f5583",
+          "version": "11.22"
         },
         "fex": {
           "repository": "https://github.com/FEX-Emu/FEX.git",
@@ -104,8 +104,8 @@
       },
       "artifact": {
         "catalog": "wine",
-        "release": "wine-11-18-arm64-v5",
-        "sha256": "5f80759ac14b99e1052748b168565deef238b58f44f10b0cf69bfd16d0110e1d"
+        "release": "wine-11-22-arm64-v0-7-2-alpha-3",
+        "sha256": "c5867d9f73e8f72492741cc937173ebbf39fe755afb7c3106cd004b9c101ad7d"
       },
       "interface": {
         "executables": [

@@ -27,7 +27,6 @@ import subprocess
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -37,7 +36,10 @@ from scripts.lanes.arm64_external import (
     FetchError,
     catalog_releases,
     download_catalog,
+    newest_release,
 )
+from scripts.lib.artifact import download_unverified, sha256
+from scripts.lib.console import warning
 from scripts.lib.github import Fetch, paged
 from scripts.lock.model import DEFAULT_LANE
 from scripts.pins import SHORT_LENGTH, PinError
@@ -46,7 +48,6 @@ from scripts.pins import SHORT_LENGTH, PinError
 # runs only when `--only` names it.
 COMPONENTS = ("wine", "dxmt", "base", "nixpkgs")
 ALL_COMPONENTS = (*COMPONENTS, "wine-arm64")
-BUILD_NUMBER = re.compile(r"-v(\d+)$")
 NIXPKGS_CHANNEL = "nixos-25.05"
 WINE_REPOSITORY = "dappermint/winecx"
 WINE_BRANCH = re.compile(r"wine11([0-9]+)")
@@ -179,48 +180,68 @@ class ArtifactState:
     sha256: str
 
 
-def _published_at(release: dict[str, Any]) -> datetime:
-    value = release.get("published_at")
-    if not isinstance(value, str):
-        raise PinError(f"catalog release {release.get('id')} has no published_at")
-    try:
-        parsed = datetime.fromisoformat(value)
-    except ValueError as problem:
-        raise PinError(
-            f"catalog release {release.get('id')} has an invalid published_at"
-        ) from problem
-    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+ArtifactFetcher = Callable[[str, Path], None]
 
 
-def _build_number(release: dict[str, Any]) -> int:
-    match = BUILD_NUMBER.search(str(release.get("id", "")))
-    return int(match.group(1)) if match else 0
+def resolve_wine_arm64(
+    fetch_catalog: Callable[[str], bytes] | None,
+    *,
+    release_id: str | None = None,
+    fetch_archive: ArtifactFetcher | None = None,
+) -> ArtifactState:
+    """Return one arm64 catalog release and the SHA-256 of the archive it serves.
 
-
-def resolve_wine_arm64(fetch_catalog: Callable[[str], bytes] | None) -> ArtifactState:
-    """Return the newest arm64 release of the external catalog.
-
-    The catalog URL is a secret, so `ARM64_RUNTIME_CATALOG_URL` must be set.
+    The catalog digest is not always the digest of the archive the entry names, so the
+    lock records the bytes that the URL serves and the build verifies those bytes.
+    With `release_id`, that release is pinned instead of the newest one. The catalog
+    URL is a secret, so `ARM64_RUNTIME_CATALOG_URL` must be set.
     """
 
     try:
         releases = catalog_releases(download_catalog(WINE_CATALOG_ENV, fetch_catalog))
+        arm64 = [
+            release
+            for release in releases
+            if isinstance(release, dict) and release.get("arch") == "arm64"
+        ]
+        if not arm64:
+            raise FetchError("catalog has no arm64 release")
+        if release_id is None:
+            chosen = newest_release(arm64)
+        else:
+            matches = [release for release in arm64 if release.get("id") == release_id]
+            if not matches:
+                raise FetchError(f"catalog has no arm64 release with id {release_id}")
+            chosen = newest_release(matches)
+        archive_url = chosen.get("url")
+        if not isinstance(archive_url, str) or not archive_url:
+            raise FetchError(f"catalog release {chosen.get('id')} has no archive URL")
     except FetchError as problem:
         raise PinError(str(problem)) from problem
-    arm64 = [
-        release
-        for release in releases
-        if isinstance(release, dict) and release.get("arch") == "arm64"
-    ]
-    if not arm64:
-        raise PinError("catalog has no arm64 release")
-    newest = max(
-        arm64, key=lambda release: (_published_at(release), _build_number(release))
-    )
-    digest = newest.get("sha256")
-    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
-        raise PinError(f"catalog release {newest.get('id')} has no valid SHA-256")
-    return ArtifactState(str(newest["id"]), digest)
+
+    with tempfile.TemporaryDirectory() as directory:
+        archive = Path(directory) / "wine.tar.xz"
+        try:
+            if fetch_archive is None:
+                download_unverified(
+                    archive_url, archive, label="Hashing the catalog archive"
+                )
+            else:
+                fetch_archive(archive_url, archive)
+        except OSError as problem:
+            raise PinError("cannot download the catalog archive") from problem
+        try:
+            digest = sha256(archive)
+        except OSError as problem:
+            raise PinError("cannot read the catalog archive") from problem
+
+    declared = chosen.get("sha256")
+    if isinstance(declared, str) and declared != digest:
+        warning(
+            f"the catalog digest of {chosen.get('id')} differs from the archive; "
+            "the lock records the archive bytes"
+        )
+    return ArtifactState(str(chosen["id"]), digest)
 
 
 RESOLVERS: dict[str, Callable[[Fetch], Any]] = {

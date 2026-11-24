@@ -32,8 +32,6 @@ The direct Nix inputs are FreeType, GnuTLS, libpng, zlib, Brotli, bzip2, Nettle,
 
 The opt-in Hardware Cursor Wine patch filters the exact region-specific cursor asset basename during file-name resolution. It does not contain, redistribute, or modify game assets. The game installation remains user-owned and unchanged.
 
-## Generated release inventory
-
 ## License files in the archive
 
 The file `LICENSES/index.json` lists every component with its version, SPDX identifier, source, license files, optional notice, and status. The status is `verified` or `unverified`. A component can also name the targets that ship it. The module `scripts/release/licenses.py` validates the index against `runtime.lock.json`, the build script, and the generated inventory. The clean build puts `Licenses/` (with `index.json`) and `NOTICE.md` at the root of the runtime archive. The native-arm64 canary build writes the same payload for its target, so it lists Wine, DXMT, FEX, and the Nix closure but not MoltenVK. The release check fails when the payload is missing.
@@ -41,5 +39,7 @@ The file `LICENSES/index.json` lists every component with its version, SPDX iden
 The external ARM64 archive keeps its upstream `share/licenses` directory. The runtime release adds Wine, DXMT, FEX, and MoltenVK notices. The generated Nix closure inventory is not part of the external lane.
 
 The corresponding-source offer for the Nix libraries is not yet in place.
+
+## Generated release inventory
 
 The clean build writes `inventory-<arch>.tsv`. Wine and DXMT map to their locked source identities. MoltenVK maps to the SHA-256-pinned base archive. FEX maps to its locked target source. Each Nix library maps to the realised store output and the pinned Nixpkgs revision it came from. The release workflow includes the inventory in the source archive, as a separate draft asset, and in the generated third-party notices.

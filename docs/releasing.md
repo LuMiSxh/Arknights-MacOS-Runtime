@@ -30,9 +30,11 @@ The workflow has these jobs:
 | ------------- | ------------------------------ | --------------------------------------------------------------------------------------------- |
 | `prepare`     | Always                         | Validates the inputs and selects the lanes. A release also checks that the tag and release do not exist. |
 | `build-x86_64` | `target` is `both` or `rosetta-x86_64` | Builds the x86_64 lane on `xcode-27`.                                                  |
+| `smoke-x86_64` | `target` builds the x86_64 lane | Boots a prefix and creates a Direct3D 11 device from the built runtime on `macos-15` and `macos-26`. |
 | `build-arm64` | `target` is `both` or `native-arm64`   | Builds the ARM64 lane on `macos-26` in the `release-arm64` environment.                |
 | `combine`     | `release` channel              | Verifies the lane outputs and writes one `provenance.json` and one `THIRD-PARTY-NOTICES.txt`. |
 | `deltas`      | `release` channel              | Writes delta archives from recent releases. Best effort: a failure does not block `publish`. |
+| `recheck`     | `release` channel              | Checks again that the tag and release do not exist before `publish`.                          |
 | `publish`     | `release` channel              | Attests the assets, creates the tag, and creates the draft release.                           |
 
 Every lane job has read-only permissions and uploads its output as the artifact `runtime-<target>`. The artifact keeps for 3 days. The `release-arm64` environment and its secret reach only the ARM64 lane job.

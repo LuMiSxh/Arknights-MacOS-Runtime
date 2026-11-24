@@ -233,6 +233,14 @@ def fetch_verified(
     return destination
 
 
+def download_unverified(url: str, destination: Path, *, label: str) -> Path:
+    """Stream `url` into `destination` for a caller that verifies the bytes itself."""
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    _download(url, destination, label)
+    return destination
+
+
 def _download(url: str, partial: Path, label: str) -> None:
     with (
         urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response,
