@@ -534,7 +534,7 @@ jobs:
     # A read-only job re-checks the tag right before publishing, so that publish never
     # checks out code. The tag creation and `--verify-tag` still fail on an existing tag.
     recheck:
-        needs: [prepare, combine]
+        needs: [prepare, combine, deltas]
         if: ${{ inputs.channel == 'release' }}
         runs-on: ubuntu-24.04
         timeout-minutes: 10

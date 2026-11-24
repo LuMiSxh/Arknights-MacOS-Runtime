@@ -20,6 +20,7 @@ import tarfile
 import tempfile
 from collections.abc import Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
@@ -568,6 +569,9 @@ def main(arguments: list[str] | None = None) -> int:
                     ArtifactError,
                     OSError,
                     tarfile.TarError,
+                    # A bsdiff worker killed for memory must not block the release.
+                    BrokenProcessPool,
+                    MemoryError,
                 ) as problem:
                     warning(f"skipping {arch} delta from v{source}: {problem}")
                 else:
