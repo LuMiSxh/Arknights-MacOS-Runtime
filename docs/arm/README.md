@@ -8,10 +8,10 @@ The x86_64 lane stays the default until the game passes the compatibility checks
 
 The **Runtime Build** workflow reads the catalog URL from the repository secret `ARM64_RUNTIME_CATALOG_URL`. It fetches exactly the release that `lanes.native-arm64.artifact` in [`runtime.lock.json`](../../runtime.lock.json) pins. The build never writes the lock.
 
-- The fetch verifies the catalog SHA-256 and size against the lock.
-- A missing pinned release or a SHA-256 disagreement fails the fetch.
+- The fetch verifies the downloaded archive against the lock's SHA-256. The catalog's own digest and size are advisory.
+- A missing pinned release, or an archive that differs from the lock, fails the fetch.
 - The catalog sometimes rebuilds a release under the same id. In that case, review the new archive and run `just pins update --only wine-arm64`.
-- To move to a newer catalog release, run the same command. It writes the newest release id and SHA-256 to the lock. It needs `ARM64_RUNTIME_CATALOG_URL` in the environment.
+- To move to a newer catalog release, run the same command. It downloads the archive, hashes the bytes, and writes that id and SHA-256 to the lock. Add `--release ID` to pin a named release instead of the newest one. It needs `ARM64_RUNTIME_CATALOG_URL` in the environment.
 
 The catalog and archive URLs never appear in output, assets, or provenance.
 
@@ -23,7 +23,7 @@ The lock declares `native-arm64` with `build: external`. `uv run --locked --no-d
 
 | Field         | Value                                                                  |
 | ------------- | ---------------------------------------------------------------------- |
-| Wine source   | Upstream Wine 11.18, commit `7b3fff76fa5178f6ce0141b2c776afa2a822f101` |
+| Wine source   | Upstream Wine 11.22, commit `9f8c4ae4d35c7ff4153267aba9618c026f5f5583` |
 | Minimum macOS | 26.0                                                                   |
 | Builder       | [wine-build-new](https://github.com/riverfog7/wine-build-new)          |
 

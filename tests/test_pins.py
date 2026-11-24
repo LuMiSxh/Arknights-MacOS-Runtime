@@ -2,6 +2,7 @@
 
 
 import base64
+import hashlib
 import json
 import os
 import tempfile
@@ -211,7 +212,11 @@ class UpdateTests(PinsTestCase):
 
         self.assertEqual(snapshot(self.root), before)
 
-    def test_wine_arm64_moves_to_the_newest_catalog_release(self) -> None:
+    def wine_arm64_catalog(self) -> tuple[bytes, dict[str, bytes]]:
+        archives = {
+            "https://c.example/v4.tar.xz": b"version four",
+            "https://c.example/v6.tar.xz": b"version six",
+        }
         catalog = json.dumps(
             {
                 "releases": [
@@ -220,34 +225,70 @@ class UpdateTests(PinsTestCase):
                         "arch": "arm64",
                         "published_at": "2026-11-07T12:14:35Z",
                         "sha256": "1" * 64,
+                        "url": "https://c.example/v4.tar.xz",
                     },
                     {
                         "id": "wine-11-18-arm64-v6",
                         "arch": "arm64",
                         "published_at": "2026-11-07T12:14:35Z",
                         "sha256": "2" * 64,
+                        "url": "https://c.example/v6.tar.xz",
                     },
                     {"id": "other-x86", "arch": "x86_64", "sha256": "3" * 64},
                 ]
             }
         ).encode()
+        return catalog, archives
+
+    def update_wine_arm64(
+        self, catalog: bytes, archives: dict[str, bytes], release_id: str | None = None
+    ) -> cli.UpdateResult:
+        def fetch_archive(url: str, path: Path) -> None:
+            path.write_bytes(archives[url])
 
         with mock.patch.dict(
             os.environ, {"ARM64_RUNTIME_CATALOG_URL": "https://c.example/"}
         ):
-            result = cli.run_update(
+            return cli.run_update(
                 self.root,
                 ("wine-arm64",),
                 dry_run=False,
                 fetch=make_fetch({}),
                 fetch_catalog=lambda url: catalog,
+                fetch_archive=fetch_archive,
+                release_id=release_id,
                 allowlist=ALLOWLIST,
             )
 
+    def test_wine_arm64_moves_to_the_newest_catalog_release(self) -> None:
+        catalog, archives = self.wine_arm64_catalog()
+
+        result = self.update_wine_arm64(catalog, archives)
+
         artifact = self.lock_on_disk()["lanes"]["native-arm64"]["artifact"]
         self.assertEqual(artifact["release"], "wine-11-18-arm64-v6")
-        self.assertEqual(artifact["sha256"], "2" * 64)
+        self.assertEqual(artifact["sha256"], hashlib.sha256(b"version six").hexdigest())
         self.assertEqual([o.status for o in result.outcomes], ["updated"])
+
+    def test_wine_arm64_pins_the_named_release(self) -> None:
+        catalog, archives = self.wine_arm64_catalog()
+
+        self.update_wine_arm64(catalog, archives, release_id="wine-11-18-arm64-v4")
+
+        artifact = self.lock_on_disk()["lanes"]["native-arm64"]["artifact"]
+        self.assertEqual(artifact["release"], "wine-11-18-arm64-v4")
+        self.assertEqual(
+            artifact["sha256"], hashlib.sha256(b"version four").hexdigest()
+        )
+
+    def test_wine_arm64_rejects_an_unknown_release_id(self) -> None:
+        catalog, archives = self.wine_arm64_catalog()
+        before = snapshot(self.root)
+
+        with self.assertRaisesRegex(pins.PinError, "no arm64 release with id"):
+            self.update_wine_arm64(catalog, archives, release_id="wine-11-18-arm64-v9")
+
+        self.assertEqual(snapshot(self.root), before)
 
 
 class CheckTests(PinsTestCase):

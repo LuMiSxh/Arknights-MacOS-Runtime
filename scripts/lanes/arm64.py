@@ -98,9 +98,9 @@ def build_runtime(
                 "commit": lane.sources["wine"].commit,
             },
             "artifact": {
-                "id": artifact["id"],
-                "sha256": artifact["sha256"],
-                "size": artifact.get("size"),
+                "id": artifact.id,
+                "sha256": artifact.sha256,
+                "size": artifact.size,
             },
         },
         dxmt={
