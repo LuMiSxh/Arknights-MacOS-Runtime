@@ -3,10 +3,12 @@
 
 import base64
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 from scripts import pins
 from scripts.pins import cli, mentions, resolve
@@ -208,6 +210,44 @@ class UpdateTests(PinsTestCase):
             self.update(routes=routes)
 
         self.assertEqual(snapshot(self.root), before)
+
+    def test_wine_arm64_moves_to_the_newest_catalog_release(self) -> None:
+        catalog = json.dumps(
+            {
+                "releases": [
+                    {
+                        "id": "wine-11-18-arm64-v4",
+                        "arch": "arm64",
+                        "published_at": "2026-11-07T12:14:35Z",
+                        "sha256": "1" * 64,
+                    },
+                    {
+                        "id": "wine-11-18-arm64-v6",
+                        "arch": "arm64",
+                        "published_at": "2026-11-07T12:14:35Z",
+                        "sha256": "2" * 64,
+                    },
+                    {"id": "other-x86", "arch": "x86_64", "sha256": "3" * 64},
+                ]
+            }
+        ).encode()
+
+        with mock.patch.dict(
+            os.environ, {"ARM64_RUNTIME_CATALOG_URL": "https://c.example/"}
+        ):
+            result = cli.run_update(
+                self.root,
+                ("wine-arm64",),
+                dry_run=False,
+                fetch=make_fetch({}),
+                fetch_catalog=lambda url: catalog,
+                allowlist=ALLOWLIST,
+            )
+
+        artifact = self.lock_on_disk()["lanes"]["native-arm64"]["artifact"]
+        self.assertEqual(artifact["release"], "wine-11-18-arm64-v6")
+        self.assertEqual(artifact["sha256"], "2" * 64)
+        self.assertEqual([o.status for o in result.outcomes], ["updated"])
 
 
 class CheckTests(PinsTestCase):

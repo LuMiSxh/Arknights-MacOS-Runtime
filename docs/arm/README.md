@@ -6,11 +6,12 @@ The x86_64 lane stays the default until the game passes the compatibility checks
 
 ## Catalog and pin generation
 
-The **Runtime Build** workflow reads the catalog URL from the repository secret `ARM64_RUNTIME_CATALOG_URL`. It selects the newest ARM64 release by default, or the `arm64_release_id` passed to the manual dispatch.
+The **Runtime Build** workflow reads the catalog URL from the repository secret `ARM64_RUNTIME_CATALOG_URL`. It fetches exactly the release that `lanes.native-arm64.artifact` in [`runtime.lock.json`](../../runtime.lock.json) pins. The build never writes the lock.
 
-- When the selected release matches the lock pin, the fetch enforces the locked SHA-256.
-- When the selected release differs, the fetch downloads it, verifies the catalog SHA-256 and size, and writes the new release id and SHA-256 to [`runtime.lock.json`](../../runtime.lock.json). Downstream steps verify against the lock.
+- The fetch verifies the catalog SHA-256 and size against the lock.
 - A missing pinned release or a SHA-256 disagreement fails the fetch.
+- The catalog sometimes rebuilds a release under the same id. In that case, review the new archive and run `just update-pins --only wine-arm64`.
+- To move to a newer catalog release, run the same command. It writes the newest release id and SHA-256 to the lock. It needs `ARM64_RUNTIME_CATALOG_URL` in the environment.
 
 The catalog and archive URLs never appear in output, assets, or provenance.
 

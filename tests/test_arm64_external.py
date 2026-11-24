@@ -17,7 +17,6 @@ from scripts.targets.arm64_external import (
     FetchError,
     _extract_archive,
     fetch_selected_release,
-    select_release,
 )
 
 RELEASE_ID = "wine-11-18-arm64-v5"
@@ -78,96 +77,6 @@ def _text_values(value):
             yield from _text_values(child)
     elif isinstance(value, str):
         yield value
-
-
-def test_uses_the_highest_build_when_publish_dates_match():
-    releases = [
-        {
-            "id": "wine-11-18-arm64-v4",
-            "arch": "arm64",
-            "published_at": "2026-11-07T12:14:35Z",
-        },
-        {
-            "id": "wine-11-18-arm64-v6",
-            "arch": "arm64",
-            "published_at": "2026-11-07T12:14:35Z",
-        },
-    ]
-
-    assert select_release(releases, "")["id"] == "wine-11-18-arm64-v6"
-
-
-def test_select_release_rejects_a_missing_published_at():
-    releases = [
-        {"id": "wine-11-18-arm64-v4", "arch": "arm64"},
-        {
-            "id": "wine-11-18-arm64-v5",
-            "arch": "arm64",
-            "published_at": "2026-11-07T12:14:35Z",
-        },
-    ]
-
-    with pytest.raises(FetchError, match="published_at"):
-        select_release(releases, "")
-
-
-def test_explicit_release_id_wins_over_the_newest():
-    releases = [
-        {
-            "id": "wine-11-18-arm64-v5",
-            "arch": "arm64",
-            "published_at": "2026-11-07T12:14:35Z",
-        },
-        {
-            "id": "wine-11-18-arm64-v4",
-            "arch": "arm64",
-            "published_at": "2026-11-06T06:35:15Z",
-        },
-    ]
-
-    assert (
-        select_release(releases, "wine-11-18-arm64-v4")["id"] == "wine-11-18-arm64-v4"
-    )
-
-
-def test_fetch_uses_the_newest_arm64_release_by_default(tmp_path, monkeypatch):
-    newest = b"newest archive"
-    older = b"older archive"
-    catalog_url = "https://catalog.example/catalog.json"
-    newest_url = "https://download.example/newest.tar.xz"
-    older_url = "https://download.example/older.tar.xz"
-    catalog = json.dumps(
-        {
-            "releases": [
-                {
-                    "id": "wine-11-18-arm64-v4",
-                    "arch": "arm64",
-                    "published_at": "2026-11-06T06:35:15Z",
-                    "sha256": _sha256(older),
-                    "url": older_url,
-                },
-                {
-                    "id": "wine-11-18-arm64-v5",
-                    "arch": "arm64",
-                    "published_at": "2026-11-07T12:14:35Z",
-                    "sha256": _sha256(newest),
-                    "url": newest_url,
-                },
-            ]
-        }
-    ).encode()
-    monkeypatch.setenv("ARM64_RUNTIME_CATALOG_URL", catalog_url)
-    responses = {catalog_url: catalog, newest_url: newest, older_url: older}
-
-    release, path = fetch_selected_release(
-        "ARM64_RUNTIME_CATALOG_URL",
-        "",
-        tmp_path / "wine.tar.xz",
-        fetch=responses.__getitem__,
-    )
-
-    assert release["id"] == "wine-11-18-arm64-v5"
-    assert path.read_bytes() == newest
 
 
 def _single_member_tar(name: str, *, linkname: str | None = None) -> bytes:
@@ -271,7 +180,7 @@ def test_fetch_rejects_a_catalog_sha_mismatch(tmp_path, monkeypatch):
         }
     )
 
-    with pytest.raises(FetchError, match="SHA-256"):
+    with pytest.raises(FetchError, match="update-pins --only wine-arm64"):
         fetch_selected_release(
             "ARM64_RUNTIME_CATALOG_URL",
             RELEASE_ID,
@@ -350,76 +259,59 @@ def test_extract_rejects_unsafe_archive_members(tmp_path, name, linkname):
         _extract_archive(archive, tmp_path / "out")
 
 
-@pytest.mark.parametrize(
-    ("catalog_id", "sha256"),
-    [("wine-11-18-arm64-v6", "b" * 64), (RELEASE_ID, "c" * 64)],
-    ids=["newer-release", "rebuilt-archive"],
-)
-def test_fetch_target_updates_the_lock_when_the_catalog_release_differs(
-    tmp_path, monkeypatch, catalog_id, sha256
+def test_fetch_target_takes_exactly_the_locked_release(tmp_path, monkeypatch):
+    locked = b"locked archive"
+    newer = b"newer archive"
+    catalog_url = "https://catalog.example/catalog.json"
+    locked_url = "https://download.example/locked.tar.xz"
+    newer_url = "https://download.example/newer.tar.xz"
+    catalog = json.dumps(
+        {
+            "releases": [
+                {
+                    "id": RELEASE_ID,
+                    "arch": "arm64",
+                    "published_at": "2026-11-07T12:14:35Z",
+                    "sha256": _sha256(locked),
+                    "url": locked_url,
+                },
+                {
+                    "id": "wine-11-18-arm64-v6",
+                    "arch": "arm64",
+                    "published_at": "2026-11-08T12:14:35Z",
+                    "sha256": _sha256(newer),
+                    "url": newer_url,
+                },
+            ]
+        }
+    ).encode()
+    monkeypatch.setenv("ARM64_RUNTIME_CATALOG_URL", catalog_url)
+    responses = {catalog_url: catalog, locked_url: locked, newer_url: newer}
+
+    release, path = fetch_selected_release(
+        "ARM64_RUNTIME_CATALOG_URL",
+        RELEASE_ID,
+        tmp_path / "wine.tar.xz",
+        _sha256(locked),
+        fetch=responses.__getitem__,
+    )
+
+    assert release["id"] == RELEASE_ID
+    assert path.read_bytes() == locked
+
+
+def test_fetch_target_fails_when_the_catalog_rebuilt_the_locked_release(
+    tmp_path, monkeypatch
 ):
-    pin_writes = []
+    catalog_url = "https://catalog.example/catalog.json"
+    rebuilt = _release(b"rebuilt archive")
+    monkeypatch.setenv("ARM64_RUNTIME_CATALOG_URL", catalog_url)
+    monkeypatch.setattr(fetch_external, "_urlopen_bytes", lambda url: _catalog(rebuilt))
 
-    def fake_fetch(env_name, release_id, output, expected_sha256=None, fetch=None):
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_bytes(b"archive")
-        return (
-            {
-                "id": catalog_id,
-                "arch": "arm64",
-                "sha256": sha256,
-                "size": 7,
-            },
-            output,
-        )
+    with pytest.raises(FetchError, match="re-pin with `just update-pins"):
+        fetch_external.fetch_target(_lane(), tmp_path / "incoming")
 
-    def fake_extract(archive, destination):
-        (destination / "wine").mkdir()
-
-    def fake_write_artifact_pin(root, target, release, pinned_sha256):
-        pin_writes.append((target, release, pinned_sha256))
-        return True
-
-    monkeypatch.setattr(fetch_external, "fetch_selected_release", fake_fetch)
-    monkeypatch.setattr(fetch_external, "_extract_archive", fake_extract)
-    monkeypatch.setattr(fetch_external, "write_artifact_pin", fake_write_artifact_pin)
-
-    fetch_external.fetch_target(_lane(), tmp_path / "incoming", "")
-
-    assert pin_writes == [("native-arm64", catalog_id, sha256)]
-
-
-def test_fetch_target_keeps_the_lock_when_extraction_fails(tmp_path, monkeypatch):
-    pin_writes = []
-
-    def fake_fetch(env_name, release_id, output, expected_sha256=None, fetch=None):
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_bytes(b"archive")
-        return (
-            {
-                "id": "wine-11-18-arm64-v6",
-                "arch": "arm64",
-                "sha256": "b" * 64,
-                "size": 7,
-            },
-            output,
-        )
-
-    def failing_extract(archive, destination):
-        raise FetchError("cannot extract the wine archive: broken")
-
-    def fake_write_artifact_pin(root, target, release, sha256):
-        pin_writes.append((target, release, sha256))
-        return True
-
-    monkeypatch.setattr(fetch_external, "fetch_selected_release", fake_fetch)
-    monkeypatch.setattr(fetch_external, "_extract_archive", failing_extract)
-    monkeypatch.setattr(fetch_external, "write_artifact_pin", fake_write_artifact_pin)
-
-    with pytest.raises(FetchError, match="cannot extract"):
-        fetch_external.fetch_target(_lane(), tmp_path / "incoming", "")
-
-    assert pin_writes == []
+    assert not (tmp_path / "incoming" / "wine.tar.xz").exists()
 
 
 def test_assemble_moves_the_wine_tree_and_adds_links(tmp_path):

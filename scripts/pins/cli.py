@@ -12,6 +12,7 @@ import copy
 import json
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,11 +28,13 @@ from scripts.pins.mentions import (
     run_check,
 )
 from scripts.pins.resolve import (
+    ALL_COMPONENTS,
     COMPONENTS,
     RESOLVERS,
     Runner,
     apply_state,
     guard_patches,
+    resolve_wine_arm64,
     run_process,
 )
 
@@ -59,6 +62,7 @@ def _describe(component: str, pins: dict[str, str]) -> str:
         "dxmt": pins["dxmt.version"],
         "base": f"{pins['base.tag']} ({pins['base.sha256'][:SHORT_LENGTH]})",
         "nixpkgs": pins["nixpkgs.short"],
+        "wine-arm64": f"{pins['wine-arm64.release']} ({pins['wine-arm64.sha256'][:SHORT_LENGTH]})",
     }[component]
 
 
@@ -68,6 +72,7 @@ def run_update(
     *,
     dry_run: bool,
     fetch: Fetch,
+    fetch_catalog: Callable[[str], bytes] | None = None,
     run: Runner = run_process,
     allowlist: dict[str, tuple[str, ...]] = ALLOWLIST,
 ) -> UpdateResult:
@@ -77,10 +82,13 @@ def run_update(
     old_pins = pins_from_lock(old_lock)
     new_lock = copy.deepcopy(old_lock)
     outcomes: list[Outcome] = []
-    for component in COMPONENTS:
+    for component in ALL_COMPONENTS:
         if component not in only:
             continue
-        state = RESOLVERS[component](fetch)
+        if component == "wine-arm64":
+            state = resolve_wine_arm64(fetch_catalog)
+        else:
+            state = RESOLVERS[component](fetch)
         trial = copy.deepcopy(old_lock)
         apply_state(trial, component, state)
         before = _describe(component, old_pins)
@@ -152,7 +160,9 @@ def main(argv: list[str] | None = None, fetch: Fetch = github_fetch) -> int:
     )
     update.add_argument("--dry-run", action="store_true", help="write nothing")
     update.add_argument(
-        "--only", default=",".join(COMPONENTS), help="comma-separated components"
+        "--only",
+        default=",".join(COMPONENTS),
+        help=f"comma-separated components of {', '.join(ALL_COMPONENTS)}",
     )
     commands.add_parser("check", help="verify that all mentions agree with the lock")
     export = commands.add_parser("export", help="write wine-build-new/lock.json")
@@ -176,10 +186,10 @@ def main(argv: list[str] | None = None, fetch: Fetch = github_fetch) -> int:
             return 0
 
         only = tuple(name.strip() for name in arguments.only.split(",") if name.strip())
-        unknown = sorted(set(only) - set(COMPONENTS))
+        unknown = sorted(set(only) - set(ALL_COMPONENTS))
         if unknown or not only:
             parser.error(
-                f"--only takes {', '.join(COMPONENTS)}; got {unknown or 'nothing'}"
+                f"--only takes {', '.join(ALL_COMPONENTS)}; got {unknown or 'nothing'}"
             )
         result = run_update(ROOT, only, dry_run=arguments.dry_run, fetch=fetch)
     except (PinError, GitHubError) as failure:

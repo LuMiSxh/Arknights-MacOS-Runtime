@@ -24,10 +24,7 @@ on:
                     - both
                     - rosetta-x86_64
                     - native-arm64
-            arm64_release_id:
-                description: Catalog release id for the ARM64 lane. Leave empty for the newest ARM64 release.
-                required: false
-                type: string
+
 
 permissions: {}
 
@@ -414,7 +411,7 @@ jobs:
               env:
                   VERSION: ${{ inputs.version }}
                   CHANNEL: ${{ inputs.channel }}
-                  ARM64_RELEASE_ID: ${{ inputs.arm64_release_id }}
+
                   ARM64_RUNTIME_CATALOG_URL: ${{ secrets.ARM64_RUNTIME_CATALOG_URL }}
                   CC: ccache clang
                   CXX: ccache clang++
@@ -430,11 +427,10 @@ jobs:
               if: ${{ always() }}
               run: if command -v ccache >/dev/null; then ccache -s; fi
 
-            # The catalog fetch may re-pin runtime.lock.json on purpose; provenance records it.
             - name: Refuse a modified checkout
               shell: bash
               run: |
-                  if [[ -n "$(git status --porcelain -- . ':!runtime.lock.json')" ]]; then
+                  if [[ -n "$(git status --porcelain)" ]]; then
                     echo "error: build modified tracked repository files" >&2
                     exit 1
                   fi

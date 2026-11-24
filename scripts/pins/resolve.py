@@ -22,20 +22,31 @@ longer applies to the new commit.
 """
 
 import base64
-import json
 import re
 import subprocess
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from scripts.build_common import NATIVE_ARM64_TARGET
 from scripts.lib.github import Fetch, paged
 from scripts.lock.model import DEFAULT_LANE
-from scripts.pins import LOCK_NAME, SHORT_LENGTH, PinError, read_lock
+from scripts.pins import SHORT_LENGTH, PinError
+from scripts.targets.arm64_external import (
+    WINE_CATALOG_ENV,
+    FetchError,
+    catalog_releases,
+    download_catalog,
+)
 
+# `update` moves these by default. `wine-arm64` needs the secret catalog URL, so it
+# runs only when `--only` names it.
 COMPONENTS = ("wine", "dxmt", "base", "nixpkgs")
+ALL_COMPONENTS = (*COMPONENTS, "wine-arm64")
+BUILD_NUMBER = re.compile(r"-v(\d+)$")
 NIXPKGS_CHANNEL = "nixos-25.05"
 WINE_REPOSITORY = "dappermint/winecx"
 WINE_BRANCH = re.compile(r"wine11([0-9]+)")
@@ -162,6 +173,56 @@ def resolve_nixpkgs(fetch: Fetch) -> NixpkgsState:
     return NixpkgsState(branch_tip(fetch, NIXPKGS_REPOSITORY, NIXPKGS_CHANNEL))
 
 
+@dataclass(frozen=True)
+class ArtifactState:
+    release: str
+    sha256: str
+
+
+def _published_at(release: dict[str, Any]) -> datetime:
+    value = release.get("published_at")
+    if not isinstance(value, str):
+        raise PinError(f"catalog release {release.get('id')} has no published_at")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as problem:
+        raise PinError(
+            f"catalog release {release.get('id')} has an invalid published_at"
+        ) from problem
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+def _build_number(release: dict[str, Any]) -> int:
+    match = BUILD_NUMBER.search(str(release.get("id", "")))
+    return int(match.group(1)) if match else 0
+
+
+def resolve_wine_arm64(fetch_catalog: Callable[[str], bytes] | None) -> ArtifactState:
+    """Return the newest arm64 release of the external catalog.
+
+    The catalog URL is a secret, so `ARM64_RUNTIME_CATALOG_URL` must be set.
+    """
+
+    try:
+        releases = catalog_releases(download_catalog(WINE_CATALOG_ENV, fetch_catalog))
+    except FetchError as problem:
+        raise PinError(str(problem)) from problem
+    arm64 = [
+        release
+        for release in releases
+        if isinstance(release, dict) and release.get("arch") == "arm64"
+    ]
+    if not arm64:
+        raise PinError("catalog has no arm64 release")
+    newest = max(
+        arm64, key=lambda release: (_published_at(release), _build_number(release))
+    )
+    digest = newest.get("sha256")
+    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise PinError(f"catalog release {newest.get('id')} has no valid SHA-256")
+    return ArtifactState(str(newest["id"]), digest)
+
+
 RESOLVERS: dict[str, Callable[[Fetch], Any]] = {
     "wine": resolve_wine,
     "dxmt": resolve_dxmt,
@@ -177,7 +238,11 @@ def apply_state(lock: dict[str, Any], component: str, state: Any) -> None:
     """Write a resolved state into the lock."""
 
     lane = lock["lanes"][DEFAULT_LANE]
-    if component in ("wine", "dxmt"):
+    if component == "wine-arm64":
+        lock["lanes"][NATIVE_ARM64_TARGET]["artifact"].update(
+            release=state.release, sha256=state.sha256
+        )
+    elif component in ("wine", "dxmt"):
         lane["sources"][component].update(commit=state.commit, version=state.version)
     elif component == "base":
         artifact = lane["base"]
@@ -185,23 +250,6 @@ def apply_state(lock: dict[str, Any], component: str, state: Any) -> None:
         artifact["recipe"]["commit"] = state.recipe_commit
     else:
         lock["shared"]["nixpkgs"]["commit"] = state.commit
-
-
-def write_artifact_pin(root: Path, target: str, release: str, sha256: str) -> bool:
-    """Update one external target's artifact pin and rewrite the lock in place.
-
-    Return True when the lock changed. The text keeps the same
-    ``json.dumps(lock, indent=2)`` formatting that `run_update` writes, so
-    `pins.py check` and `scripts.lock validate` keep passing.
-    """
-
-    lock = read_lock(root)
-    artifact = lock["lanes"][target]["artifact"]
-    if artifact.get("release") == release and artifact.get("sha256") == sha256:
-        return False
-    artifact.update(release=release, sha256=sha256)
-    (root / LOCK_NAME).write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
-    return True
 
 
 def run_process(command: list[str]) -> tuple[int, str]:

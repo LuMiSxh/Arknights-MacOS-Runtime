@@ -16,6 +16,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from scripts.build_common import NATIVE_ARM64_TARGET
 from scripts.lock.model import DEFAULT_LANE
 from scripts.pins import SHORT_LENGTH, PinError, read_lock
 
@@ -92,6 +93,9 @@ def pins_from_lock(lock: dict[str, Any]) -> dict[str, str]:
     pins["nixpkgs.commit"] = nixpkgs["commit"]
     pins["nixpkgs.short"] = nixpkgs["commit"][:SHORT_LENGTH]
     pins["nixpkgs.link"] = _link(nixpkgs["repository"], nixpkgs["commit"])
+    external = lock["lanes"][NATIVE_ARM64_TARGET]["artifact"]
+    pins["wine-arm64.release"] = external["release"]
+    pins["wine-arm64.sha256"] = external["sha256"]
     return pins
 
 

@@ -51,7 +51,8 @@ A newer nixpkgs channel is a manual decision. Change the constant, then review t
 2. Run `just update-pins --dry-run`. The command resolves the new state and writes nothing.
 3. Read the summary table. Each row shows the old pin, the new pin, and the status.
 4. Run `just update-pins`.
-5. To update one component, run `just update-pins --only wine`. The values of `--only` are `wine`, `dxmt`, `base`, and `nixpkgs`.
+5. To update one component, run `just update-pins --only wine`. The values of `--only` are `wine`, `dxmt`, `base`, `nixpkgs`, and `wine-arm64`.
+6. The default run skips `wine-arm64`. It needs the catalog URL in `ARM64_RUNTIME_CATALOG_URL`. Run `just update-pins --only wine-arm64` to pin the newest ARM64 catalog release.
 
 The command stops with no changes when it cannot resolve the base archive or its recipe commit. It also stops when the API gives no digest for the asset.
 

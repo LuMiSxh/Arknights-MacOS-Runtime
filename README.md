@@ -53,7 +53,7 @@ Requirements: macOS 26+, Homebrew `llvm@15`, Meson, Ninja, Bison, Flex, pkg-conf
 just build-release native-arm64 0.9.0
 ```
 
-Set `ARM64_RELEASE_ID` to choose a catalog release.
+The build fetches the catalog release that `runtime.lock.json` pins. Run `just update-pins --only wine-arm64` to move it.
 
 The ARM64 Wine payload is built in [wine-build-new](https://github.com/riverfog7/wine-build-new). This repository builds DXMT for ARM64EC, repacks the external tree into the client contract, and validates the result. See the [native ARM64 lane](docs/arm/README.md) and the [patch export](wine-build-new/README.md).
 

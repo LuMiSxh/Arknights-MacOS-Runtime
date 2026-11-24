@@ -15,16 +15,14 @@ import re
 import tarfile
 import urllib.request
 from collections.abc import Callable
-from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from scripts.build_common import NATIVE_ARM64_TARGET, ROOT
+from scripts.build_common import NATIVE_ARM64_TARGET
 from scripts.lib.artifact import ArtifactError, fetch_verified
-from scripts.lib.console import info, success, warning
+from scripts.lib.console import info, success
 from scripts.lock.model import Lane, LockError
 from scripts.lock.parse import load_lock
-from scripts.pins.resolve import write_artifact_pin
 
 # The catalog URL is a secret. It is never logged, so a leaked catalog or archive
 # location stays out of CI output.
@@ -32,7 +30,6 @@ WINE_CATALOG_ENV = "ARM64_RUNTIME_CATALOG_URL"
 
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
-_BUILD_NUMBER = re.compile(r"-v(\d+)$")
 
 
 class FetchError(RuntimeError):
@@ -62,7 +59,9 @@ def download_catalog(
     return catalog
 
 
-def _select_release(releases: list[Any], release_id: str) -> dict[str, Any]:
+def select_release(releases: list[Any], release_id: str) -> dict[str, Any]:
+    """Return the one release with the locked id."""
+
     matches = [
         entry
         for entry in releases
@@ -80,64 +79,36 @@ def _require_arm64(release: dict[str, Any]) -> None:
         raise FetchError("catalog release architecture is not arm64")
 
 
-def _releases(catalog: dict[str, Any]) -> list[Any]:
+def catalog_releases(catalog: dict[str, Any]) -> list[Any]:
     releases = catalog.get("releases")
     if not isinstance(releases, list):
         raise FetchError("catalog must name a releases array")
     return releases
 
 
-def _published_at(release: dict[str, Any]) -> datetime:
-    value = release.get("published_at")
-    if not isinstance(value, str):
-        raise FetchError("catalog release has no published_at")
-    try:
-        parsed = datetime.fromisoformat(value)
-    except ValueError as problem:
-        raise FetchError("catalog release has an invalid published_at") from problem
-    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
-
-
-def _build_number(release: dict[str, Any]) -> int:
-    match = _BUILD_NUMBER.search(str(release.get("id", "")))
-    return int(match.group(1)) if match else 0
-
-
-def select_release(releases: list[Any], release_id: str) -> dict[str, Any]:
-    """Return the named release, or the newest ARM64 release when no id is given."""
-
-    if release_id:
-        return _select_release(releases, release_id)
-    arm64 = [
-        release
-        for release in releases
-        if isinstance(release, dict) and release.get("arch") == "arm64"
-    ]
-    if not arm64:
-        raise FetchError("catalog has no arm64 release")
-    return max(
-        arm64, key=lambda release: (_published_at(release), _build_number(release))
-    )
-
-
 def fetch_selected_release(
     env_name: str,
     release_id: str,
     output: Path,
-    expected_sha256: str | None = None,
+    expected_sha256: str,
     fetch: Callable[[str], bytes] | None = None,
 ) -> tuple[dict[str, Any], Path]:
-    """Download the selected release after its catalog fields and bytes are verified."""
+    """Download the locked release after its catalog fields and bytes are verified."""
 
     catalog = download_catalog(env_name, fetch)
-    release = select_release(_releases(catalog), release_id)
+    release = select_release(catalog_releases(catalog), release_id)
     _require_arm64(release)
 
     declared = release.get("sha256")
     if not isinstance(declared, str) or _SHA256.fullmatch(declared) is None:
         raise FetchError("catalog release has no valid SHA-256")
-    if expected_sha256 is not None and declared != expected_sha256:
-        raise FetchError("catalog SHA-256 does not match the locked SHA-256")
+    if declared != expected_sha256:
+        # The catalog rebuilds a release in place, so the same id can carry new bytes.
+        raise FetchError(
+            f"the catalog SHA-256 of {release_id} differs from the locked SHA-256 "
+            f"({expected_sha256} -> {declared}). Review the new archive, then "
+            "re-pin with `just update-pins --only wine-arm64`."
+        )
 
     archive_url = release.get("url")
     if not isinstance(archive_url, str) or not archive_url:
@@ -192,10 +163,10 @@ def _extract_archive(archive: Path, destination: Path) -> None:
             raise FetchError(f"cannot extract the wine archive: {problem}") from problem
 
 
-def fetch_target(lane: Lane, output: Path, release_id: str) -> dict[str, Any]:
-    """Fetch, verify, and extract the pinned Wine archive into `output`.
+def fetch_target(lane: Lane, output: Path) -> dict[str, Any]:
+    """Fetch, verify, and extract the locked Wine archive into `output`.
 
-    Return the catalog release. A changed archive under a pinned id re-pins the lock.
+    Return the catalog release. The build never writes the lock.
     """
 
     output.mkdir(parents=True, exist_ok=True)
@@ -203,26 +174,12 @@ def fetch_target(lane: Lane, output: Path, release_id: str) -> dict[str, Any]:
     if artifact is None or artifact.catalog != "wine":
         raise FetchError("the external target must pin the wine catalog")
     release, archive = fetch_selected_release(
-        WINE_CATALOG_ENV, release_id, output / "wine.tar.xz"
+        WINE_CATALOG_ENV, artifact.release, output / "wine.tar.xz", artifact.sha256
     )
-    info(f"Selected catalog release {release['id']}")
+    info(f"Fetched catalog release {release['id']}")
     _extract_archive(archive, output)
     if not (output / "wine").is_dir():
         raise FetchError("extracted archive has no wine directory")
-    # The upstream catalog sometimes replaces a release's archive under the same id, so a
-    # new SHA-256 for the pinned id is re-pinned with a warning instead of failing.
-    if release["id"] == artifact.release and release["sha256"] != artifact.sha256:
-        warning(
-            f"The catalog archive for {release['id']} changed since it was pinned "
-            f"({artifact.sha256} -> {release['sha256']})"
-        )
-    if (
-        release["id"] != artifact.release or release["sha256"] != artifact.sha256
-    ) and write_artifact_pin(ROOT, lane.name, release["id"], release["sha256"]):
-        warning(
-            f"Updated the {lane.name} artifact pin to {release['id']} "
-            f"({release['sha256']})"
-        )
     success("Fetched and verified the wine archive")
     return release
 

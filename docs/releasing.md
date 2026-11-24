@@ -22,7 +22,7 @@ The client pins the release archive URL and SHA-256 in its `runtime.json`. There
 | `version`          | Bare SemVer, such as `1.0.0-rc1`. Do not add `+x86`, `+arm`, or a leading `v`. |
 | `channel`          | `candidate` (default) or `release`.                                         |
 | `target`           | `both` (default), `rosetta-x86_64`, or `native-arm64`.                      |
-| `arm64_release_id` | Optional catalog release id for the ARM64 lane. Empty selects the newest.    |
+
 
 The workflow has these jobs:
 
@@ -61,8 +61,8 @@ The ARM64 lane ships an external Wine tree and builds DXMT in the workflow. The 
 
 `shared.toolchain.llvmMingw` in `runtime.lock.json` pins the llvm-mingw release URL and SHA-256. The repository variables `LLVM_MINGW_URL` and `LLVM_MINGW_SHA256` apply only when the lock has no pin. They are public build inputs, not secrets.
 
-1. Dispatch **Runtime Build** as described above. Optionally enter `arm64_release_id`. Leave it empty to use the newest ARM64 release.
-2. The workflow selects the release id and takes the SHA-256 from the catalog, fetches the artifact, verifies it, and extracts it. The lock pin is the last verified baseline. The catalog and archive URLs never appear in output, assets, or provenance.
+1. To use a newer catalog release, run `just update-pins --only wine-arm64` and commit the lock. Then dispatch **Runtime Build** as described above.
+2. The workflow fetches the release that the lock pins, verifies its SHA-256, and extracts it. A SHA-256 change under the same id fails the build until you re-pin. The catalog and archive URLs never appear in output, assets, or provenance.
 3. `scripts/targets/arm64_dxmt.py` builds DXMT from `lanes.native-arm64.sources.dxmt` for ARM64EC with `MACOSX_DEPLOYMENT_TARGET=26.0`. It needs the fetched Wine artifact, so the lane fetches Wine first.
 4. `scripts/targets/arm64_assemble.py` repacks the client tree as `Libraries/Wine`, `Libraries/DXMT`, `Licenses/`, and `NOTICE.md`. The signed loader bundle is renamed to `Arknights.app`. It keeps its Developer ID signature.
 5. `scripts/build.py release --target native-arm64 --version 0.9.0` validates the tree and runs the release gates. The gate requires `inheritedMachOAboveTarget` to be `0`. Check the validation report before you publish.

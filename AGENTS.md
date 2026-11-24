@@ -26,7 +26,7 @@
 
 ## Conventions
 
-- `runtime.lock.json` is the sole source of source pins, patch order, archive paths, and deployment target. The native ARM64 artifact comes from the external catalog; the lane verifies its SHA-256 and records the selection in its provenance fragment. When the selected release differs from the lock pin, the fetch writes the new release id and SHA-256 to the lock; when it matches, it enforces the locked SHA-256.
+- `runtime.lock.json` is the sole source of source pins, patch order, archive paths, and deployment target. The native ARM64 artifact comes from the external catalog; the lane fetches exactly the release that the lock pins, verifies its SHA-256, and records it in its provenance fragment. A build never writes the lock. A SHA-256 change under the same release id fails the build until `just update-pins --only wine-arm64` re-pins it.
 - Use full commits and SHA-256 hashes; reject floating refs and unverified downloads.
 - Keep generated sources, downloads, reports, and artifacts under `.build/`; never commit binaries.
 - Run Python through the root `pyproject.toml` and `uv.lock` with `uv run --locked`; keep runtime orchestration standard-library-only.

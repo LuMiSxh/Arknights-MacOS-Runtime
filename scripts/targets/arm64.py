@@ -3,10 +3,9 @@
 """The native-arm64 lane: Wine from the external catalog and DXMT built for ARM64EC.
 
 The catalog URL comes from `ARM64_RUNTIME_CATALOG_URL` and is never printed. The optional
-`ARM64_RELEASE_ID` pins one catalog release. Leave it empty for the newest ARM64 release.
+The build fetches exactly the catalog release that `runtime.lock.json` pins.
 """
 
-import os
 import shutil
 import sys
 from pathlib import Path
@@ -17,7 +16,6 @@ from scripts.build_common import (
     VALIDATE_CLI,
     WINE_BUILD_NEW_REPOSITORY,
     Builder,
-    BuildError,
 )
 from scripts.lock.sources import BUILD_ROOT
 from scripts.targets import Target, inventory_name
@@ -34,7 +32,7 @@ TARGET = Target(
     pe_compiler="arm64ec-w64-mingw32",
 )
 
-RELEASE_ID_ENVIRONMENT = "ARM64_RELEASE_ID"
+
 # Repository paths that the corresponding-source archive carries.
 SOURCE_REPOSITORY_MEMBERS = (
     "wine-build-new",
@@ -71,9 +69,7 @@ def build_runtime(
     lane = require_external_lock(TARGET.name)
     root = BUILD_ROOT / TARGET.arch
     root.mkdir(parents=True, exist_ok=True)
-    artifact = fetch_target(
-        lane, root / "incoming", os.environ.get(RELEASE_ID_ENVIRONMENT, "").strip()
-    )
+    artifact = fetch_target(lane, root / "incoming")
     install = build_dxmt_arm64(builder, TARGET, lane, root)
 
     libraries = root / "Libraries"
@@ -83,11 +79,6 @@ def build_runtime(
     (root / "NOTICE.md").unlink(missing_ok=True)
     assemble(root / "incoming" / "wine", install, libraries, root, lane.interface)
     verify_interface(libraries, lane.interface)
-
-    # The fetch may re-pin the lock. The pin that the build records must match the catalog.
-    pinned = require_external_lock(TARGET.name).artifact
-    if (pinned.release, pinned.sha256) != (artifact["id"], artifact["sha256"]):
-        raise BuildError("external artifact metadata does not match the lock pin")
 
     output.mkdir(parents=True, exist_ok=True)
     inventory = output / inventory_name(TARGET.arch)
