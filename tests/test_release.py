@@ -25,8 +25,6 @@ class ReleaseVerificationTests(unittest.TestCase):
         self._write_repository()
         self.archive = self.root / "runtime.tar.xz"
         self._write_runtime_archive()
-        self.checksum = self.root / "runtime.tar.xz.sha256"
-        self._write_checksum(self.archive, self.checksum)
         self.source_root = self.root / "sources"
         for name in ("wine", "dxmt"):
             path = self.source_root / name
@@ -39,8 +37,6 @@ class ReleaseVerificationTests(unittest.TestCase):
         )
         self.source_archive = self.root / "sources.tar.xz"
         self._write_source_archive()
-        self.source_checksum = self.root / "sources.tar.xz.sha256"
-        self._write_checksum(self.source_archive, self.source_checksum)
         self.validation_report = self.root / "validation.json"
         self.validation_report.write_text(
             json.dumps(
@@ -150,21 +146,14 @@ class ReleaseVerificationTests(unittest.TestCase):
                 member.size = len(data)
                 archive.addfile(member, io.BytesIO(data))
 
-    @staticmethod
-    def _write_checksum(artifact: Path, checksum: Path) -> None:
-        digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-        checksum.write_text(f"{digest}  {artifact.name}\n", encoding="utf-8")
-
     def _verify(self) -> dict[str, object]:
         return verify_release(
             repository_root=self.root,
             version="0.1.0",
             commit="3" * 40,
             archive=self.archive,
-            checksum=self.checksum,
             source_root=self.source_root,
             source_archive=self.source_archive,
-            source_checksum=self.source_checksum,
             validation_report=self.validation_report,
             component_inventory=self.component_inventory,
         )
@@ -176,7 +165,6 @@ class ReleaseVerificationTests(unittest.TestCase):
 
     def test_rejects_a_runtime_archive_missing_a_listed_license_file(self) -> None:
         self._write_runtime_archive(omit="DXMT")
-        self._write_checksum(self.archive, self.checksum)
 
         with self.assertRaisesRegex(ReleaseValidationError, "missing a license file"):
             self._verify()
@@ -210,15 +198,6 @@ class ReleaseVerificationTests(unittest.TestCase):
                 with self.assertRaisesRegex(ReleaseValidationError, "missing patches"):
                     self._verify()
 
-    def test_rejects_checksum_that_names_another_artifact(self) -> None:
-        self.checksum.write_text(
-            f"{hashlib.sha256(self.archive.read_bytes()).hexdigest()}  other.tar.xz\n",
-            encoding="utf-8",
-        )
-
-        with self.assertRaisesRegex(ReleaseValidationError, "names"):
-            self._verify()
-
     def test_rejects_a_missing_or_symlinked_source_checkout(self) -> None:
         (self.source_root / "wine" / "source.c").unlink()
         (self.source_root / "wine").rmdir()
@@ -235,7 +214,6 @@ class ReleaseVerificationTests(unittest.TestCase):
         for member in ("scripts", "Justfile", "pyproject.toml", "uv.lock"):
             with self.subTest(member=member):
                 self._write_source_archive(omit=(member,))
-                self._write_checksum(self.source_archive, self.source_checksum)
 
                 with self.assertRaisesRegex(
                     ReleaseValidationError,
@@ -248,7 +226,6 @@ class ReleaseVerificationTests(unittest.TestCase):
             source = tarfile.TarInfo("../escape")
             source.size = 0
             archive.addfile(source)
-        self._write_checksum(self.source_archive, self.source_checksum)
 
         with self.assertRaisesRegex(ReleaseValidationError, "unsafe path"):
             self._verify()
@@ -394,12 +371,6 @@ def _write_external_archives(root: Path) -> None:
         add_dir(tar, "docs/arm")
         add_file(tar, "docs/arm/provenance.md", b"provenance\n")
 
-    for artifact in (runtime_archive, source_archive):
-        digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-        (root / f"{artifact.name}.sha256").write_text(
-            f"{digest}  {artifact.name}\n", encoding="utf-8"
-        )
-
 
 def test_external_target_accepts_the_minimal_notice_set(tmp_path):
     root = tmp_path / "external"
@@ -424,10 +395,8 @@ def test_external_target_accepts_the_minimal_notice_set(tmp_path):
         version="0.9.0",
         commit="7" * 40,
         archive=root / "runtime.tar.xz",
-        checksum=root / "runtime.tar.xz.sha256",
         source_root=root,
         source_archive=root / "sources.tar.xz",
-        source_checksum=root / "sources.tar.xz.sha256",
         validation_report=root / "validation.json",
         component_inventory=root / "inventory.tsv",
         target="native-arm64",

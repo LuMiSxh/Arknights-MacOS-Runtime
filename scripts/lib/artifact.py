@@ -9,7 +9,7 @@ import re
 import stat
 import tarfile
 import urllib.request
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Collection, Iterator, Sequence
 from pathlib import Path, PurePosixPath
 
 from .console import Progress
@@ -19,6 +19,7 @@ DOWNLOAD_TIMEOUT_SECONDS = 60
 ARCHIVE_PRESET = 9 | lzma.PRESET_EXTREME
 DIRECTORY_MODE = 0o755
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+CHECKSUMS_NAME = "SHA256SUMS"
 EXCLUDED_NAMES = frozenset((".git", "__pycache__"))
 
 
@@ -58,13 +59,59 @@ def read_checksum(checksum: Path, artifact_name: str) -> str:
 
 
 def verify_checksum(artifact: Path, checksum: Path) -> str:
-    """Return the SHA-256 of `artifact` after it matches its `.sha256` file."""
+    """Return the SHA-256 of `artifact` after it matches a legacy `.sha256` sidecar."""
 
     expected = read_checksum(checksum, artifact.name)
     actual = sha256(artifact)
     if actual != expected:
         raise ArtifactError(
             f"{artifact.name} SHA-256 does not match its checksum: {actual} != {expected}"
+        )
+    return actual
+
+
+def write_checksums(directory: Path, *, exclude: Collection[str] = ()) -> Path:
+    """Write `SHA256SUMS` for every file in `directory` except the excluded names.
+
+    Each line is `<hex>  <name>`, sorted by name, so `shasum -a 256 -c` accepts it.
+    """
+
+    names = sorted(
+        path.name
+        for path in directory.iterdir()
+        if path.is_file() and path.name != CHECKSUMS_NAME and path.name not in exclude
+    )
+    path = directory / CHECKSUMS_NAME
+    path.write_text(
+        "".join(f"{sha256(directory / name)}  {name}\n" for name in names),
+        encoding="utf-8",
+    )
+    return path
+
+
+def read_checksums(path: Path) -> dict[str, str]:
+    """Return the name to SHA-256 map of a `SHA256SUMS` file."""
+
+    sums: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        digest, separator, name = line.partition("  ")
+        if not separator or SHA256_PATTERN.fullmatch(digest) is None or not name:
+            raise ArtifactError(f"{path.name} has invalid syntax: {line!r}")
+        sums[name] = digest
+    return sums
+
+
+def verify_listed(artifact: Path, checksums: Path) -> str:
+    """Return the SHA-256 of `artifact` after `SHA256SUMS` lists the same digest."""
+
+    expected = read_checksums(checksums).get(artifact.name)
+    if expected is None:
+        raise ArtifactError(f"{checksums.name} does not list {artifact.name}")
+    actual = sha256(artifact)
+    if actual != expected:
+        raise ArtifactError(
+            f"{artifact.name} SHA-256 does not match {checksums.name}: "
+            f"{actual} != {expected}"
         )
     return actual
 
@@ -135,8 +182,7 @@ def write_archive(
     Each source is added with everything below it. The output is deterministic: members
     are sorted by name, with mtime 0, uid and gid 0, and empty owner names. Modes are 0755
     for directories and executable files, and 0644 for other files. Hard links, devices,
-    and FIFOs are rejected. The xz stream has a CRC64 check. The SHA-256 checksum goes
-    beside it as `<tar_name>.sha256`.
+    and FIFOs are rejected. The xz stream has a CRC64 check.
     """
 
     members = _members(entries)
@@ -151,9 +197,6 @@ def write_archive(
                     tar.addfile(info, content)
             else:
                 tar.addfile(info)
-    (directory / f"{tar_name}.sha256").write_text(
-        f"{sha256(path)}  {tar_name}\n", encoding="utf-8"
-    )
     return path
 
 

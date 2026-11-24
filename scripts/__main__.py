@@ -20,6 +20,7 @@ COMMANDS: dict[str, str | dict[str, str]] = {
     "release": {
         "combine": "scripts.release.combine:main",
         "deltas": "scripts.release.deltas:main",
+        "manifest": "scripts.release.manifest:main",
         "assert-absent": "scripts.release.absent:main",
         "licenses": "scripts.release.licenses:main",
     },

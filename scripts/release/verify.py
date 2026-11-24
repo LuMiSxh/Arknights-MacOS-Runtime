@@ -10,7 +10,6 @@ from typing import Any
 
 from scripts.build_common import NATIVE_ARM64_TARGET
 from scripts.lanes import RUNTIME_ROOT
-from scripts.lib.artifact import ArtifactError, verify_checksum
 from scripts.release.licenses import (
     ARCHIVE_LICENSES_DIRECTORY,
     ARCHIVE_NOTICE,
@@ -125,19 +124,8 @@ def _regular_file(path: Path, description: str) -> Path:
     return path
 
 
-def _verify_checksum(artifact: Path, checksum: Path, description: str) -> str:
-    artifact = _regular_file(artifact, description)
-    checksum = _regular_file(checksum, f"{description} checksum")
-    try:
-        return verify_checksum(artifact, checksum)
-    except ArtifactError as problem:
-        raise ReleaseValidationError(f"{description}: {problem}") from problem
-
-
-def _validate_source_archive(
-    path: Path, checksum: Path, members: tuple[str, ...]
-) -> str:
-    digest = _verify_checksum(path, checksum, "corresponding-source archive")
+def _validate_source_archive(path: Path, members: tuple[str, ...]) -> None:
+    _regular_file(path, "corresponding-source archive")
     found: set[str] = set()
     try:
         with tarfile.open(path, mode="r:xz") as archive:
@@ -165,7 +153,6 @@ def _validate_source_archive(
         raise ReleaseValidationError(
             "corresponding-source archive is missing: " + ", ".join(missing)
         )
-    return digest
 
 
 def _validate_archive_licenses(
@@ -286,10 +273,8 @@ def verify_release(
     version: str,
     commit: str,
     archive: Path,
-    checksum: Path,
     source_root: Path,
     source_archive: Path,
-    source_checksum: Path,
     validation_report: Path,
     component_inventory: Path,
     target: str = DEFAULT_TARGET,
@@ -335,10 +320,8 @@ def verify_release(
     except ProvenanceInputError as error:
         raise ReleaseValidationError(str(error)) from error
     _validate_source_directories(source_root, TARGET_SOURCE_DIRECTORIES[target])
-    _verify_checksum(archive, checksum, "runtime archive")
-    _validate_source_archive(
-        source_archive, source_checksum, TARGET_SOURCE_ARCHIVE_MEMBERS[target]
-    )
+    _regular_file(archive, "runtime archive")
+    _validate_source_archive(source_archive, TARGET_SOURCE_ARCHIVE_MEMBERS[target])
     if external:
         _validate_external_archive_licenses(archive, EXTERNAL_NOTICE_FILES)
     else:

@@ -50,27 +50,32 @@ def release_tag(version: str) -> str:
     return f"v{version}"
 
 
-def runtime_archive_stem(version: str, arch: str) -> str:
+def runtime_archive_name(arch: str) -> str:
+    return f"runtime-{arch}{ARCHIVE_SUFFIX}"
+
+
+def manifest_name(arch: str) -> str:
+    return f"runtime-{arch}.json"
+
+
+def source_archive_name(arch: str) -> str:
+    return f"source-{arch}{ARCHIVE_SUFFIX}"
+
+
+def delta_archive_name(arch: str, source: str) -> str:
+    """Return the name of the delta from the bare version `source` to this release."""
+
+    return f"runtime-{arch}-from-{source}.delta{ARCHIVE_SUFFIX}"
+
+
+def legacy_runtime_archive_stem(version: str, arch: str) -> str:
+    """Return the stem of the asset names before archive schema 3, as in `...-v1.0.1-arm64`.
+
+    Those releases published `<stem>.tar.gz` with a `.sha256` sidecar. Only the delta
+    builder reads them, to fetch the previous release.
+    """
+
     return f"Arknights-MacOS-Runtime-{release_tag(version)}-{arch}"
-
-
-def runtime_archive_name(version: str, arch: str) -> str:
-    return runtime_archive_stem(version, arch) + ARCHIVE_SUFFIX
-
-
-def source_archive_name(version: str, arch: str) -> str:
-    return (
-        f"Arknights-MacOS-Runtime-{release_tag(version)}-{arch}-source{ARCHIVE_SUFFIX}"
-    )
-
-
-def delta_archive_name(version: str, source: str, arch: str) -> str:
-    """Return the name of the delta from release `source` to release `version`."""
-
-    return (
-        f"Arknights-MacOS-Runtime-{release_tag(version)}-from-{release_tag(source)}"
-        f"-{arch}.delta{ARCHIVE_SUFFIX}"
-    )
 
 
 def provenance_name(arch: str) -> str:
@@ -78,7 +83,7 @@ def provenance_name(arch: str) -> str:
 
 
 def inventory_name(arch: str) -> str:
-    return f"runtime-component-inventory-{arch}.tsv"
+    return f"inventory-{arch}.tsv"
 
 
 def notices_name(arch: str) -> str:

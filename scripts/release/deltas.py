@@ -32,11 +32,18 @@ from scripts.lanes import (
     LEGACY_ARCHIVE_SUFFIX,
     RUNTIME_ROOT,
     delta_archive_name,
+    legacy_runtime_archive_stem,
     release_tag,
     runtime_archive_name,
-    runtime_archive_stem,
 )
-from scripts.lib.artifact import ArtifactError, sha256, verify_checksum, write_archive
+from scripts.lib.artifact import (
+    CHECKSUMS_NAME,
+    ArtifactError,
+    sha256,
+    verify_checksum,
+    verify_listed,
+    write_archive,
+)
 from scripts.lib.console import info, warning
 
 ARCHITECTURES = ("x86_64", "arm64")
@@ -119,25 +126,39 @@ def list_releases() -> list[dict[str, Any]]:
 
 
 def download_runtime_archive(version: str, arch: str, directory: Path) -> Path:
-    """Download the runtime archive of a release and verify it against its checksum."""
+    """Download the runtime archive of a release and verify it against its checksum.
 
-    stem = runtime_archive_stem(version, arch)
+    The delta sources are the three newest releases, so they reach back across the asset
+    rename. A release since archive schema 3 publishes `runtime-<arch>.tar.xz` and one
+    `SHA256SUMS`. Older releases publish `Arknights-MacOS-Runtime-v<version>-<arch>.tar.gz`
+    with a `.sha256` sidecar. Try the current names first, then fall back to the old ones.
+    """
+
     directory.mkdir(parents=True)
-    _gh(
-        "release",
-        "download",
-        release_tag(version),
-        "--dir",
-        str(directory),
-        "--pattern",
-        f"{stem}.tar.*",
-    )
+    tag = release_tag(version)
+    archive = directory / runtime_archive_name(arch)
+    try:
+        _download_assets(tag, directory, archive.name, CHECKSUMS_NAME)
+    except DeltaError:
+        info(f"{tag} has no {archive.name}; trying the legacy asset names")
+    else:
+        verify_listed(archive, directory / CHECKSUMS_NAME)
+        return archive
+    stem = legacy_runtime_archive_stem(version, arch)
+    _download_assets(tag, directory, f"{stem}.tar.*")
     for suffix in (ARCHIVE_SUFFIX, LEGACY_ARCHIVE_SUFFIX):
-        archive = directory / f"{stem}{suffix}"
-        if archive.is_file():
-            verify_checksum(archive, archive.with_name(f"{archive.name}.sha256"))
-            return archive
-    raise DeltaError(f"release {release_tag(version)} has no {arch} runtime archive")
+        legacy = directory / f"{stem}{suffix}"
+        if legacy.is_file():
+            verify_checksum(legacy, legacy.with_name(f"{legacy.name}.sha256"))
+            return legacy
+    raise DeltaError(f"release {tag} has no {arch} runtime archive")
+
+
+def _download_assets(tag: str, directory: Path, *patterns: str) -> None:
+    arguments = ["release", "download", tag, "--dir", str(directory)]
+    for pattern in patterns:
+        arguments += ["--pattern", pattern]
+    _gh(*arguments)
 
 
 def _safe_relative(name: str) -> str:
@@ -417,7 +438,7 @@ def write_delta(
         )
         return write_archive(
             directory,
-            delta_archive_name(version, source_version, arch),
+            delta_archive_name(arch, source_version),
             [(delta_root, DELTA_ROOT)],
         )
 
@@ -508,7 +529,6 @@ def _write_checked_delta(
         except Exception:
             # An unverified delta must never reach the release upload.
             delta.unlink()
-            delta.with_name(f"{delta.name}.sha256").unlink()
             raise
         return delta
 
@@ -532,7 +552,7 @@ def main(arguments: list[str] | None = None) -> int:
         info("no published release to build deltas from")
         return 0
     for arch in ARCHITECTURES:
-        archive = parsed.dist / runtime_archive_name(parsed.version, arch)
+        archive = parsed.dist / runtime_archive_name(arch)
         if not archive.is_file():
             warning(f"deltas skipped for {arch}: {archive.name} is missing")
             continue

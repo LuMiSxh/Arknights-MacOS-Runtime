@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: MPL-2.0
 
+import fnmatch
+import hashlib
+import io
 import json
 import os
 import tarfile
@@ -8,10 +11,15 @@ import unittest
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from scripts.release.deltas import (
+    DeltaError,
     apply_delta_archive,
     apply_patch,
     diff_bytes,
+    download_runtime_archive,
+    extract_install_root,
     select_sources,
     tree_entries,
     write_delta,
@@ -161,6 +169,66 @@ def _release(
         "isPrerelease": prerelease,
         "publishedAt": published,
     }
+
+
+def _tar(path: Path, members: dict[str, bytes], mode: str) -> None:
+    with tarfile.open(path, mode) as tar:
+        for name, content in members.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(content)
+            tar.addfile(info, io.BytesIO(content))
+
+
+def _release_assets(tmp_path: Path, legacy: bool) -> dict[str, bytes]:
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    if legacy:
+        name = "Arknights-MacOS-Runtime-v1.0.1-arm64.tar.gz"
+        _tar(staging / name, {"Libraries/Wine/bin/wine": b"wine"}, "w:gz")
+        digest = hashlib.sha256((staging / name).read_bytes()).hexdigest()
+        (staging / f"{name}.sha256").write_text(f"{digest}  {name}\n")
+    else:
+        _tar(staging / "runtime-arm64.tar.xz", {"Runtime/bin/wine": b"wine"}, "w:xz")
+        digest = hashlib.sha256((staging / "runtime-arm64.tar.xz").read_bytes())
+        (staging / "SHA256SUMS").write_text(
+            f"{digest.hexdigest()}  runtime-arm64.tar.xz\n"
+        )
+    return {path.name: path.read_bytes() for path in staging.iterdir()}
+
+
+@pytest.mark.parametrize(
+    ("legacy", "expected"),
+    [
+        (False, "runtime-arm64.tar.xz"),
+        (True, "Arknights-MacOS-Runtime-v1.0.1-arm64.tar.gz"),
+    ],
+    ids=["current names", "legacy names of a previous release"],
+)
+def test_the_previous_release_downloads_under_current_and_legacy_names(
+    tmp_path, monkeypatch, legacy, expected
+):
+    assets = _release_assets(tmp_path, legacy)
+
+    def gh(*arguments: str) -> str:
+        directory = Path(arguments[arguments.index("--dir") + 1])
+        patterns = [
+            arguments[i + 1] for i, a in enumerate(arguments) if a == "--pattern"
+        ]
+        matched = [n for n in assets if any(fnmatch.fnmatch(n, p) for p in patterns)]
+        if not matched:
+            raise DeltaError("no assets match")
+        for name in matched:
+            (directory / name).write_bytes(assets[name])
+        return ""
+
+    monkeypatch.setattr("scripts.release.deltas._gh", gh)
+
+    archive = download_runtime_archive("1.0.1", "arm64", tmp_path / "download")
+
+    assert archive.name == expected
+    assert (
+        extract_install_root(archive, tmp_path / "root") / "bin/wine"
+    ).read_bytes() == b"wine"
 
 
 if __name__ == "__main__":

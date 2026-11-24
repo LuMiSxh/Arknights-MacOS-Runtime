@@ -77,11 +77,11 @@ def package_runtime(
     output.mkdir(parents=True, exist_ok=True)
     runtime_archive = write_archive(
         output,
-        runtime_archive_name(version, target.arch),
+        runtime_archive_name(target.arch),
         install_entries(content_root),
     )
     source_archive = write_archive(
-        output, source_archive_name(version, target.arch), source_entries
+        output, source_archive_name(target.arch), source_entries
     )
     (output / notices_name(target.arch)).write_text(
         third_party_notices(repository_root, inventory, target.name),
@@ -94,10 +94,8 @@ def package_runtime(
             version=version,
             commit=source_commit,
             archive=runtime_archive,
-            checksum=runtime_archive.with_name(f"{runtime_archive.name}.sha256"),
             source_root=source_root,
             source_archive=source_archive,
-            source_checksum=source_archive.with_name(f"{source_archive.name}.sha256"),
             validation_report=validation_report,
             component_inventory=inventory,
             target=target.name,

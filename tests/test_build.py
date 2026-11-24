@@ -5,36 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.lanes import runtime_archive_name, source_archive_name
-from scripts.lib.artifact import sha256, write_archive
-
-
-class ArchiveNameTests(unittest.TestCase):
-    def test_artifact_names_and_shasum_checksums_follow_the_release_convention(
-        self,
-    ) -> None:
-        self.assertEqual(
-            runtime_archive_name("0.9.0", "arm64"),
-            "Arknights-MacOS-Runtime-v0.9.0-arm64.tar.xz",
-        )
-        self.assertEqual(
-            source_archive_name("0.9.0", "arm64"),
-            "Arknights-MacOS-Runtime-v0.9.0-arm64-source.tar.xz",
-        )
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            member = root / "Runtime"
-            member.mkdir()
-            (member / "marker").write_bytes(b"x")
-            name = runtime_archive_name("0.9.0", "arm64")
-
-            path = write_archive(root, name, [(member, "Runtime")])
-
-            self.assertEqual(path.name, name)
-            self.assertEqual(
-                path.with_name(f"{name}.sha256").read_text(encoding="utf-8"),
-                f"{sha256(path)}  {name}\n",
-            )
+from scripts.lanes import runtime_archive_name
+from scripts.lib.artifact import write_archive
 
 
 class ArchiveDeterminismTests(unittest.TestCase):
@@ -47,7 +19,7 @@ class ArchiveDeterminismTests(unittest.TestCase):
             os.chmod(tree / "bin" / "tool", 0o755)
             (tree / "data.txt").write_bytes(b"data")
             os.symlink("tool", tree / "bin" / "link")
-            name = runtime_archive_name("0.9.0", "arm64")
+            name = runtime_archive_name("arm64")
             (root / "first").mkdir()
             (root / "second").mkdir()
 

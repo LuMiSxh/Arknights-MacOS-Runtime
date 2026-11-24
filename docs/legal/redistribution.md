@@ -42,4 +42,4 @@ The external ARM64 archive keeps its upstream `share/licenses` directory. The ru
 
 The corresponding-source offer for the Nix libraries is not yet in place.
 
-The clean build writes `runtime-component-inventory.tsv`. Wine and DXMT map to their locked source identities. MoltenVK maps to the SHA-256-pinned base archive. FEX maps to its locked target source. Each Nix library maps to the realised store output and the pinned Nixpkgs revision it came from. The release workflow includes the inventory in the source archive, as a separate draft asset, and in the generated third-party notices.
+The clean build writes `inventory-<arch>.tsv`. Wine and DXMT map to their locked source identities. MoltenVK maps to the SHA-256-pinned base archive. FEX maps to its locked target source. Each Nix library maps to the realised store output and the pinned Nixpkgs revision it came from. The release workflow includes the inventory in the source archive, as a separate draft asset, and in the generated third-party notices.

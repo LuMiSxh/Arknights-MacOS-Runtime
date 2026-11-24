@@ -43,9 +43,10 @@ build lane="rosetta-x86_64" version="0.0.0-dev" mode="candidate":
 combine version +inputs:
     args=(); for dir in {{ inputs }}; do args+=(--input "$dir"); done; {{ uv }} -m scripts release combine --version "{{ version }}" --output .build/release "${args[@]}"
 
-# Write delta archives from recent releases into a combined release directory.
+# Write delta archives, runtime manifests, and SHA256SUMS into a combined release directory.
 deltas version dist:
     {{ uv_deltas }} -m scripts release deltas --version "{{ version }}" --dist "{{ dist }}"
+    {{ uv }} -m scripts release manifest --dist "{{ dist }}"
 
 verify path=".build/x86_64/candidate/Libraries":
     {{ uv }} -m scripts validate-runtime "{{ path }}"

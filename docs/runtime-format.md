@@ -22,6 +22,47 @@ Each release also publishes `provenance.json`, `THIRD-PARTY-NOTICES.txt` and `SH
 Releases before archive schema 3 use the older names `Arknights-MacOS-Runtime-v<version>-<arch>.tar.gz` with `.sha256` sidecars.
 Only the delta builder still reads them, as delta sources.
 
+## Runtime manifest (manifest schema 1)
+
+`runtime-<arch>.json` is the one file the client needs to pin a lane.
+The `deltas` job writes it after the deltas exist, so it lists exactly the deltas that the release carries.
+The release tag and `name` give the download URL: `https://github.com/LuMiSxh/Arknights-MacOS-Runtime/releases/download/v<version>/<name>`.
+
+```json
+{
+  "schemaVersion": 1,
+  "arch": "arm64",
+  "version": "1.0.2",
+  "minimumMacOS": "26.0",
+  "archive": { "name": "runtime-arm64.tar.xz", "sha256": "…", "sizeBytes": 241874082 },
+  "deltas": [
+    { "from": "1.0.1", "name": "runtime-arm64-from-1.0.1.delta.tar.xz", "sha256": "…", "sizeBytes": 1234567 }
+  ],
+  "interface": { "…": "the lane interface of runtime.lock.json, verbatim" },
+  "components": { "wine": "11.18", "dxmt": "0.80" },
+  "provenance": {
+    "buildRepository": "https://github.com/LuMiSxh/Arknights-MacOS-Runtime",
+    "buildCommit": "…",
+    "externalBuildRepository": "https://github.com/riverfog7/wine-build-new",
+    "externalBuildCommit": "…",
+    "wineRepository": "…",
+    "wineCommit": "…",
+    "dxmtRepository": "…",
+    "dxmtCommit": "…"
+  }
+}
+```
+
+- `version` is the bare version of the release. `arch` is `x86_64` or `arm64`.
+- `archive` and `deltas[]` give the asset name, the SHA-256 and the size in bytes. `deltas` is empty when the release has none.
+- `interface` has the same shape as the lane `interface` in `runtime.lock.json`. Its paths are relative to the installed root.
+- `components` maps `wine` and `dxmt` to their version strings. It has no `moltenvk`, because the lock does not record a MoltenVK version.
+- `provenance` has flat string keys. `external*` keys exist only for the `arm64` lane.
+  The `x86_64` lane adds `moltenvk*`, `nixpkgs*`, `baseRecipe*`, `baseArchiveUrl` and `baseArchiveSha256`.
+  The `*Repository` values have no `.git` suffix.
+- The `provenance.json` asset still carries the full runtime lock under `runtimeLock.contents`, for this release only.
+  The client reads the manifest instead.
+
 Deltas exist only for releases, never for prereleases.
 A release ships deltas from the newest three published, non-draft, non-prerelease releases before it.
 Delta generation is best effort: a failed delta is skipped and the full archive still ships.
@@ -109,7 +150,7 @@ the final `newPos` differs from `newSize`, or diff or extra bytes are left over.
 
 ## Client application
 
-1. The pin lists deltas per lane as `{ "from", "url", "sha256", "sizeBytes" }`.
+1. The pin lists deltas per lane as `{ "from", "url", "sha256", "sizeBytes" }`. The client builds each `url` from the manifest `name`.
    The client uses a delta only when `from` equals the installed version.
 2. It downloads and verifies the delta like a full archive, then extracts it with the archive path rules.
 3. It clones the installed root into staging, checks every `keep` and `patch` source hash, applies the entries,

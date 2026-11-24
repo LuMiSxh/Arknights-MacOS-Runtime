@@ -3,7 +3,7 @@
 """Combine the lane outputs into one release.
 
 Each input directory holds `provenance-<ARCH>.json` fragments and the files they name. The
-command checks every archive against its `.sha256` file and its fragment. It then writes
+command checks every archive against its fragment. It then writes
 one `provenance.json` and one `THIRD-PARTY-NOTICES.txt` for the release. It needs only the
 standard library, so it runs on Linux.
 """
@@ -21,7 +21,7 @@ from scripts.lanes import (
     notices_name,
     release_tag,
 )
-from scripts.lib.artifact import ArtifactError, verify_checksum
+from scripts.lib.artifact import sha256
 from scripts.lib.console import error, success
 from scripts.release.verify import (
     ReleaseValidationError,
@@ -69,7 +69,7 @@ def _read_fragments(
 
 
 def _checked_archive(directory: Path, record: Any) -> Path:
-    """Return an archive whose bytes, size, and checksum file match its fragment."""
+    """Return an archive whose bytes and size match its fragment."""
 
     if not isinstance(record, dict) or not isinstance(record.get("name"), str):
         raise CombineError("fragment has no archive record")
@@ -77,20 +77,11 @@ def _checked_archive(directory: Path, record: Any) -> Path:
     if Path(name).name != name or name in ("", ".", ".."):
         raise CombineError(f"archive name is not a plain file name: {name!r}")
     archive = _regular(directory / name)
-    try:
-        digest = verify_checksum(archive, _regular(archive.with_name(f"{name}.sha256")))
-    except ArtifactError as problem:
-        raise CombineError(str(problem)) from problem
-    if digest != record.get("sha256"):
+    if sha256(archive) != record.get("sha256"):
         raise CombineError(f"{name} SHA-256 does not match its fragment")
     if archive.stat().st_size != record.get("sizeBytes"):
         raise CombineError(f"{name} size does not match its fragment")
     return archive
-
-
-def _copy_with_checksum(archive: Path, output: Path) -> None:
-    for path in (archive, archive.with_name(f"{archive.name}.sha256")):
-        shutil.copy2(_regular(path), output / path.name)
 
 
 def combine(
@@ -119,9 +110,8 @@ def combine(
         if not isinstance(arch, str) or not arch:
             raise CombineError(f"fragment has no arch: {fragment['target']}")
         for record in ARCHIVE_RECORDS:
-            _copy_with_checksum(
-                _checked_archive(directory, fragment.get(record)), output
-            )
+            archive = _checked_archive(directory, fragment.get(record))
+            shutil.copy2(archive, output / archive.name)
         shutil.copy2(
             _regular(directory / inventory_name(arch)), output / inventory_name(arch)
         )
