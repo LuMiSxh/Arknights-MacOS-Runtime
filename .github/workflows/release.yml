@@ -622,9 +622,17 @@ jobs:
                   }
                   trap cleanup ERR
 
-                  gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
-                    -f ref="refs/tags/$RELEASE_TAG" \
-                    -f sha="$BUILD_COMMIT" >/dev/null
+                  # GitHub intermittently answers 403 "Resource not accessible by integration"
+                  # for a ref the token may create, so retry before failing the release.
+                  for attempt in 1 2 3 4 5; do
+                    if gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+                      -f ref="refs/tags/$RELEASE_TAG" \
+                      -f sha="$BUILD_COMMIT" >/dev/null; then
+                      break
+                    fi
+                    echo "tag creation attempt $attempt failed; retrying" >&2
+                    sleep $((attempt * 3))
+                  done
                   # The new ref can read as 404 for a moment after the POST.
                   tag_sha=""
                   for attempt in 1 2 3 4 5; do
