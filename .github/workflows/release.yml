@@ -140,6 +140,13 @@ jobs:
             - name: Install build tools
               run: brew install ccache just mingw-w64 meson ninja
 
+            # Some runner images ship Xcode without the Metal toolchain.
+            - name: Install the Metal toolchain when missing
+              run: |
+                  if ! xcrun -sdk macosx metal --version >/dev/null 2>&1; then
+                      xcodebuild -downloadComponent MetalToolchain
+                  fi
+
             - name: Restore compiler cache
               uses: actions/cache@v4.3.0
               with:
@@ -383,6 +390,13 @@ jobs:
 
             - name: Install build tools
               run: brew install ccache llvm@15 meson ninja bison flex pkg-config
+
+            # Some runner images ship Xcode without the Metal toolchain.
+            - name: Install the Metal toolchain when missing
+              run: |
+                  if ! xcrun -sdk macosx metal --version >/dev/null 2>&1; then
+                      xcodebuild -downloadComponent MetalToolchain
+                  fi
 
             - name: Build the runtime
               shell: bash
