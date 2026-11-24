@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.lib.artifact import sha256
+from scripts.lib.artifact import ArtifactError, verify_checksum
 from scripts.lib.console import error, success
 from scripts.release.verify import (
     ReleaseValidationError,
@@ -83,15 +83,14 @@ def _checked_archive(directory: Path, record: Any) -> Path:
     if Path(name).name != name or name in ("", ".", ".."):
         raise CombineError(f"archive name is not a plain file name: {name!r}")
     archive = _regular(directory / name)
-    digest = sha256(archive)
+    try:
+        digest = verify_checksum(archive, _regular(archive.with_name(f"{name}.sha256")))
+    except ArtifactError as problem:
+        raise CombineError(str(problem)) from problem
     if digest != record.get("sha256"):
         raise CombineError(f"{name} SHA-256 does not match its fragment")
     if archive.stat().st_size != record.get("sizeBytes"):
         raise CombineError(f"{name} size does not match its fragment")
-    checksum = _regular(archive.with_name(f"{name}.sha256"))
-    fields = checksum.read_text(encoding="utf-8").split()
-    if len(fields) != 2 or fields[0] != digest or fields[1].removeprefix("*") != name:
-        raise CombineError(f"{name}.sha256 does not match the archive")
     return archive
 
 

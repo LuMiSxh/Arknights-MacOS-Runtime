@@ -30,8 +30,9 @@ from scripts.build_common import (
     nix_package_outputs,
     references_in,
 )
+from scripts.lock.model import Lock, load_lock
+from scripts.lock.sources import BUILD_ROOT, fetch_base, prepare
 from scripts.release.licenses import generate
-from scripts.runtime import BUILD_ROOT, fetch_base, load_lock, prepare
 from scripts.targets import ROSETTA_X86_64_TARGET, Target, inventory_name
 from scripts.targets.dxmt import build_dxmt
 from scripts.targets.package import package_runtime
@@ -81,12 +82,10 @@ def patched_machos() -> tuple[str, ...]:
     )
 
 
-def build_environment(
-    builder: Builder, lock: dict[str, object]
-) -> tuple[str, list[Path]]:
-    nixpkgs_revision = str(lock["build"]["nixpkgs"]["commit"])
-    nixpkgs = f"github:NixOS/nixpkgs/{nixpkgs_revision}"
-    builder.environment["MACOSX_DEPLOYMENT_TARGET"] = str(lock["deploymentTarget"])
+def build_environment(builder: Builder, lock: Lock) -> tuple[str, list[Path]]:
+    nixpkgs = f"github:NixOS/nixpkgs/{lock.nixpkgs.commit}"
+    deployment = lock.lane(TARGET.name).minimum_macos
+    builder.environment["MACOSX_DEPLOYMENT_TARGET"] = deployment
 
     tool_paths = [
         nix_build(builder, f"{nixpkgs}#{attribute}")
@@ -278,7 +277,7 @@ def prepare_base(root: Path, *, clean_release: bool) -> Path:
 
 def configure_runtime(
     builder: Builder,
-    lock: dict[str, object],
+    lock: Lock,
     root: Path,
     source_root: Path,
 ) -> tuple[str, list[Path], Path]:
@@ -366,7 +365,8 @@ def build_runtime(
     pinned base.
     """
 
-    lock = load_lock(target=TARGET.name)
+    lock = load_lock()
+    lane = lock.lane(TARGET.name)
     root = BUILD_ROOT / TARGET.arch
     if root.exists():
         raise BuildError(f"build output already exists: {root}")
@@ -385,7 +385,7 @@ def build_runtime(
     (candidate / "DXMT/x64").mkdir(parents=True, exist_ok=True)
     build_dxmt_x86_64(
         builder,
-        str(lock["deploymentTarget"]),
+        lane.minimum_macos,
         source_root / "dxmt",
         root,
         wine_build,
@@ -400,7 +400,7 @@ def build_runtime(
 
     output.mkdir(parents=True, exist_ok=True)
     inventory = output / inventory_name(TARGET.arch)
-    write_inventory(inventory, libraries, str(lock["build"]["nixpkgs"]["commit"]))
+    write_inventory(inventory, libraries, lock.nixpkgs.commit)
     validation_report = root / "validation.json"
     if release:
         builder.run(
@@ -414,7 +414,6 @@ def build_runtime(
             validation_report,
         )
         generate(ROOT, candidate.parent, inventory=inventory, target=TARGET.name)
-        members = ("Libraries", "Licenses", "NOTICE.md")
     else:
         builder.run(
             sys.executable,
@@ -427,7 +426,6 @@ def build_runtime(
             "--report",
             validation_report,
         )
-        members = ("Libraries",)
     return package_runtime(
         repository_root=ROOT,
         target=TARGET,
@@ -435,20 +433,19 @@ def build_runtime(
         release=release,
         output=output,
         content_root=candidate.parent,
-        members=members,
         source_entries=source_entries(source_root, inventory),
         source_root=source_root,
         inventory=inventory,
         validation_report=validation_report,
         wine={
-            "repository": lock["sources"]["wine"]["repository"],
-            "commit": lock["sources"]["wine"]["commit"],
-            "version": lock["sources"]["wine"]["version"],
+            "repository": lane.sources["wine"].repository,
+            "commit": lane.sources["wine"].commit,
+            "version": lane.sources["wine"].version,
         },
         dxmt={
-            "repository": lock["sources"]["dxmt"]["repository"],
-            "commit": lock["sources"]["dxmt"]["commit"],
-            "version": lock["sources"]["dxmt"]["version"],
+            "repository": lane.sources["dxmt"].repository,
+            "commit": lane.sources["dxmt"].commit,
+            "version": lane.sources["dxmt"].version,
         },
         source_commit=source_commit,
     )

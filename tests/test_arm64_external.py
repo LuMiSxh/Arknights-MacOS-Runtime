@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from scripts.build_common import CLEARED_DOS_STUB
+from scripts.lock.model import Artifact, DxmtPayload, Interface, Lane, Launcher
 from scripts.targets import arm64_external as fetch_external
 from scripts.targets.arm64_assemble import AssemblyError, assemble
 from scripts.targets.arm64_external import (
@@ -42,15 +43,30 @@ def _release(archive: bytes, *, arch: str = "arm64", size: int | None = None) ->
     return release
 
 
-def _interface() -> dict:
-    return {
-        "dxmtDirectory": "DXMT",
-        "requiredFiles": [
-            "DXMT/x64/d3d10core.dll",
-            "DXMT/x64/d3d11.dll",
-            "DXMT/x64/dxgi.dll",
-        ],
-    }
+def _interface() -> Interface:
+    return Interface(
+        executables=("bin/wine64",),
+        required_files=(),
+        mac_driver="lib/wine/aarch64-unix/winemac.so",
+        launcher=Launcher("bin/Arknights", "wine64"),
+        dxmt=DxmtPayload(
+            "DXMT", {"x64": "system32"}, ("d3d10core.dll", "d3d11.dll", "dxgi.dll")
+        ),
+        features={},
+    )
+
+
+def _lane() -> Lane:
+    return Lane(
+        name="native-arm64",
+        arch="arm64",
+        build="external",
+        minimum_macos="26.0",
+        sources={},
+        interface=_interface(),
+        base=None,
+        artifact=Artifact("wine", RELEASE_ID, "a" * 64),
+    )
 
 
 def _text_values(value):
@@ -368,18 +384,7 @@ def test_fetch_target_updates_the_lock_when_the_catalog_release_differs(
     monkeypatch.setattr(fetch_external, "_extract_archive", fake_extract)
     monkeypatch.setattr(fetch_external, "write_artifact_pin", fake_write_artifact_pin)
 
-    fetch_external.fetch_target(
-        {
-            "target": "native-arm64",
-            "artifact": {
-                "catalog": "wine",
-                "release": RELEASE_ID,
-                "sha256": "a" * 64,
-            },
-        },
-        tmp_path / "incoming",
-        "",
-    )
+    fetch_external.fetch_target(_lane(), tmp_path / "incoming", "")
 
     assert pin_writes == [("native-arm64", catalog_id, sha256)]
 
@@ -412,18 +417,7 @@ def test_fetch_target_keeps_the_lock_when_extraction_fails(tmp_path, monkeypatch
     monkeypatch.setattr(fetch_external, "write_artifact_pin", fake_write_artifact_pin)
 
     with pytest.raises(FetchError, match="cannot extract"):
-        fetch_external.fetch_target(
-            {
-                "target": "native-arm64",
-                "artifact": {
-                    "catalog": "wine",
-                    "release": RELEASE_ID,
-                    "sha256": "a" * 64,
-                },
-            },
-            tmp_path / "incoming",
-            "",
-        )
+        fetch_external.fetch_target(_lane(), tmp_path / "incoming", "")
 
     assert pin_writes == []
 

@@ -8,120 +8,66 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from scripts.runtime import (
-    LockError,
-    load_lock,
-    prepare,
-    validate_wine_patch_parity,
-)
+from scripts.lock.model import ROOT, LockError, load_lock
+from scripts.lock.patches import export_wine_build_new
+from scripts.lock.sources import prepare
+from tests.lock_fixture import DEFAULT_LANE, patch_entry, synthetic_lock
+
+
+def _digest(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
 
 
 class RuntimeLockTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary_directory.name)
-        patch = self.root / "patches" / "wine" / "0001.patch"
-        patch.parent.mkdir(parents=True)
-        patch.write_text("example patch\n", encoding="utf-8")
-        self.lock = {
-            "schemaVersion": 3,
-            "archiveSchemaVersion": 2,
-            "defaultTarget": "rosetta-x86_64",
-            "deploymentTarget": "15.0",
-            "sources": {
-                "wine": {
-                    "repository": "https://github.com/dappermint/winecx.git",
-                    "commit": "7dbc5b5322a6ef3fb04bdc643c64b188fd641149",
-                },
-                "dxmt": {
-                    "repository": "https://github.com/3Shain/dxmt.git",
-                    "commit": "19e24ee068a44a747e556965730482038c5bb068",
-                },
-            },
-            "baseArtifact": {
-                "url": "https://github.com/example/runtime/releases/download/v1/Libraries.tar.gz",
-                "sha256": "a" * 64,
-                "recipe": {
-                    "repository": "https://github.com/example/recipe.git",
-                    "commit": "b" * 40,
-                },
-            },
-            "baseProvenance": {
-                "moltenvk": {
-                    "repository": "https://github.com/KhronosGroup/MoltenVK.git",
-                    "commit": "c" * 40,
-                },
-                "wineGecko": {
-                    "repository": "https://gitlab.winehq.org/wine/wine-gecko.git",
-                    "commit": "f" * 40,
-                },
-            },
-            "build": {
-                "nixpkgs": {
-                    "repository": "https://github.com/NixOS/nixpkgs.git",
-                    "commit": "a" * 40,
-                }
-            },
-            "interface": {
-                "executables": ["Wine/bin/wine64"],
-                "requiredFiles": ["Wine/lib/wine/x86_64-unix/winemac.so"],
-            },
-            "features": {
-                "hardwareCursor": True,
-                "metalFXSpatialUpscaling": True,
-                "nativeFullscreenSpace": True,
-            },
-            "targets": {"rosetta-x86_64": {"buildMode": "build"}},
-            "patches": [
-                {
-                    "id": "wine-audio-default-output",
-                    "component": "wine",
-                    "number": 12,
-                    "gate": "LMISXH_AKMOCL_AUDIO",
-                    "default": True,
-                    "targets": ["rosetta-x86_64"],
-                    "path": "patches/wine/0001.patch",
-                    "sha256": hashlib.sha256(b"example patch\n").hexdigest(),
-                }
-            ],
-        }
+        path = "patches/wine/0001.patch"
+        self.write_patch(path, "example patch\n")
+        self.document = synthetic_lock(
+            [patch_entry("wine-12", "wine", 12, path, _digest("example patch\n"))]
+        )
 
     def tearDown(self) -> None:
         self.temporary_directory.cleanup()
 
-    def write_lock(self) -> Path:
+    def write_patch(self, relative: str, text: str) -> str:
+        path = self.root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        return _digest(text)
+
+    def load(self, document: dict | None = None):
         path = self.root / "runtime.lock.json"
-        path.write_text(json.dumps(self.lock), encoding="utf-8")
-        return path
+        path.write_text(json.dumps(document or self.document), encoding="utf-8")
+        return load_lock(path, repository_root=self.root)
 
     def test_rejects_a_patch_path_outside_the_repository(self) -> None:
-        self.lock["patches"][0]["path"] = "../escape.patch"
+        self.document["patches"][0]["files"][DEFAULT_LANE]["path"] = "../escape.patch"
         with self.assertRaisesRegex(LockError, "repository-relative"):
-            load_lock(self.write_lock(), repository_root=self.root)
+            self.load()
 
     def test_rejects_a_patch_hash_mismatch(self) -> None:
-        self.lock["patches"][0]["sha256"] = "b" * 64
+        self.document["patches"][0]["files"][DEFAULT_LANE]["sha256"] = "b" * 64
         with self.assertRaisesRegex(LockError, "hash mismatch"):
-            load_lock(self.write_lock(), repository_root=self.root)
+            self.load()
 
     def test_prepare_applies_the_whole_patch_list_in_lock_order(self) -> None:
-        def entry(patch_id: str, component: str, path: str) -> dict[str, str]:
-            return {"id": patch_id, "component": component, "path": path}
-
-        view = {
-            "target": "rosetta-x86_64",
-            "defaultTarget": "rosetta-x86_64",
-            "buildMode": "build",
-            "sources": {
-                "wine": {"repository": "https://example.invalid/wine", "commit": "1"},
-                "dxmt": {"repository": "https://example.invalid/dxmt", "commit": "2"},
-            },
-            "patches": [
-                entry("a", "wine", "patches/wine/0003-first.patch"),
-                entry("b", "dxmt", "patches/dxmt/0001-third.patch"),
-                entry("c", "wine", "patches/wine/0004-second.patch"),
-            ],
-        }
+        entries = [
+            ("wine", 3, "patches/wine/0003-first.patch"),
+            ("dxmt", 1, "patches/dxmt/0001-third.patch"),
+            ("wine", 4, "patches/wine/0004-second.patch"),
+        ]
+        self.document["patches"] = [
+            patch_entry(
+                f"{component}-{number}",
+                component,
+                number,
+                path,
+                self.write_patch(path, f"{path}\n"),
+            )
+            for component, number, path in entries
+        ]
         applied: list[str] = []
 
         def record(*command: str, cwd: Path | None = None) -> None:
@@ -129,8 +75,8 @@ class RuntimeLockTests(unittest.TestCase):
                 applied.append(Path(command[2]).name)
 
         with (
-            mock.patch("scripts.runtime.load_lock", return_value=view),
-            mock.patch("scripts.runtime._run", side_effect=record),
+            mock.patch("scripts.lock.sources.load_lock", return_value=self.load()),
+            mock.patch("scripts.lock.sources._run", side_effect=record),
         ):
             prepare(self.root / "sources")
 
@@ -139,15 +85,9 @@ class RuntimeLockTests(unittest.TestCase):
             ["0001-third.patch", "0003-first.patch", "0004-second.patch"],
         )
 
-    def test_rejects_an_undeclared_target(self) -> None:
-        with self.assertRaisesRegex(LockError, "unknown target"):
-            load_lock(self.write_lock(), repository_root=self.root, target="riscv64")
-
-    def test_rejects_a_patch_naming_an_undeclared_target(self) -> None:
-        self.lock["patches"][0]["targets"] = ["native-arm64"]
-
-        with self.assertRaisesRegex(LockError, "undeclared target"):
-            load_lock(self.write_lock(), repository_root=self.root)
+    def test_rejects_an_undeclared_lane(self) -> None:
+        with self.assertRaisesRegex(LockError, "unknown lane 'riscv64'"):
+            self.load().lane("riscv64")
 
     def test_rejects_a_malformed_patch_schema_field(self) -> None:
         cases = {
@@ -157,63 +97,74 @@ class RuntimeLockTests(unittest.TestCase):
         }
         for field, (value, message) in cases.items():
             with self.subTest(field=field):
-                lock = copy.deepcopy(self.lock)
-                lock["patches"][0][field] = value
-                path = self.root / f"{field}.lock.json"
-                path.write_text(json.dumps(lock), encoding="utf-8")
+                document = copy.deepcopy(self.document)
+                document["patches"][0][field] = value
 
                 with self.assertRaisesRegex(LockError, message):
-                    load_lock(path, repository_root=self.root)
+                    self.load(document)
 
-    def test_rejects_unknown_target_keys(self) -> None:
-        self.lock["targets"]["rosetta-x86_64"] = {"sorce": {}}
+    def test_rejects_unknown_lane_keys(self) -> None:
+        self.document["lanes"][DEFAULT_LANE]["sorce"] = {}
 
-        with self.assertRaisesRegex(LockError, "unknown keys"):
-            load_lock(self.write_lock(), repository_root=self.root)
+        with self.assertRaisesRegex(LockError, "unknown keys: sorce"):
+            self.load()
 
     def test_rejects_an_interface_path_that_leaves_the_runtime(self) -> None:
-        self.lock["interface"]["executables"] = ["../escape"]
+        self.document["lanes"][DEFAULT_LANE]["interface"]["executables"] = ["../escape"]
 
         with self.assertRaisesRegex(LockError, "runtime-relative"):
-            load_lock(self.write_lock(), repository_root=self.root)
+            self.load()
 
+    def test_rejects_an_invalid_lock_with_its_exact_message(self) -> None:
+        def unknown_lane(document: dict) -> None:
+            document["patches"][0]["files"]["riscv64"] = {
+                "path": "patches/wine/0001.patch",
+                "sha256": _digest("example patch\n"),
+            }
 
-class WinePatchParityTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.temporary_directory = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary_directory.name)
+        def duplicate_number(document: dict) -> None:
+            document["patches"].append(
+                patch_entry(
+                    "wine-12-copy",
+                    "wine",
+                    12,
+                    "patches/wine/0001.patch",
+                    _digest("example patch\n"),
+                )
+            )
 
-    def tearDown(self) -> None:
-        self.temporary_directory.cleanup()
+        def missing_executables(document: dict) -> None:
+            del document["lanes"][DEFAULT_LANE]["interface"]["executables"]
 
-    def test_rejects_a_wine_patch_number_that_differs_between_lanes(self) -> None:
         cases = {
-            "same name, different number": (
-                "patches/wine/0019-winemac-squircle-app-icon.patch",
-                "wine-build-new/patches/0015-winemac-squircle-app-icon.patch",
-                "winemac-squircle-app-icon has different",
+            "unknown lane in a patch file": (
+                unknown_lane,
+                "patch wine-12 names an undeclared lane: riscv64",
             ),
-            "same number, different name": (
-                "patches/wine/0016-winecoreaudio-default-output.patch",
-                "wine-build-new/patches/0016-ntdll-name-the-macos-loader-link.patch",
-                "Wine patch number 0016 names different",
+            "duplicate patch number": (
+                duplicate_number,
+                "duplicate wine patch number: 12",
+            ),
+            "missing interface field": (
+                missing_executables,
+                "lanes.rosetta-x86_64.interface is missing executables",
             ),
         }
-        for case, (x86_path, arm_path, message) in cases.items():
-            with self.subTest(case):
-                runtime_lock = self.root / "runtime.lock.json"
-                arm_lock = self.root / "lock.json"
-                runtime_lock.write_text(
-                    json.dumps({"patches": [{"component": "wine", "path": x86_path}]}),
-                    encoding="utf-8",
-                )
-                arm_lock.write_text(
-                    json.dumps({"wine": {"patches": [{"path": arm_path}]}}),
-                    encoding="utf-8",
-                )
+        for name, (mutate, message) in cases.items():
+            with self.subTest(name):
+                document = copy.deepcopy(self.document)
+                mutate(document)
 
-                with self.assertRaisesRegex(LockError, message):
-                    validate_wine_patch_parity(runtime_lock, arm_lock)
+                with self.assertRaises(LockError) as caught:
+                    self.load(document)
+                self.assertEqual(str(caught.exception), message)
+
+
+class ExportTests(unittest.TestCase):
+    def test_export_matches_the_committed_wine_build_new_lock(self) -> None:
+        committed = (ROOT / "wine-build-new" / "lock.json").read_text(encoding="utf-8")
+
+        self.assertEqual(export_wine_build_new(load_lock()), committed)
 
 
 if __name__ == "__main__":

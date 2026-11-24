@@ -68,7 +68,7 @@ To move a kept pin, port the failed patch to the new commit. Then run the update
 1. Read the output of `just check`. The update already runs the lock validation and the license check.
 2. Review the gates in [`patch-registry.md`](patch-registry.md) for the new commits.
 3. Review the license statements for DXMT and Wine when the upstream license can change.
-4. The MoltenVK and Wine Gecko entries in `baseProvenance` do not change by themselves. Update them by hand if the new base archive changes them.
+4. The MoltenVK and Wine Gecko entries in `lanes.rosetta-x86_64.base.provenance` do not change by themselves. Update them by hand if the new base archive changes them.
 5. Dispatch the release workflow. See [`releasing.md`](releasing.md).
 6. Update the client pin with the update command of the client repository.
 

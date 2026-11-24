@@ -10,29 +10,27 @@ the repository variables.
 
 import sys
 from pathlib import Path
-from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.build_common import NATIVE_ARM64_TARGET
 from scripts.lib.console import error
-from scripts.runtime import LockError, load_lock
+from scripts.lock.model import Lock, LockError, load_lock
 
 
-def llvm_mingw_pin(lock: dict[str, Any]) -> tuple[str, str]:
+def llvm_mingw_pin(lock: Lock) -> tuple[str, str]:
     """Return the pinned llvm-mingw URL and SHA-256, or two empty strings."""
 
-    entry = (lock.get("toolchain") or {}).get("llvmMingw")
-    if not isinstance(entry, dict):
+    toolchain = lock.llvm_mingw
+    if toolchain is None:
         return "", ""
-    return str(entry.get("url", "")), str(entry.get("sha256", ""))
+    return toolchain.url, toolchain.sha256
 
 
 def main() -> int:
     try:
-        lock = load_lock(target=NATIVE_ARM64_TARGET)
+        lock = load_lock()
     except (LockError, OSError) as caught:
         error(str(caught))
         return 1

@@ -10,15 +10,20 @@ import os
 import re
 import struct
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
 if __package__:
     from .lib.console import error, success, warning
-    from .runtime import BUILD_ROOT, LOCK_PATH, load_lock
+    from .lock.model import LOCK_PATH, load_lock
+    from .lock.sources import BUILD_ROOT
 else:
-    from lib.console import error, success, warning
-    from runtime import BUILD_ROOT, LOCK_PATH, load_lock
+    # Run as a script, the repository root is not on sys.path.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from scripts.lib.console import error, success, warning
+    from scripts.lock.model import LOCK_PATH, load_lock
+    from scripts.lock.sources import BUILD_ROOT
 
 
 MINOS_PATTERN = re.compile(r"\bminos\s+([0-9]+(?:\.[0-9]+){1,2})")
@@ -300,17 +305,14 @@ def main() -> int:
         help="reject i386, DXMT x32, GStreamer, and FFmpeg payloads (clean builds)",
     )
     arguments = parser.parse_args()
-    lock = load_lock(LOCK_PATH, target=arguments.target)
-    if arguments.require_64_bit_only and lock["buildMode"] == "external":
+    lane = load_lock(LOCK_PATH).lane(arguments.target)
+    if arguments.require_64_bit_only and lane.build == "external":
         error(
             "external targets keep the i386 WoW64 payload; "
             "do not pass --require-64-bit-only"
         )
         return 1
-    required_paths = [
-        *lock["interface"]["executables"],
-        *lock["interface"]["requiredFiles"],
-    ]
+    required_paths = list(lane.interface.staged_paths())
     try:
         validate_structure(arguments.runtime, required_paths)
         if arguments.require_64_bit_only:
@@ -318,14 +320,14 @@ def main() -> int:
         architecture_count = validate_required_architectures(
             arguments.runtime, required_paths
         )
-        validate_metalfx_support(arguments.runtime, lock["features"])
+        validate_metalfx_support(arguments.runtime, lane.interface.features)
         # The external ARM64 Wine tree is built upstream and sometimes ships binaries
         # with a newer minimum macOS; report them without blocking the release.
         macho_count, inherited_count = validate_macho_targets(
             arguments.runtime,
-            lock["deploymentTarget"],
+            lane.minimum_macos,
             arguments.baseline,
-            warn_newer=lock["buildMode"] == "external",
+            warn_newer=lane.build == "external",
         )
     except (
         RuntimeValidationError,
@@ -342,9 +344,9 @@ def main() -> int:
         json.dumps(
             {
                 "runtime": str(arguments.runtime.resolve()),
-                "target": lock["target"],
-                "deploymentTarget": lock["deploymentTarget"],
-                "minimumMacOS": lock["interface"].get("minimumMacOS"),
+                "target": lane.name,
+                "deploymentTarget": lane.minimum_macos,
+                "minimumMacOS": lane.minimum_macos,
                 "requiredArchitecturesChecked": architecture_count,
                 "machoFilesChecked": macho_count,
                 "inheritedMachOAboveTarget": inherited_count,

@@ -14,7 +14,7 @@ The **Runtime Build** workflow reads the catalog URL from the repository secret 
 
 The catalog and archive URLs never appear in output, assets, or provenance.
 
-The lock declares `native-arm64` with `buildMode: external`. `scripts/runtime.py prepare --target native-arm64` refuses the target.
+The lock declares `native-arm64` with `build: external`. `uv run --locked --no-dev -m scripts.lock prepare --target native-arm64` refuses the target.
 
 ## Shipped artifact
 
@@ -44,7 +44,7 @@ The archive has no DXMT, no `winemetal.so`, no `wine64`, no `Arknights` link, an
 
 ## DXMT
 
-The release workflow builds DXMT from `sources.dxmt` at commit `647b0020ba5764e5593b12407afd76964fa11e20` with `MACOSX_DEPLOYMENT_TARGET=26.0`. It also builds a minimal Wine tree from `sources.wine` for the import libraries. That build tree is a build dependency and is never shipped. The macOS driver `winemac.so` comes from the external tree. The old external `dxmt-experimental-v1` artifact is not used.
+The release workflow builds DXMT from `lanes.native-arm64.sources.dxmt` at commit `647b0020ba5764e5593b12407afd76964fa11e20` with `MACOSX_DEPLOYMENT_TARGET=26.0`. It also builds a minimal Wine tree from `lanes.native-arm64.sources.wine` for the import libraries. That build tree is a build dependency and is never shipped. The macOS driver `winemac.so` comes from the external tree. The old external `dxmt-experimental-v1` artifact is not used.
 
 ## Entitlements and window chrome
 

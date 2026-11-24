@@ -165,10 +165,11 @@ class UpdateTests(PinsTestCase):
         result = self.update()
 
         lock = self.lock_on_disk()
-        self.assertEqual(lock["sources"]["wine"]["commit"], NEW_WINE)
-        self.assertEqual(lock["sources"]["dxmt"]["version"], "0.81-12-gbbbbbbb")
-        self.assertEqual(lock["baseArtifact"]["recipe"]["commit"], NEW_RECIPE)
-        self.assertEqual(lock["build"]["nixpkgs"]["commit"], NEW_NIXPKGS)
+        lane = lock["lanes"]["rosetta-x86_64"]
+        self.assertEqual(lane["sources"]["wine"]["commit"], NEW_WINE)
+        self.assertEqual(lane["sources"]["dxmt"]["version"], "0.81-12-gbbbbbbb")
+        self.assertEqual(lane["base"]["recipe"]["commit"], NEW_RECIPE)
+        self.assertEqual(lock["shared"]["nixpkgs"]["commit"], NEW_NIXPKGS)
         self.assertEqual(
             (self.root / "notice.txt").read_text(),
             f"Wine 11.19 at {NEW_WINE}\nPinned build 0.81-12 is not release 0.80.\n",
@@ -188,8 +189,10 @@ class UpdateTests(PinsTestCase):
         result = self.update(runner)
 
         lock = self.lock_on_disk()
-        self.assertEqual(lock["sources"]["wine"], self.lock["sources"]["wine"])
-        self.assertEqual(lock["sources"]["dxmt"]["commit"], NEW_DXMT)
+        lane = lock["lanes"]["rosetta-x86_64"]
+        original = self.lock["lanes"]["rosetta-x86_64"]
+        self.assertEqual(lane["sources"]["wine"], original["sources"]["wine"])
+        self.assertEqual(lane["sources"]["dxmt"]["commit"], NEW_DXMT)
         kept = next(o for o in result.outcomes if o.component == "wine")
         self.assertEqual(kept.status, "kept")
         self.assertIn("wine-hardware-cursor-suppression", kept.reason)

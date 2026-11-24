@@ -23,12 +23,12 @@ def _write_lane(directory: Path, target: str, arch: str) -> None:
 
     directory.mkdir(parents=True)
     content = directory / "content"
-    (content / "Libraries").mkdir(parents=True)
-    (content / "Libraries" / "marker").write_bytes(arch.encode())
+    (content / "Runtime").mkdir(parents=True)
+    (content / "Runtime" / "marker").write_bytes(arch.encode())
     runtime = write_archive(
         directory,
         runtime_archive_name(VERSION, arch),
-        [(content / "Libraries", "Libraries")],
+        [(content / "Runtime", "Runtime")],
     )
     source = directory / "source.txt"
     source.write_bytes(b"source")

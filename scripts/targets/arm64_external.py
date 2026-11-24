@@ -22,8 +22,8 @@ from typing import Any
 from scripts.build_common import NATIVE_ARM64_TARGET, ROOT
 from scripts.lib.artifact import ArtifactError, fetch_verified
 from scripts.lib.console import info, success, warning
+from scripts.lock.model import Lane, LockError, load_lock
 from scripts.release.pins import write_artifact_pin
-from scripts.runtime import LockError, load_lock
 
 # The catalog URL is a secret. It is never logged, so a leaked catalog or archive
 # location stays out of CI output.
@@ -191,15 +191,15 @@ def _extract_archive(archive: Path, destination: Path) -> None:
             raise FetchError(f"cannot extract the wine archive: {problem}") from problem
 
 
-def fetch_target(lock: dict[str, Any], output: Path, release_id: str) -> dict[str, Any]:
+def fetch_target(lane: Lane, output: Path, release_id: str) -> dict[str, Any]:
     """Fetch, verify, and extract the pinned Wine archive into `output`.
 
     Return the catalog release. A changed archive under a pinned id re-pins the lock.
     """
 
     output.mkdir(parents=True, exist_ok=True)
-    artifact = lock["artifact"]
-    if artifact["catalog"] != "wine":
+    artifact = lane.artifact
+    if artifact is None or artifact.catalog != "wine":
         raise FetchError("the external target must pin the wine catalog")
     release, archive = fetch_selected_release(
         WINE_CATALOG_ENV, release_id, output / "wine.tar.xz"
@@ -210,26 +210,26 @@ def fetch_target(lock: dict[str, Any], output: Path, release_id: str) -> dict[st
         raise FetchError("extracted archive has no wine directory")
     # The upstream catalog sometimes replaces a release's archive under the same id, so a
     # new SHA-256 for the pinned id is re-pinned with a warning instead of failing.
-    if release["id"] == artifact["release"] and release["sha256"] != artifact["sha256"]:
+    if release["id"] == artifact.release and release["sha256"] != artifact.sha256:
         warning(
             f"The catalog archive for {release['id']} changed since it was pinned "
-            f"({artifact['sha256']} -> {release['sha256']})"
+            f"({artifact.sha256} -> {release['sha256']})"
         )
     if (
-        release["id"] != artifact["release"] or release["sha256"] != artifact["sha256"]
-    ) and write_artifact_pin(ROOT, lock["target"], release["id"], release["sha256"]):
+        release["id"] != artifact.release or release["sha256"] != artifact.sha256
+    ) and write_artifact_pin(ROOT, lane.name, release["id"], release["sha256"]):
         warning(
-            f"Updated the {lock['target']} artifact pin to {release['id']} "
+            f"Updated the {lane.name} artifact pin to {release['id']} "
             f"({release['sha256']})"
         )
     success("Fetched and verified the wine archive")
     return release
 
 
-def require_external_lock(target: str = NATIVE_ARM64_TARGET) -> dict[str, Any]:
-    """Load the lock for one target and require its external build mode."""
+def require_external_lock(target: str = NATIVE_ARM64_TARGET) -> Lane:
+    """Load the lane for one target and require an external build with an artifact pin."""
 
-    lock = load_lock(target=target)
-    if lock["buildMode"] != "external":
-        raise LockError(f"the {lock['target']} target is not an external target")
-    return lock
+    lane = load_lock().lane(target)
+    if lane.build != "external" or lane.artifact is None:
+        raise LockError(f"the {lane.name} target is not an external target")
+    return lane

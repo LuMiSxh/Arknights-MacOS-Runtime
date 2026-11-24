@@ -21,12 +21,35 @@ from scripts.release.provenance import (
 from scripts.release.toolchain import collect_toolchain
 from scripts.release.verify import verify_release
 from scripts.targets import (
+    RUNTIME_ROOT,
     Target,
     notices_name,
     provenance_name,
     runtime_archive_name,
     source_archive_name,
 )
+
+
+def install_entries(content_root: Path) -> list[tuple[Path, str]]:
+    """Map the staged tree to the members of the installed runtime root.
+
+    The children of `Libraries/Wine` become children of `Runtime/`. Every other staged
+    library directory keeps its name, such as `DXMT/`. `Licenses/` and `NOTICE.md` are
+    included when the lane has them.
+    """
+
+    libraries = content_root / "Libraries"
+    entries: list[tuple[Path, str]] = []
+    for child in sorted(libraries.iterdir()):
+        if child.name == "Wine":
+            for grandchild in sorted(child.iterdir()):
+                entries.append((grandchild, f"{RUNTIME_ROOT}/{grandchild.name}"))
+        else:
+            entries.append((child, f"{RUNTIME_ROOT}/{child.name}"))
+    for name in ("Licenses", "NOTICE.md"):
+        if (content_root / name).exists():
+            entries.append((content_root / name, f"{RUNTIME_ROOT}/{name}"))
+    return entries
 
 
 def package_runtime(
@@ -37,7 +60,6 @@ def package_runtime(
     release: bool,
     output: Path,
     content_root: Path,
-    members: tuple[str, ...],
     source_entries: Sequence[tuple[Path, str]],
     source_root: Path,
     inventory: Path,
@@ -56,7 +78,7 @@ def package_runtime(
     runtime_archive = write_archive(
         output,
         runtime_archive_name(version, target.arch),
-        [(content_root / member, member) for member in members],
+        install_entries(content_root),
     )
     source_archive = write_archive(
         output, source_archive_name(version, target.arch), source_entries

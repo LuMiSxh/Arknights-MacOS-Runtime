@@ -53,11 +53,15 @@ from typing import Any
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 if __package__:
     from ..lib.console import error, info, success, warning
+    from ..lock.model import DEFAULT_LANE
 else:
     if str(REPOSITORY_ROOT / "scripts") not in sys.path:
         sys.path.insert(0, str(REPOSITORY_ROOT / "scripts"))
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    sys.path.insert(0, str(REPOSITORY_ROOT))
     from lib.console import error, info, success, warning
+
+    from scripts.lock.model import DEFAULT_LANE
 
 LOCK_NAME = "runtime.lock.json"
 COMPONENTS = ("wine", "dxmt", "base", "nixpkgs")
@@ -284,14 +288,15 @@ RESOLVERS: dict[str, Callable[[Fetch], Any]] = {
 def apply_state(lock: dict[str, Any], component: str, state: Any) -> None:
     """Write a resolved state into the lock."""
 
+    lane = lock["lanes"][DEFAULT_LANE]
     if component in ("wine", "dxmt"):
-        lock["sources"][component].update(commit=state.commit, version=state.version)
+        lane["sources"][component].update(commit=state.commit, version=state.version)
     elif component == "base":
-        artifact = lock["baseArtifact"]
+        artifact = lane["base"]
         artifact.update(url=state.url, sha256=state.sha256)
         artifact["recipe"]["commit"] = state.recipe_commit
     else:
-        lock["build"]["nixpkgs"]["commit"] = state.commit
+        lock["shared"]["nixpkgs"]["commit"] = state.commit
 
 
 def write_artifact_pin(root: Path, target: str, release: str, sha256: str) -> bool:
@@ -299,11 +304,11 @@ def write_artifact_pin(root: Path, target: str, release: str, sha256: str) -> bo
 
     Return True when the lock changed. The text keeps the same
     ``json.dumps(lock, indent=2)`` formatting that `run_update` writes, so
-    `pins.py check` and `runtime.py validate-lock` keep passing.
+    `pins.py check` and `scripts.lock validate` keep passing.
     """
 
     lock = _read_lock(root)
-    artifact = lock["targets"][target]["artifact"]
+    artifact = lock["lanes"][target]["artifact"]
     if artifact.get("release") == release and artifact.get("sha256") == sha256:
         return False
     artifact.update(release=release, sha256=sha256)
@@ -325,8 +330,9 @@ def pins_from_lock(lock: dict[str, Any]) -> dict[str, str]:
     """Derive every pin key that a marker or an allowlisted file may name."""
 
     pins: dict[str, str] = {}
+    lane = lock["lanes"][DEFAULT_LANE]
     for name in ("wine", "dxmt"):
-        source = lock["sources"][name]
+        source = lane["sources"][name]
         pins[f"{name}.commit"] = source["commit"]
         pins[f"{name}.short"] = source["commit"][:SHORT_LENGTH]
         pins[f"{name}.version"] = source["version"]
@@ -337,7 +343,7 @@ def pins_from_lock(lock: dict[str, Any]) -> dict[str, str]:
         f"{describe['tag']}-{describe['count']}" if describe else pins["dxmt.version"]
     )
     pins["dxmt.describe"] = "v" + pins["dxmt.version"]
-    artifact = lock["baseArtifact"]
+    artifact = lane["base"]
     release = DOWNLOAD_TAG.search(artifact["url"])
     if release is None:
         raise PinError(f"cannot read the release tag from {artifact['url']}")
@@ -347,7 +353,7 @@ def pins_from_lock(lock: dict[str, Any]) -> dict[str, str]:
     pins["base.sha256"] = artifact["sha256"]
     pins["base.recipe"] = artifact["recipe"]["commit"]
     pins["base.recipeShort"] = artifact["recipe"]["commit"][:SHORT_LENGTH]
-    nixpkgs = lock["build"]["nixpkgs"]
+    nixpkgs = lock["shared"]["nixpkgs"]
     pins["nixpkgs.commit"] = nixpkgs["commit"]
     pins["nixpkgs.short"] = nixpkgs["commit"][:SHORT_LENGTH]
     pins["nixpkgs.link"] = _link(nixpkgs["repository"], nixpkgs["commit"])
@@ -507,12 +513,17 @@ def guard_patches(
 ) -> str | None:
     """Apply the patches of a component in lock order to a shallow clone of `commit`.
 
-    Return None when all patches apply, else the reason. Like `runtime.py prepare`,
+    Return None when all patches apply, else the reason. Like `scripts.lock prepare`,
     each patch is checked and then applied, so later patches see earlier ones.
     """
 
-    repository = lock["sources"][component]["repository"]
-    patches = [patch for patch in lock["patches"] if patch["component"] == component]
+    lane = lock["lanes"][DEFAULT_LANE]
+    repository = lane["sources"][component]["repository"]
+    patches = [
+        patch
+        for patch in lock["patches"]
+        if patch["component"] == component and DEFAULT_LANE in patch["files"]
+    ]
     with tempfile.TemporaryDirectory(prefix=f"pins-{component}-") as directory:
         git = ["git", "-C", directory]
         for step in (
@@ -524,7 +535,7 @@ def guard_patches(
             if status != 0:
                 return f"cannot fetch {commit[:SHORT_LENGTH]}: {output}"
         for patch in patches:
-            path = str(root / patch["path"])
+            path = str(root / patch["files"][DEFAULT_LANE]["path"])
             for action in (["--check"], []):
                 status, output = run([*git, "apply", *action, path])
                 if status != 0:
@@ -660,7 +671,7 @@ FOLLOW_UPS = (
 
 def _post_checks(root: Path) -> bool:
     commands = (
-        [sys.executable, "scripts/runtime.py", "validate-lock"],
+        [sys.executable, "-m", "scripts.lock", "validate"],
         [sys.executable, "scripts/release/licenses.py", "generate", "--check"],
     )
     clean = True

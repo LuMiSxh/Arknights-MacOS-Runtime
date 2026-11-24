@@ -14,9 +14,9 @@ import os
 import re
 import shutil
 from pathlib import Path, PurePosixPath
-from typing import Any
 
 from scripts.build_common import ROOT, WINE_BUILD_NEW_REPOSITORY, clear_dos_stub
+from scripts.lock.model import Interface
 from scripts.release.licenses import EXTERNAL_NOTICE_FILES
 
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:")
@@ -176,23 +176,12 @@ def _write_notices(archive_root: Path, wine_root: Path) -> None:
     (archive_root / "NOTICE.md").write_text(_render_notice(), encoding="utf-8")
 
 
-def _dxmt_payload_dlls(interface: dict[str, Any]) -> tuple[str, ...]:
-    """Return the DXMT PE payload names from the lock interface."""
-
-    prefix = f"{interface['dxmtDirectory']}/x64/"
-    return tuple(
-        PurePosixPath(relative).name
-        for relative in interface["requiredFiles"]
-        if relative.startswith(prefix)
-    )
-
-
 def assemble(
     wine_root: Path,
     dxmt_root: Path,
     output: Path,
     archive_root: Path,
-    interface: dict[str, Any],
+    interface: Interface,
 ) -> Path:
     """Build the `Libraries/` tree. Returns that directory."""
 
@@ -222,9 +211,9 @@ def assemble(
         dxmt_root / "aarch64-windows" / "winemetal.dll", windows / "winemetal.dll"
     )
 
-    payload = output / interface["dxmtDirectory"] / "x64"
+    payload = output / interface.dxmt.directory / "x64"
     payload.mkdir(parents=True)
-    for name in _dxmt_payload_dlls(interface):
+    for name in interface.dxmt.libraries:
         destination = payload / name
         _copy_file(dxmt_root / "aarch64-windows" / name, destination)
         clear_dos_stub(destination)
@@ -233,8 +222,8 @@ def assemble(
     return output
 
 
-def verify_interface(libraries: Path, interface: dict[str, Any]) -> None:
-    for relative in (*interface["executables"], *interface["requiredFiles"]):
+def verify_interface(libraries: Path, interface: Interface) -> None:
+    for relative in interface.staged_paths():
         path = libraries / relative
         if not path.exists():
             raise AssemblyError(f"assembled tree is missing: {relative}")

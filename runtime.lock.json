@@ -1,80 +1,90 @@
 {
-  "schemaVersion": 3,
-  "archiveSchemaVersion": 2,
-  "defaultTarget": "rosetta-x86_64",
-  "deploymentTarget": "15.0",
-  "toolchain": {
-    "llvmMingw": {
-      "url": "https://github.com/mstorsjo/llvm-mingw/releases/download/20261104/llvm-mingw-20261104-ucrt-macos-universal.tar.xz",
-      "sha256": "66cbd5178c4a71b0d473e68ede172f8eb7d15d023e67f39201d0a69e21f6bf3c"
-    }
-  },
-  "sources": {
-    "wine": {
-      "repository": "https://github.com/dappermint/winecx.git",
-      "commit": "a54b8240683e92bf4c15cb1ba6bf92a9539bd768",
-      "version": "11.17"
+  "schemaVersion": 4,
+  "shared": {
+    "toolchain": {
+      "llvmMingw": {
+        "url": "https://github.com/mstorsjo/llvm-mingw/releases/download/20261104/llvm-mingw-20261104-ucrt-macos-universal.tar.xz",
+        "sha256": "66cbd5178c4a71b0d473e68ede172f8eb7d15d023e67f39201d0a69e21f6bf3c"
+      }
     },
-    "dxmt": {
-      "repository": "https://github.com/3Shain/dxmt.git",
-      "commit": "0df86108348bab2aaa5c4610a5eb63a9de9047ac",
-      "version": "0.80-408-g0df8610"
-    }
-  },
-  "baseArtifact": {
-    "url": "https://github.com/dappermint/Whisky/releases/download/v4.7.3/Libraries.tar.gz",
-    "sha256": "a4b5d63493f80698cce5cad8e7212d9a51c8292037b00c478f4652636fcfd331",
-    "recipe": {
-      "repository": "https://github.com/dappermint/winecx-gptk.git",
-      "commit": "0bf3eabc2f0d95154282eb86b11205cbbaae6c65"
-    }
-  },
-  "baseProvenance": {
-    "moltenvk": {
-      "repository": "https://github.com/KhronosGroup/MoltenVK.git",
-      "commit": "db66022459ffb663aa2b50f6b018bc2e124f5edf"
-    },
-    "wineGecko": {
-      "repository": "https://gitlab.winehq.org/wine/wine-gecko.git",
-      "commit": "557ea0c2e9f9ebd621323b3dbfbdd18c2528759c"
-    }
-  },
-  "build": {
     "nixpkgs": {
       "repository": "https://github.com/NixOS/nixpkgs.git",
       "commit": "ac62194c3917d5f474c1a844b6fd6da2db95077d"
     }
   },
-  "interface": {
-    "wineDirectory": "Wine",
-    "dxmtDirectory": "DXMT",
-    "executables": [
-      "Wine/bin/Arknights",
-      "Wine/bin/wine64",
-      "Wine/bin/wineserver"
-    ],
-    "requiredFiles": [
-      "Wine/lib/wine/x86_64-unix/winemac.so",
-      "Wine/lib/wine/x86_64-unix/winecoreaudio.so",
-      "Wine/lib/wine/x86_64-windows/winemetal.dll",
-      "DXMT/x64/d3d10core.dll",
-      "DXMT/x64/d3d11.dll",
-      "DXMT/x64/dxgi.dll",
-      "DXMT/x64/winemetal.dll"
-    ]
-  },
-  "features": {
-    "hardwareCursor": true,
-    "metalFXSpatialUpscaling": true,
-    "nativeFullscreenSpace": true
-  },
-  "targets": {
+  "lanes": {
     "rosetta-x86_64": {
-      "buildMode": "build"
+      "arch": "x86_64",
+      "build": "build",
+      "minimumMacOS": "15.0",
+      "sources": {
+        "wine": {
+          "repository": "https://github.com/dappermint/winecx.git",
+          "commit": "a54b8240683e92bf4c15cb1ba6bf92a9539bd768",
+          "version": "11.17"
+        },
+        "dxmt": {
+          "repository": "https://github.com/3Shain/dxmt.git",
+          "commit": "0df86108348bab2aaa5c4610a5eb63a9de9047ac",
+          "version": "0.80-408-g0df8610"
+        }
+      },
+      "base": {
+        "url": "https://github.com/dappermint/Whisky/releases/download/v4.7.3/Libraries.tar.gz",
+        "sha256": "a4b5d63493f80698cce5cad8e7212d9a51c8292037b00c478f4652636fcfd331",
+        "recipe": {
+          "repository": "https://github.com/dappermint/winecx-gptk.git",
+          "commit": "0bf3eabc2f0d95154282eb86b11205cbbaae6c65"
+        },
+        "provenance": {
+          "moltenvk": {
+            "repository": "https://github.com/KhronosGroup/MoltenVK.git",
+            "commit": "db66022459ffb663aa2b50f6b018bc2e124f5edf"
+          },
+          "wineGecko": {
+            "repository": "https://gitlab.winehq.org/wine/wine-gecko.git",
+            "commit": "557ea0c2e9f9ebd621323b3dbfbdd18c2528759c"
+          }
+        }
+      },
+      "interface": {
+        "executables": [
+          "bin/wine64",
+          "bin/wineserver"
+        ],
+        "requiredFiles": [
+          "lib/wine/x86_64-unix/winecoreaudio.so",
+          "lib/wine/x86_64-unix/winemac.so",
+          "lib/wine/x86_64-windows/winemetal.dll"
+        ],
+        "macDriver": "lib/wine/x86_64-unix/winemac.so",
+        "launcher": {
+          "path": "bin/Arknights",
+          "target": "wine64"
+        },
+        "dxmt": {
+          "payloadDirectory": "DXMT",
+          "destinations": {
+            "x64": "system32"
+          },
+          "libraries": [
+            "d3d10core.dll",
+            "d3d11.dll",
+            "dxgi.dll",
+            "winemetal.dll"
+          ]
+        },
+        "features": {
+          "hardwareCursor": true,
+          "metalFXSpatialUpscaling": true,
+          "nativeFullscreenSpace": true
+        }
+      }
     },
     "native-arm64": {
-      "buildMode": "external",
-      "deploymentTarget": "26.0",
+      "arch": "arm64",
+      "build": "external",
+      "minimumMacOS": "26.0",
       "sources": {
         "wine": {
           "repository": "https://gitlab.winehq.org/wine/wine.git",
@@ -97,217 +107,372 @@
         "release": "wine-11-18-arm64-v5",
         "sha256": "5f80759ac14b99e1052748b168565deef238b58f44f10b0cf69bfd16d0110e1d"
       },
-      "baseArtifact": null,
       "interface": {
-        "wineDirectory": "Wine",
-        "dxmtDirectory": "DXMT",
-        "minimumMacOS": "26.0",
         "executables": [
-          "Wine/bin/Arknights",
-          "Wine/bin/wine64",
-          "Wine/bin/wineserver"
+          "bin/wine64",
+          "bin/wineserver"
         ],
         "requiredFiles": [
-          "Wine/lib/wine/aarch64-unix/winemac.so",
-          "Wine/lib/wine/aarch64-unix/winecoreaudio.so",
-          "Wine/lib/wine/aarch64-unix/winemetal.so",
-          "Wine/lib/wine/aarch64-unix/libarm64ecfex.so",
-          "Wine/lib/wine/aarch64-unix/libwow64fex.so",
-          "Wine/lib/wine/aarch64-windows/winemetal.dll",
-          "Wine/lib/wine/aarch64-windows/libarm64ecfex.dll",
-          "Wine/lib/wine/aarch64-windows/libwow64fex.dll",
-          "DXMT/x64/d3d10core.dll",
-          "DXMT/x64/d3d11.dll",
-          "DXMT/x64/dxgi.dll"
-        ]
-      },
-      "features": {
-        "hardwareCursor": true,
-        "metalFXSpatialUpscaling": true,
-        "nativeFullscreenSpace": true
+          "lib/wine/aarch64-unix/libarm64ecfex.so",
+          "lib/wine/aarch64-unix/libwow64fex.so",
+          "lib/wine/aarch64-unix/winecoreaudio.so",
+          "lib/wine/aarch64-unix/winemac.so",
+          "lib/wine/aarch64-unix/winemetal.so",
+          "lib/wine/aarch64-windows/libarm64ecfex.dll",
+          "lib/wine/aarch64-windows/libwow64fex.dll",
+          "lib/wine/aarch64-windows/winemetal.dll"
+        ],
+        "macDriver": "lib/wine/aarch64-unix/winemac.so",
+        "launcher": {
+          "path": "bin/Arknights",
+          "target": "wine64"
+        },
+        "dxmt": {
+          "payloadDirectory": "DXMT",
+          "destinations": {
+            "x64": "system32"
+          },
+          "libraries": [
+            "d3d10core.dll",
+            "d3d11.dll",
+            "dxgi.dll"
+          ]
+        },
+        "features": {
+          "hardwareCursor": true,
+          "metalFXSpatialUpscaling": true,
+          "nativeFullscreenSpace": true
+        }
       }
     }
   },
   "patches": [
     {
+      "number": 1,
+      "id": "wine-ntdll-carry-eflags-af-df",
+      "component": "wine",
+      "gate": "LMISXH_AKMOCL_EFLAGS",
+      "default": true,
+      "files": {
+        "native-arm64": {
+          "path": "wine-build-new/patches/0001-ntdll-carry-eflags-af-df.patch",
+          "sha256": "2c4d130d97a09f3dc7e7887df376402a6af74731ee64f76c414b885fdfb0d5ce"
+        }
+      }
+    },
+    {
+      "number": 2,
+      "id": "wine-ntdll-hybrid-thread-entry",
+      "component": "wine",
+      "gate": "LMISXH_AKMOCL_HYBRID_THREAD",
+      "default": true,
+      "files": {
+        "native-arm64": {
+          "path": "wine-build-new/patches/0002-ntdll-hybrid-thread-entry.patch",
+          "sha256": "84362ee6b9a8a0b2b60cec36494790d6635fc24768eaa63f6c566a19721dc920"
+        }
+      }
+    },
+    {
+      "number": 3,
       "id": "wine-ace-ntoskrnl-surface",
       "component": "wine",
-      "number": 3,
       "gate": "LMISXH_AKMOCL_ACE_IMPORTS",
       "default": true,
-      "targets": [
-        "rosetta-x86_64"
-      ],
-      "path": "patches/wine/0003-ntoskrnl-arknights-ace-imports.patch",
-      "sha256": "6c2600408285b28e7d08c902620d2ab41f47855e6d37533a6c03c2bbaca84ff4"
+      "files": {
+        "native-arm64": {
+          "path": "wine-build-new/patches/0003-ntoskrnl-arknights-ace-imports.patch",
+          "sha256": "4a707e62aa8472cde73c32167e8a51275a4489cd664757f1d2d3ad91fa78222a"
+        },
+        "rosetta-x86_64": {
+          "path": "patches/wine/0003-ntoskrnl-arknights-ace-imports.patch",
+          "sha256": "6c2600408285b28e7d08c902620d2ab41f47855e6d37533a6c03c2bbaca84ff4"
+        }
+      }
     },
     {
+      "number": 4,
       "id": "wine-userenv-appcontainer",
       "component": "wine",
-      "number": 4,
       "gate": "LMISXH_AKMOCL_APPCONTAINER",
       "default": true,
-      "targets": [
-        "rosetta-x86_64"
-      ],
-      "path": "patches/wine/0004-userenv-appcontainer-apis.patch",
-      "sha256": "e0ef297cb81ddc89938dac653673a47216f4b6898287a9642028a6a13351bc87"
+      "files": {
+        "native-arm64": {
+          "path": "wine-build-new/patches/0004-userenv-appcontainer-apis.patch",
+          "sha256": "6d280a63900fcd54da21c8fa7d852d4f6d3dcf5bf3ca3d03fd5f8593c1aa8cc4"
+        },
+        "rosetta-x86_64": {
+          "path": "patches/wine/0004-userenv-appcontainer-apis.patch",
+          "sha256": "e0ef297cb81ddc89938dac653673a47216f4b6898287a9642028a6a13351bc87"
+        }
+      }
     },
     {
+      "number": 5,
       "id": "wine-winsock-address-list-sort",
       "component": "wine",
-      "number": 5,
       "gate": "LMISXH_AKMOCL_WINSOCK",
       "default": true,
-      "targets": [
-        "rosetta-x86_64"
-      ],
-      "path": "patches/wine/0005-ws2_32-address-list-sort.patch",
-      "sha256": "7389325541a13b14cb5bf22292758622fcb6f7c90579b0b9531853ae60e1ec39"
+      "files": {
+        "native-arm64": {
+          "path": "wine-build-new/patches/0005-ws2_32-address-list-sort.patch",
+          "sha256": "7b0314606a0382db420a0595d6e3f24f00a490dd42144f23b7797771137387a0"
+        },
+        "rosetta-x86_64": {
+          "path": "patches/wine/0005-ws2_32-address-list-sort.patch",
+          "sha256": "7389325541a13b14cb5bf22292758622fcb6f7c90579b0b9531853ae60e1ec39"
+        }
+      }
     },
     {
+      "number": 6,
       "id": "wine-cef-bilibili-stackbase",
       "component": "wine",
-      "number": 6,
       "gate": "LMISXH_AKMOCL_CEF",
       "default": true,
-      "targets": [
-        "rosetta-x86_64"
-      ],
-      "path": "patches/wine/0006-ntdll-bilibili-cef80-stack-base.patch",
-      "sha256": "ae3b588741a8b2e0ffb4e5d4ee7f91b1960e7b1164bccdcb855d088ea2b2742d"
+      "files": {
+        "native-arm64": {
+          "path": "wine-build-new/patches/0006-ntdll-bilibili-cef80-stack-base.patch",
+          "sha256": "8d6c2edc02926defa061207a1ac7df45d086bc54862fbb8af32b3feb5331b8ee"
+        },
+        "rosetta-x86_64": {
+          "path": "patches/wine/0006-ntdll-bilibili-cef80-stack-base.patch",
+          "sha256": "ae3b588741a8b2e0ffb4e5d4ee7f91b1960e7b1164bccdcb855d088ea2b2742d"
+        }
+      }
     },
     {
+      "number": 7,
       "id": "wine-cn-bilibili-layered-child",
       "component": "wine",
-      "number": 7,
       "gate": "LMISXH_AKMOCL_CN",
       "default": false,
-      "targets": [
-        "rosetta-x86_64"
-      ],
-      "path": "patches/wine/0007-win32u-winemac-bilibili-layered-child.patch",
-      "sha256": "3238b29322c9677602d2441270d1b6abd102450c1d25915176d0642bfbe38011"
+      "files": {
+        "native-arm64": {
+          "path": "wine-build-new/patches/0007-win32u-winemac-bilibili-layered-child.patch",
+          "sha256": "84df7813dc238862bdad2e16a2e74febe7c392e0eb21ec5cb4807a650c3411ec"
+        },
+        "rosetta-x86_64": {
+          "path": "patches/wine/0007-win32u-winemac-bilibili-layered-child.patch",
+          "sha256": "3238b29322c9677602d2441270d1b6abd102450c1d25915176d0642bfbe38011"
+        }
+      }
     },
     {
+      "number": 8,
       "id": "wine-cn-bilibili-join-all-spaces",
       "component": "wine",
-      "number": 8,
       "gate": "LMISXH_AKMOCL_CN",
       "default": false,
-      "targets": [
-        "rosetta-x86_64"
-      ],
-      "path": "patches/wine/0008-winemac-bilibili-join-all-spaces.patch",
-      "sha256": "13894e9ec70c5bf1959dc22d7b9081ec1f353968fa6583f09c413ff5e3d056c9"
+      "files": {
+        "native-arm64": {
+          "path": "wine-build-new/patches/0008-winemac-bilibili-join-all-spaces.patch",
+          "sha256": "697cc61e8391b6a75bb01b429f4ac3830cc8062f74da257fd8f215e2cb0b2113"
+        },
+        "rosetta-x86_64": {
+          "path": "patches/wine/0008-winemac-bilibili-join-all-spaces.patch",
+          "sha256": "13894e9ec70c5bf1959dc22d7b9081ec1f353968fa6583f09c413ff5e3d056c9"
+        }
+      }
     },
     {
+      "number": 9,
       "id": "wine-fullscreen-native-space",
       "component": "wine",
-      "number": 9,
       "gate": "LMISXH_AKMOCL_FULLSCREEN",
       "default": false,
-      "targets": [
-        "rosetta-x86_64"
-      ],
-      "path": "patches/wine/0009-winemac-native-fullscreen-space.patch",
-      "sha256": "57c283c853b58a23d5e30ae23c1874924422e0b6a6a5a4372ea1b9b8106c9bf5"
+      "files": {
+        "native-arm64": {
+          "path": "wine-build-new/patches/0009-winemac-native-fullscreen-space.patch",
+          "sha256": "810cf5be6e22caac6a29c08ca9e626994e5332bdae481dbefa53cde5003837d6"
+        },
+        "rosetta-x86_64": {
+          "path": "patches/wine/0009-winemac-native-fullscreen-space.patch",
+          "sha256": "57c283c853b58a23d5e30ae23c1874924422e0b6a6a5a4372ea1b9b8106c9bf5"
+        }
+      }
     },
     {
+      "number": 10,
       "id": "wine-hardware-cursor-suppression",
       "component": "wine",
-      "number": 10,
       "gate": "LMISXH_AKMOCL_CURSOR",
       "default": false,
-      "targets": [
-        "rosetta-x86_64"
-      ],
-      "path": "patches/wine/0010-ntdll-hide-software-cursor-asset.patch",
-      "sha256": "d132e261106042c5d6be62c0de35ebaf04f7809f04e4b8a7ef0e1f7faf550f03"
+      "files": {
+        "native-arm64": {
+          "path": "wine-build-new/patches/0010-ntdll-hide-software-cursor-asset.patch",
+          "sha256": "38906c22221391219ce88f5e446b25e3d3cf7b05e119c351b04d8f0b6fd7b0e5"
+        },
+        "rosetta-x86_64": {
+          "path": "patches/wine/0010-ntdll-hide-software-cursor-asset.patch",
+          "sha256": "d132e261106042c5d6be62c0de35ebaf04f7809f04e4b8a7ef0e1f7faf550f03"
+        }
+      }
     },
     {
+      "number": 11,
       "id": "wine-menu-command-q-quit",
       "component": "wine",
-      "number": 11,
       "gate": "LMISXH_AKMOCL_MENU",
       "default": true,
-      "targets": [
-        "rosetta-x86_64"
-      ],
-      "path": "patches/wine/0011-winemac-command-q-quit.patch",
-      "sha256": "ccedacf1110b8e2310b0cc23bb5c97dc5d710b00dbbb88b510c82d74c738022a"
+      "files": {
+        "native-arm64": {
+          "path": "wine-build-new/patches/0011-winemac-command-q-quit.patch",
+          "sha256": "15f825f09c2a2822fe00d3e7f4ae1791e29821af0f151596515fc784fe5dfabd"
+        },
+        "rosetta-x86_64": {
+          "path": "patches/wine/0011-winemac-command-q-quit.patch",
+          "sha256": "ccedacf1110b8e2310b0cc23bb5c97dc5d710b00dbbb88b510c82d74c738022a"
+        }
+      }
     },
     {
+      "number": 12,
       "id": "wine-audio-default-output",
       "component": "wine",
-      "number": 12,
       "gate": "LMISXH_AKMOCL_AUDIO",
       "default": true,
-      "targets": [
-        "rosetta-x86_64"
-      ],
-      "path": "patches/wine/0012-winecoreaudio-default-output.patch",
-      "sha256": "fe165b563fd9e1038f9720eb47ab94cbb86238c046add14c65195980c9509dc9"
+      "files": {
+        "rosetta-x86_64": {
+          "path": "patches/wine/0012-winecoreaudio-default-output.patch",
+          "sha256": "fe165b563fd9e1038f9720eb47ab94cbb86238c046add14c65195980c9509dc9"
+        }
+      }
     },
     {
+      "number": 13,
       "id": "wine-ace-relative-wait",
       "component": "wine",
-      "number": 13,
       "gate": "LMISXH_AKMOCL_ACE_TIMING",
       "default": true,
-      "targets": [
-        "rosetta-x86_64"
-      ],
-      "path": "patches/wine/0013-ntdll-ace-qpc-relative-wait.patch",
-      "sha256": "54ae64434b8762455cc6491b39d264f8bc6a4a2d4ae98cf64dd95150423d0613"
+      "files": {
+        "rosetta-x86_64": {
+          "path": "patches/wine/0013-ntdll-ace-qpc-relative-wait.patch",
+          "sha256": "54ae64434b8762455cc6491b39d264f8bc6a4a2d4ae98cf64dd95150423d0613"
+        }
+      }
     },
     {
+      "number": 14,
       "id": "wine-ace-dispatcher-spoof",
       "component": "wine",
-      "number": 14,
       "gate": "LMISXH_AKMOCL_ACE_DISPATCHER",
       "default": true,
-      "targets": [
-        "rosetta-x86_64"
-      ],
-      "path": "patches/wine/0014-kernel32-ace-dispatcher-spoof.patch",
-      "sha256": "46d981408412267fa9f90b5fc06ff9e013cd92cc38efe0edff3e9ea4e0dd9400"
+      "files": {
+        "rosetta-x86_64": {
+          "path": "patches/wine/0014-kernel32-ace-dispatcher-spoof.patch",
+          "sha256": "46d981408412267fa9f90b5fc06ff9e013cd92cc38efe0edff3e9ea4e0dd9400"
+        }
+      }
     },
     {
+      "number": 15,
       "id": "wine-ace-rosetta-workarounds",
       "component": "wine",
-      "number": 15,
       "gate": "LMISXH_AKMOCL_ACE_ROSETTA",
       "default": true,
-      "targets": [
-        "rosetta-x86_64"
-      ],
-      "path": "patches/wine/0015-macos-rosetta-ace-workarounds.patch",
-      "sha256": "92c9a211701924774b043ed1d13a4281e46fb68d33a1fdcd58916b6e72125f1d"
+      "files": {
+        "rosetta-x86_64": {
+          "path": "patches/wine/0015-macos-rosetta-ace-workarounds.patch",
+          "sha256": "92c9a211701924774b043ed1d13a4281e46fb68d33a1fdcd58916b6e72125f1d"
+        }
+      }
     },
     {
-      "id": "wine-winemac-squircle-app-icon",
+      "number": 16,
+      "id": "wine-ntdll-name-the-macos-loader-link-after-the-application",
       "component": "wine",
-      "number": 19,
-      "gate": "LMISXH_AKMOCL_SQUIRCLE_ICON",
+      "gate": "LMISXH_AKMOCL_LOADER_LINK",
       "default": true,
-      "targets": [
-        "rosetta-x86_64"
-      ],
-      "path": "patches/wine/0019-winemac-squircle-app-icon.patch",
-      "sha256": "5eee86c4eeeaf47056cf2b852f39307f3b1a66bb38cd5da9d90da14c2de0b713"
+      "files": {
+        "native-arm64": {
+          "path": "wine-build-new/patches/0016-ntdll-name-the-macos-loader-link-after-the-application.patch",
+          "sha256": "003e44c1dab45f9969d9f3cfa5a460cad428e4946a38af733f467f8033868f5f"
+        }
+      }
     },
     {
-      "id": "dxmt-skip-release-present-statistics",
-      "component": "dxmt",
-      "number": 1,
+      "number": 17,
+      "id": "wine-winemac-name-the-application-menu-after-the-program",
+      "component": "wine",
+      "gate": "LMISXH_AKMOCL_LOADER_LINK",
+      "default": true,
+      "files": {
+        "native-arm64": {
+          "path": "wine-build-new/patches/0017-winemac-name-the-application-menu-after-the-program.patch",
+          "sha256": "6fe4fe66ce5da8ca73bdd9363609200803f5546d65d8c0ee5912f9fefcef9819"
+        }
+      }
+    },
+    {
+      "number": 18,
+      "id": "wine-ntdll-promote-cx-unix-environment-variables",
+      "component": "wine",
       "gate": null,
       "default": true,
-      "targets": [
-        "rosetta-x86_64"
-      ],
-      "path": "patches/dxmt/0001-dxmt-skip-release-present-statistics.patch",
-      "sha256": "fc833832a654154645cf5ebf58e1c5de1c6b6af2d9a7d5d4ceda890384285e04"
+      "files": {
+        "native-arm64": {
+          "path": "wine-build-new/patches/0018-ntdll-promote-cx-unix-environment-variables.patch",
+          "sha256": "ace719f64a9af466504fa36d87e30a82b1b0e9cdc6137aa192c8c99dd60c9703"
+        }
+      }
+    },
+    {
+      "number": 19,
+      "id": "wine-winemac-squircle-app-icon",
+      "component": "wine",
+      "gate": "LMISXH_AKMOCL_SQUIRCLE_ICON",
+      "default": true,
+      "files": {
+        "native-arm64": {
+          "path": "wine-build-new/patches/0019-winemac-squircle-app-icon.patch",
+          "sha256": "20004baedb71c7c5d8e5580c7ba97f380b05d53cc10699c0743c702f6260c561"
+        },
+        "rosetta-x86_64": {
+          "path": "patches/wine/0019-winemac-squircle-app-icon.patch",
+          "sha256": "5eee86c4eeeaf47056cf2b852f39307f3b1a66bb38cd5da9d90da14c2de0b713"
+        }
+      }
+    },
+    {
+      "number": 1,
+      "id": "dxmt-skip-release-present-statistics",
+      "component": "dxmt",
+      "gate": null,
+      "default": true,
+      "files": {
+        "rosetta-x86_64": {
+          "path": "patches/dxmt/0001-dxmt-skip-release-present-statistics.patch",
+          "sha256": "fc833832a654154645cf5ebf58e1c5de1c6b6af2d9a7d5d4ceda890384285e04"
+        }
+      }
+    },
+    {
+      "number": 1,
+      "id": "fex-arm64ec-restore-carried-eflags",
+      "component": "fex",
+      "gate": null,
+      "default": true,
+      "files": {
+        "native-arm64": {
+          "path": "wine-build-new/fex/0001-arm64ec-restore-carried-eflags.patch",
+          "sha256": "6f4ebc271f043deac6a6938a1980fbe77bb34f09160a1079dabd40982b03d89b"
+        }
+      }
     }
-  ]
+  ],
+  "export": {
+    "wine-build-new": {
+      "lane": "native-arm64",
+      "wineBase": "9f8c4ae4d35c7ff4153267aba9618c026f5f5583",
+      "queueBefore": 68,
+      "firstOrder": 73,
+      "optionalPatches": [
+        "wine-cn-bilibili-join-all-spaces",
+        "wine-fullscreen-native-space",
+        "wine-hardware-cursor-suppression",
+        "wine-menu-command-q-quit"
+      ]
+    }
+  }
 }

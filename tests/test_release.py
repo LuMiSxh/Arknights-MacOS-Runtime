@@ -15,6 +15,7 @@ from scripts.release.verify import (
     normalize_version,
     verify_release,
 )
+from tests.lock_fixture import patch_entry, synthetic_lock
 
 
 class ReleaseVerificationTests(unittest.TestCase):
@@ -22,9 +23,9 @@ class ReleaseVerificationTests(unittest.TestCase):
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary_directory.name)
         self._write_repository()
-        self.archive = self.root / "runtime.tar.gz"
+        self.archive = self.root / "runtime.tar.xz"
         self._write_runtime_archive()
-        self.checksum = self.root / "runtime.tar.gz.sha256"
+        self.checksum = self.root / "runtime.tar.xz.sha256"
         self._write_checksum(self.archive, self.checksum)
         self.source_root = self.root / "sources"
         for name in ("wine", "dxmt"):
@@ -36,9 +37,9 @@ class ReleaseVerificationTests(unittest.TestCase):
             "component\trole\tsource\nWine\truntime\texample@commit\n",
             encoding="utf-8",
         )
-        self.source_archive = self.root / "sources.tar.gz"
+        self.source_archive = self.root / "sources.tar.xz"
         self._write_source_archive()
-        self.source_checksum = self.root / "sources.tar.gz.sha256"
+        self.source_checksum = self.root / "sources.tar.xz.sha256"
         self._write_checksum(self.source_archive, self.source_checksum)
         self.validation_report = self.root / "validation.json"
         self.validation_report.write_text(
@@ -80,7 +81,7 @@ class ReleaseVerificationTests(unittest.TestCase):
             "pyproject.toml": self.root / "pyproject.toml",
             "uv.lock": self.root / "uv.lock",
         }
-        with tarfile.open(self.source_archive, "w:gz") as archive:
+        with tarfile.open(self.source_archive, "w:xz") as archive:
             for arcname, path in members.items():
                 if arcname not in omit:
                     archive.add(path, arcname=arcname)
@@ -96,65 +97,15 @@ class ReleaseVerificationTests(unittest.TestCase):
             content = f"{patch_id}\n"
             patch.write_text(content, encoding="utf-8")
             patches.append(
-                {
-                    "id": patch_id,
-                    "component": component,
-                    "number": number,
-                    "gate": None,
-                    "default": True,
-                    "targets": ["rosetta-x86_64"],
-                    "path": str(patch.relative_to(self.root)),
-                    "sha256": hashlib.sha256(content.encode()).hexdigest(),
-                }
+                patch_entry(
+                    patch_id,
+                    component,
+                    number,
+                    str(patch.relative_to(self.root)),
+                    hashlib.sha256(content.encode()).hexdigest(),
+                )
             )
-        lock = {
-            "schemaVersion": 3,
-            "archiveSchemaVersion": 2,
-            "defaultTarget": "rosetta-x86_64",
-            "targets": {"rosetta-x86_64": {"buildMode": "build"}},
-            "deploymentTarget": "15.0",
-            "sources": {
-                "wine": {
-                    "repository": "https://github.com/example/wine.git",
-                    "commit": "a" * 40,
-                },
-                "dxmt": {
-                    "repository": "https://github.com/example/dxmt.git",
-                    "commit": "b" * 40,
-                },
-            },
-            "baseArtifact": {
-                "url": "https://github.com/example/runtime/releases/download/v1/Libraries.tar.gz",
-                "sha256": "c" * 64,
-                "recipe": {
-                    "repository": "https://github.com/example/recipe.git",
-                    "commit": "d" * 40,
-                },
-            },
-            "baseProvenance": {
-                "moltenvk": {
-                    "repository": "https://github.com/example/moltenvk.git",
-                    "commit": "e" * 40,
-                },
-                "wineGecko": {
-                    "repository": "https://gitlab.winehq.org/wine/wine-gecko.git",
-                    "commit": "1" * 40,
-                },
-            },
-            "build": {
-                "nixpkgs": {
-                    "repository": "https://github.com/NixOS/nixpkgs.git",
-                    "commit": "2" * 40,
-                }
-            },
-            "interface": {},
-            "features": {
-                "hardwareCursor": True,
-                "metalFXSpatialUpscaling": True,
-                "nativeFullscreenSpace": True,
-            },
-            "patches": patches,
-        }
+        lock = synthetic_lock(patches)
         (self.root / "runtime.lock.json").write_text(json.dumps(lock), encoding="utf-8")
         for relative, content in {
             "LICENSE": "project license\n",
@@ -182,16 +133,16 @@ class ReleaseVerificationTests(unittest.TestCase):
             ]
         }
         files = {
-            "Licenses/index.json": json.dumps(index).encode(),
-            "NOTICE.md": b"# Third-party notices\n",
+            "Runtime/Licenses/index.json": json.dumps(index).encode(),
+            "Runtime/NOTICE.md": b"# Third-party notices\n",
             **{
-                f"Licenses/{name}.txt": b"license\n"
+                f"Runtime/Licenses/{name}.txt": b"license\n"
                 for name in components
                 if name != omit
             },
         }
-        with tarfile.open(self.archive, "w:gz") as archive:
-            root = tarfile.TarInfo("Libraries")
+        with tarfile.open(self.archive, "w:xz") as archive:
+            root = tarfile.TarInfo("Runtime")
             root.type = tarfile.DIRTYPE
             archive.addfile(root)
             for name, data in files.items():
@@ -261,7 +212,7 @@ class ReleaseVerificationTests(unittest.TestCase):
 
     def test_rejects_checksum_that_names_another_artifact(self) -> None:
         self.checksum.write_text(
-            f"{hashlib.sha256(self.archive.read_bytes()).hexdigest()}  other.tar.gz\n",
+            f"{hashlib.sha256(self.archive.read_bytes()).hexdigest()}  other.tar.xz\n",
             encoding="utf-8",
         )
 
@@ -293,7 +244,7 @@ class ReleaseVerificationTests(unittest.TestCase):
                     self._verify()
 
     def test_rejects_unsafe_source_archive_member(self) -> None:
-        with tarfile.open(self.source_archive, "w:gz") as archive:
+        with tarfile.open(self.source_archive, "w:xz") as archive:
             source = tarfile.TarInfo("../escape")
             source.size = 0
             archive.addfile(source)
@@ -383,99 +334,7 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
 
 
 def _write_external_fixture(root: Path) -> None:
-    lock = {
-        "schemaVersion": 3,
-        "archiveSchemaVersion": 2,
-        "defaultTarget": "rosetta-x86_64",
-        "deploymentTarget": "15.0",
-        "sources": {
-            "wine": {
-                "repository": "https://github.com/example/wine.git",
-                "commit": "a" * 40,
-            },
-            "dxmt": {
-                "repository": "https://github.com/example/dxmt.git",
-                "commit": "b" * 40,
-            },
-        },
-        "baseArtifact": {
-            "url": "https://github.com/example/runtime/releases/download/v1/Libraries.tar.gz",
-            "sha256": "c" * 64,
-            "recipe": {
-                "repository": "https://github.com/example/recipe.git",
-                "commit": "d" * 40,
-            },
-        },
-        "baseProvenance": {
-            "moltenvk": {
-                "repository": "https://github.com/example/moltenvk.git",
-                "commit": "e" * 40,
-            },
-            "wineGecko": {
-                "repository": "https://gitlab.winehq.org/wine/wine-gecko.git",
-                "commit": "f" * 40,
-            },
-        },
-        "build": {
-            "nixpkgs": {
-                "repository": "https://github.com/NixOS/nixpkgs.git",
-                "commit": "1" * 40,
-            }
-        },
-        "interface": {},
-        "features": {
-            "hardwareCursor": True,
-            "metalFXSpatialUpscaling": True,
-            "nativeFullscreenSpace": True,
-        },
-        "targets": {
-            "rosetta-x86_64": {"buildMode": "build"},
-            "native-arm64": {
-                "buildMode": "external",
-                "deploymentTarget": "26.0",
-                "sources": {
-                    "wine": {
-                        "repository": "https://gitlab.winehq.org/wine/wine.git",
-                        "commit": "2" * 40,
-                        "version": "11.18",
-                    },
-                    "fex": {
-                        "repository": "https://github.com/FEX-Emu/FEX.git",
-                        "commit": "3" * 40,
-                        "version": "2610",
-                    },
-                    "dxmt": {
-                        "repository": "https://github.com/3Shain/dxmt.git",
-                        "commit": "4" * 40,
-                        "version": "0.80",
-                    },
-                },
-                "artifact": {
-                    "catalog": "wine",
-                    "release": "wine-11-18-arm64-v5",
-                    "sha256": "5" * 64,
-                },
-                "baseArtifact": None,
-                "interface": {
-                    "wineDirectory": "Wine",
-                    "dxmtDirectory": "DXMT",
-                    "minimumMacOS": "26.0",
-                    "executables": [
-                        "Wine/bin/Arknights",
-                        "Wine/bin/wine64",
-                        "Wine/bin/wineserver",
-                    ],
-                    "requiredFiles": ["Wine/lib/wine/aarch64-unix/winemac.so"],
-                },
-                "features": {
-                    "hardwareCursor": True,
-                    "metalFXSpatialUpscaling": True,
-                    "nativeFullscreenSpace": True,
-                },
-            },
-        },
-        "patches": [],
-    }
+    lock = synthetic_lock([])
     (root / "runtime.lock.json").write_text(json.dumps(lock), encoding="utf-8")
     (root / "wine-build-new").mkdir(parents=True)
     (root / "wine-build-new" / "source.c").write_text("source\n", encoding="utf-8")
@@ -509,22 +368,22 @@ def _write_external_archives(root: Path) -> None:
         member.type = tarfile.DIRTYPE
         tar.addfile(member)
 
-    runtime_archive = root / "runtime.tar.gz"
-    with tarfile.open(runtime_archive, "w:gz") as tar:
-        add_dir(tar, "Libraries")
-        add_dir(tar, "Licenses")
-        add_dir(tar, "Licenses/runtime")
+    runtime_archive = root / "runtime.tar.xz"
+    with tarfile.open(runtime_archive, "w:xz") as tar:
+        add_dir(tar, "Runtime")
+        add_dir(tar, "Runtime/Licenses")
+        add_dir(tar, "Runtime/Licenses/runtime")
         for name in (
             "Wine-LGPL-2.1.txt",
             "DXMT-LGPL-2.1.txt",
             "runtime/MIT.txt",
             "runtime/Apache-2.0.txt",
         ):
-            add_file(tar, f"Licenses/{name}", b"license\n")
-        add_file(tar, "NOTICE.md", b"# Third-party notices\n")
+            add_file(tar, f"Runtime/Licenses/{name}", b"license\n")
+        add_file(tar, "Runtime/NOTICE.md", b"# Third-party notices\n")
 
-    source_archive = root / "sources.tar.gz"
-    with tarfile.open(source_archive, "w:gz") as tar:
+    source_archive = root / "sources.tar.xz"
+    with tarfile.open(source_archive, "w:xz") as tar:
         add_dir(tar, "wine-build-new")
         add_file(tar, "wine-build-new/source.c", b"source\n")
         add_file(tar, "runtime.lock.json", (root / "runtime.lock.json").read_bytes())
@@ -561,11 +420,11 @@ def test_external_target_accepts_the_minimal_notice_set(tmp_path):
         repository_root=root,
         version="0.9.0",
         commit="7" * 40,
-        archive=root / "runtime.tar.gz",
-        checksum=root / "runtime.tar.gz.sha256",
+        archive=root / "runtime.tar.xz",
+        checksum=root / "runtime.tar.xz.sha256",
         source_root=root,
-        source_archive=root / "sources.tar.gz",
-        source_checksum=root / "sources.tar.gz.sha256",
+        source_archive=root / "sources.tar.xz",
+        source_checksum=root / "sources.tar.xz.sha256",
         validation_report=root / "validation.json",
         component_inventory=root / "inventory.tsv",
         target="native-arm64",
@@ -574,14 +433,14 @@ def test_external_target_accepts_the_minimal_notice_set(tmp_path):
     assert validation["releaseEligible"] is False
     assert validation["builtExternally"] is True
 
-    with tarfile.open(root / "runtime.tar.gz", "r:gz") as archive:
+    with tarfile.open(root / "runtime.tar.xz", "r:xz") as archive:
         names = {member.name for member in archive.getmembers() if member.isfile()}
     assert {
-        "NOTICE.md",
-        "Licenses/Wine-LGPL-2.1.txt",
-        "Licenses/DXMT-LGPL-2.1.txt",
-        "Licenses/runtime/MIT.txt",
-        "Licenses/runtime/Apache-2.0.txt",
+        "Runtime/NOTICE.md",
+        "Runtime/Licenses/Wine-LGPL-2.1.txt",
+        "Runtime/Licenses/DXMT-LGPL-2.1.txt",
+        "Runtime/Licenses/runtime/MIT.txt",
+        "Runtime/Licenses/runtime/Apache-2.0.txt",
     } <= names
 
 

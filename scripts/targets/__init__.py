@@ -13,6 +13,9 @@ from scripts.build_common import NATIVE_ARM64_TARGET
 ROSETTA_X86_64_TARGET = "rosetta-x86_64"
 REQUIRED_TARGETS = (ROSETTA_X86_64_TARGET, NATIVE_ARM64_TARGET)
 WINE_SOURCES = frozenset(("built", "external"))
+ARCHIVE_SUFFIX = ".tar.xz"
+LEGACY_ARCHIVE_SUFFIX = ".tar.gz"
+RUNTIME_ROOT = "Runtime"
 
 
 @dataclass(frozen=True)
@@ -47,12 +50,27 @@ def release_tag(version: str) -> str:
     return f"v{version}"
 
 
+def runtime_archive_stem(version: str, arch: str) -> str:
+    return f"Arknights-MacOS-Runtime-{release_tag(version)}-{arch}"
+
+
 def runtime_archive_name(version: str, arch: str) -> str:
-    return f"Arknights-MacOS-Runtime-{release_tag(version)}-{arch}.tar.gz"
+    return runtime_archive_stem(version, arch) + ARCHIVE_SUFFIX
 
 
 def source_archive_name(version: str, arch: str) -> str:
-    return f"Arknights-MacOS-Runtime-{release_tag(version)}-{arch}-source.tar.gz"
+    return (
+        f"Arknights-MacOS-Runtime-{release_tag(version)}-{arch}-source{ARCHIVE_SUFFIX}"
+    )
+
+
+def delta_archive_name(version: str, source: str, arch: str) -> str:
+    """Return the name of the delta from release `source` to release `version`."""
+
+    return (
+        f"Arknights-MacOS-Runtime-{release_tag(version)}-from-{release_tag(source)}"
+        f"-{arch}.delta{ARCHIVE_SUFFIX}"
+    )
 
 
 def provenance_name(arch: str) -> str:

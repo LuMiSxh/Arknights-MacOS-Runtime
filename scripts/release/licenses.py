@@ -280,7 +280,7 @@ def validate_index(
     if index.get("schemaVersion") != SCHEMA_VERSION:
         problems.append(f"schemaVersion must be {SCHEMA_VERSION}")
     nixpkgs_commit = (index.get("nixpkgs") or {}).get("commit")
-    locked_commit = _lock_entry(lock, "build.nixpkgs.commit")
+    locked_commit = _lock_entry(lock, "shared.nixpkgs.commit")
     if nixpkgs_commit != locked_commit:
         problems.append("nixpkgs commit does not match runtime.lock.json")
     components = index.get("components")

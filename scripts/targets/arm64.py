@@ -19,7 +19,7 @@ from scripts.build_common import (
     Builder,
     BuildError,
 )
-from scripts.runtime import BUILD_ROOT
+from scripts.lock.sources import BUILD_ROOT
 from scripts.targets import Target, inventory_name
 from scripts.targets.arm64_assemble import assemble, verify_interface
 from scripts.targets.arm64_dxmt import build_dxmt_arm64
@@ -68,25 +68,25 @@ def build_runtime(
 ) -> Path:
     """Build the native-arm64 runtime and return the path of its provenance fragment."""
 
-    lock = require_external_lock(TARGET.name)
+    lane = require_external_lock(TARGET.name)
     root = BUILD_ROOT / TARGET.arch
     root.mkdir(parents=True, exist_ok=True)
     artifact = fetch_target(
-        lock, root / "incoming", os.environ.get(RELEASE_ID_ENVIRONMENT, "").strip()
+        lane, root / "incoming", os.environ.get(RELEASE_ID_ENVIRONMENT, "").strip()
     )
-    install = build_dxmt_arm64(builder, TARGET, lock, root)
+    install = build_dxmt_arm64(builder, TARGET, lane, root)
 
     libraries = root / "Libraries"
     for stale in (libraries, root / "Licenses"):
         if stale.exists():
             shutil.rmtree(stale)
     (root / "NOTICE.md").unlink(missing_ok=True)
-    assemble(root / "incoming" / "wine", install, libraries, root, lock["interface"])
-    verify_interface(libraries, lock["interface"])
+    assemble(root / "incoming" / "wine", install, libraries, root, lane.interface)
+    verify_interface(libraries, lane.interface)
 
     # The fetch may re-pin the lock. The pin that the build records must match the catalog.
-    pinned = require_external_lock(TARGET.name)["artifact"]
-    if (pinned["release"], pinned["sha256"]) != (artifact["id"], artifact["sha256"]):
+    pinned = require_external_lock(TARGET.name).artifact
+    if (pinned.release, pinned.sha256) != (artifact["id"], artifact["sha256"]):
         raise BuildError("external artifact metadata does not match the lock pin")
 
     output.mkdir(parents=True, exist_ok=True)
@@ -94,7 +94,7 @@ def build_runtime(
     write_inventory(
         inventory,
         artifact_id=str(artifact["id"]),
-        wine_revision=str(lock["sources"]["wine"]["commit"]),
+        wine_revision=lane.sources["wine"].commit,
     )
     validation_report = root / "validation.json"
     builder.run(
@@ -113,18 +113,17 @@ def build_runtime(
         release=release,
         output=output,
         content_root=root,
-        members=("Libraries", "Licenses", "NOTICE.md"),
         source_entries=[(ROOT / name, name) for name in SOURCE_REPOSITORY_MEMBERS],
         source_root=ROOT,
         inventory=inventory,
         validation_report=validation_report,
         wine={
-            "repository": lock["sources"]["wine"]["repository"],
-            "commit": lock["sources"]["wine"]["commit"],
-            "version": lock["sources"]["wine"]["version"],
+            "repository": lane.sources["wine"].repository,
+            "commit": lane.sources["wine"].commit,
+            "version": lane.sources["wine"].version,
             "externalBuild": {
                 "repository": WINE_BUILD_NEW_REPOSITORY,
-                "commit": lock["sources"]["wine"]["commit"],
+                "commit": lane.sources["wine"].commit,
             },
             "artifact": {
                 "id": artifact["id"],
@@ -133,9 +132,9 @@ def build_runtime(
             },
         },
         dxmt={
-            "repository": lock["sources"]["dxmt"]["repository"],
-            "commit": lock["sources"]["dxmt"]["commit"],
-            "version": lock["sources"]["dxmt"]["version"],
+            "repository": lane.sources["dxmt"].repository,
+            "commit": lane.sources["dxmt"].commit,
+            "version": lane.sources["dxmt"].version,
         },
         source_commit=source_commit,
     )

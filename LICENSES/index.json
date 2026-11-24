@@ -33,7 +33,7 @@
             "status": "verified",
             "basis": "upstream-declared",
             "notice": "notices/wine.txt",
-            "lock": "sources.wine"
+            "lock": "lanes.rosetta-x86_64.sources.wine"
         },
         {
             "name": "Wine in-tree libraries and fonts",
@@ -71,7 +71,7 @@
             "status": "verified",
             "basis": "upstream-declared",
             "notice": "notices/dxmt.txt",
-            "lock": "sources.dxmt"
+            "lock": "lanes.rosetta-x86_64.sources.dxmt"
         },
         {
             "name": "DXMT vendored DXBCParser",
@@ -159,7 +159,7 @@
             "status": "verified",
             "basis": "upstream-declared",
             "notice": "notices/moltenvk.txt",
-            "lock": "baseProvenance.moltenvk",
+            "lock": "lanes.rosetta-x86_64.base.provenance.moltenvk",
             "targets": ["rosetta-x86_64"]
         },
         {
@@ -347,7 +347,7 @@
             "status": "verified",
             "basis": "upstream-declared",
             "notice": "notices/fex.txt",
-            "lock": "targets.native-arm64.sources.fex",
+            "lock": "lanes.native-arm64.sources.fex",
             "targets": ["native-arm64"]
         }
     ],
