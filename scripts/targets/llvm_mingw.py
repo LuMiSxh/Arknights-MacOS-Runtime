@@ -16,7 +16,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.lib.console import error
-from scripts.lock.model import Lock, LockError, load_lock
+from scripts.lock.model import Lock, LockError
+from scripts.lock.parse import load_lock
 
 
 def llvm_mingw_pin(lock: Lock) -> tuple[str, str]:

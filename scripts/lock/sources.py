@@ -7,7 +7,8 @@ from pathlib import Path
 
 from scripts.lib.artifact import ArtifactError, fetch_verified
 from scripts.lib.console import info, success
-from scripts.lock.model import DEFAULT_LANE, ROOT, Lane, LockError, load_lock
+from scripts.lock.model import DEFAULT_LANE, ROOT, Lane, LockError
+from scripts.lock.parse import load_lock
 from scripts.lock.patches import lane_patches
 
 BUILD_ROOT = ROOT / ".build"

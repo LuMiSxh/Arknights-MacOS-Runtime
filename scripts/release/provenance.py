@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import Any
 
 from scripts.lib.artifact import sha256
-from scripts.lock.model import ARCHIVE_SCHEMA_VERSION, LockError, load_lock
+from scripts.lock.model import ARCHIVE_SCHEMA_VERSION, LockError
+from scripts.lock.parse import load_lock
 from scripts.targets import Target
 
 LOCK_FILE_NAME = "runtime.lock.json"

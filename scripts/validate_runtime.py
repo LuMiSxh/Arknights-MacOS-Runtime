@@ -16,13 +16,15 @@ from typing import Any
 
 if __package__:
     from .lib.console import error, success, warning
-    from .lock.model import LOCK_PATH, load_lock
+    from .lock.model import LOCK_PATH
+    from .lock.parse import load_lock
     from .lock.sources import BUILD_ROOT
 else:
     # Run as a script, the repository root is not on sys.path.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from scripts.lib.console import error, success, warning
-    from scripts.lock.model import LOCK_PATH, load_lock
+    from scripts.lock.model import LOCK_PATH
+    from scripts.lock.parse import load_lock
     from scripts.lock.sources import BUILD_ROOT
 
 

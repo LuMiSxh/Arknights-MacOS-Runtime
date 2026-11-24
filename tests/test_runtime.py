@@ -8,7 +8,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from scripts.lock.model import ROOT, LockError, load_lock
+from scripts.lock.model import ROOT, LockError
+from scripts.lock.parse import load_lock
 from scripts.lock.patches import export_wine_build_new
 from scripts.lock.sources import prepare
 from tests.lock_fixture import DEFAULT_LANE, patch_entry, synthetic_lock

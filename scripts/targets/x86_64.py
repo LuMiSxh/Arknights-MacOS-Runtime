@@ -30,7 +30,8 @@ from scripts.build_common import (
     nix_package_outputs,
     references_in,
 )
-from scripts.lock.model import Lock, load_lock
+from scripts.lock.model import Lock
+from scripts.lock.parse import load_lock
 from scripts.lock.sources import BUILD_ROOT, fetch_base, prepare
 from scripts.release.licenses import generate
 from scripts.targets import ROSETTA_X86_64_TARGET, Target, inventory_name

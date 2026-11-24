@@ -7,7 +7,8 @@ import subprocess
 from pathlib import Path
 
 from scripts.lib.console import error, success
-from scripts.lock.model import ROOT, LockError, load_lock
+from scripts.lock.model import ROOT, LockError
+from scripts.lock.parse import load_lock
 from scripts.lock.patches import export_wine_build_new
 from scripts.lock.sources import BUILD_ROOT, fetch_base, prepare
 
