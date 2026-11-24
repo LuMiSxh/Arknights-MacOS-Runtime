@@ -1,0 +1,25 @@
+name: Tag probe
+
+on:
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+jobs:
+    probe:
+        runs-on: ubuntu-24.04
+        steps:
+            - name: Probe tag creation
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  set -u
+                  gh --version
+                  tag="probe-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+                  echo "creating refs/tags/$tag at $GITHUB_SHA"
+                  gh api --include --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+                    -f ref="refs/tags/$tag" \
+                    -f sha="$GITHUB_SHA" || true
+                  echo "--- delete ---"
+                  gh api --include --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/$tag" || true
