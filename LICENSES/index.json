@@ -60,7 +60,7 @@
             "status": "verified",
             "basis": "upstream-declared",
             "notice": "notices/wine-bundled.txt",
-            "note": "Read in winecx at the pinned commit: NOTICES.md, libs/*/LICENSE|COPYING|COPYRIGHT, fonts/*.sfd. Texts of libtiff, OLDAP-2.8, and TU-Berlin-2.0 match the SPDX texts after whitespace normalisation. The texts of Zlib, BSD-2-Clause (JXR), and the IJG license body match with other holder lines. Unicode-DFS-2016 is by wording only (confidence: medium, the file is the 2022 ICU variant). Items without an SPDX text (Unicode Bidirectional Algorithm, X11/DEC, RTF Tools, ray-box article, SQLite, ICU License) are verbatim in the notice. Dual-licensed code uses the MIT terms. Which of these libraries and fonts the shipped binaries contain is inferred from the configure flags and make install-lib in scripts/build-canary.sh. It is not proven by binary inspection."
+            "note": "Read in winecx at the pinned commit: NOTICES.md, libs/*/LICENSE|COPYING|COPYRIGHT, fonts/*.sfd. Texts of libtiff, OLDAP-2.8, and TU-Berlin-2.0 match the SPDX texts after whitespace normalisation. The texts of Zlib, BSD-2-Clause (JXR), and the IJG license body match with other holder lines. Unicode-DFS-2016 is by wording only (confidence: medium, the file is the 2022 ICU variant). Items without an SPDX text (Unicode Bidirectional Algorithm, X11/DEC, RTF Tools, ray-box article, SQLite, ICU License) are verbatim in the notice. Dual-licensed code uses the MIT terms. Which of these libraries and fonts the shipped binaries contain is inferred from the configure flags and make install-lib in scripts/lanes/x86_64.py. It is not proven by binary inspection."
         },
         {
             "name": "DXMT",

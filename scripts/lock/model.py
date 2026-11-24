@@ -16,7 +16,7 @@ LOCK_PATH = ROOT / "runtime.lock.json"
 # The runtime archive format. The lock no longer pins it; the release provenance records it.
 ARCHIVE_SCHEMA_VERSION = 3
 DEFAULT_LANE = "rosetta-x86_64"
-REQUIRED_SOURCES = ("wine", "dxmt")
+
 # Where a lane's files sit in the staged `Libraries/` tree. The installed root drops both.
 STAGED_WINE = "Wine"
 DXMT_ARCHITECTURE = "x64"
