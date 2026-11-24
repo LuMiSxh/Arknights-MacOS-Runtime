@@ -9,7 +9,7 @@
 2. `just monitor`: verifies every pinned upstream commit and reports newer heads without changing the lock.
 3. `just prepare`: clones the pinned sources and applies every patch in lock order without fuzz. Use `--skip-patch ID` to leave one patch out before a rebase.
 4. `just build`: builds a candidate runtime for the `rosetta-x86_64` lane. It is not a release build.
-5. `just verify`: checks archive paths, file types, DXMT native-loader markers, dependency references, and deployment targets. Prepare locally rebuilt D3D10/D3D11/DXGI DLLs with the DOS stub of `scripts/build.py`. Otherwise Wine's builtin marker overrides native-first loading. Keep the builtin marker on `winemetal.dll`.
+5. `just verify`: checks archive paths, file types, DXMT native-loader markers, dependency references, and deployment targets. Prepare locally rebuilt D3D10/D3D11/DXGI DLLs with the DOS stub of `scripts/build_common.py`. Otherwise Wine's builtin marker overrides native-first loading. Keep the builtin marker on `winemetal.dll`.
 6. The build verifies its emitted checksum before it publishes the artifact. Integrate and exercise the artifact in its consumer.
 7. To test one lane in CI, dispatch **Runtime Build** with `channel` set to `candidate` and one `target`.
 8. After a clean full build, dispatch **Runtime Build** with `channel` set to `release`, `target` set to `both`, and one version. It creates the tag and draft release only after all release gates pass.

@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --locked --no-dev
 # SPDX-License-Identifier: MPL-2.0
 
 """Record a manually started Arknights scene with Metal Performance Trace."""
@@ -203,7 +202,3 @@ def main(arguments: list[str] | None = None) -> int:
         )
         return error.returncode or 1
     return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --locked --no-dev
 # SPDX-License-Identifier: MPL-2.0
 
 """Fetch and verify the external native-arm64 Wine artifact.
@@ -6,7 +5,7 @@
 The catalog URL lives only in the GitHub Actions secret `ARM64_RUNTIME_CATALOG_URL`.
 This script reads it from an environment variable and never writes a URL to output, logs,
 or error messages.
-DXMT is built locally by `scripts/targets/arm64_dxmt.py`, not downloaded.
+DXMT is built locally by `scripts/lanes/arm64_dxmt.py`, not downloaded.
 """
 
 import json
@@ -107,7 +106,7 @@ def fetch_selected_release(
         raise FetchError(
             f"the catalog SHA-256 of {release_id} differs from the locked SHA-256 "
             f"({expected_sha256} -> {declared}). Review the new archive, then "
-            "re-pin with `just update-pins --only wine-arm64`."
+            "re-pin with `just pins update --only wine-arm64`."
         )
 
     archive_url = release.get("url")

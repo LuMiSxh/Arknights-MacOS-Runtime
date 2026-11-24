@@ -32,15 +32,15 @@ from pathlib import Path
 from typing import Any
 
 from scripts.build_common import NATIVE_ARM64_TARGET
-from scripts.lib.github import Fetch, paged
-from scripts.lock.model import DEFAULT_LANE
-from scripts.pins import SHORT_LENGTH, PinError
-from scripts.targets.arm64_external import (
+from scripts.lanes.arm64_external import (
     WINE_CATALOG_ENV,
     FetchError,
     catalog_releases,
     download_catalog,
 )
+from scripts.lib.github import Fetch, paged
+from scripts.lock.model import DEFAULT_LANE
+from scripts.pins import SHORT_LENGTH, PinError
 
 # `update` moves these by default. `wine-arm64` needs the secret catalog URL, so it
 # runs only when `--only` names it.

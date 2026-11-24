@@ -1,10 +1,9 @@
-#!/usr/bin/env -S uv run --locked --no-dev
 # SPDX-License-Identifier: MPL-2.0
 
 """Repack the external native-arm64 tree into the client runtime contract.
 
 The external builder ships a signed `wine/` tree. DXMT is built locally for
-ARM64EC by `scripts/targets/arm64_dxmt.py`. This wrapper moves both into the `Libraries/` layout,
+ARM64EC by `scripts/lanes/arm64_dxmt.py`. This wrapper moves both into the `Libraries/` layout,
 adds the launcher aliases, and clears the Wine DOS-stub marker from the native DXMT
 D3D payloads. It renames the signed `wine.app` loader bundle to `Arknights.app` and never
 rewrites bytes inside it.

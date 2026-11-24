@@ -5,15 +5,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.lib.artifact import sha256, write_archive
-from scripts.release.combine import CombineError, combine
-from scripts.targets import (
+from scripts.lanes import (
     inventory_name,
     notices_name,
     provenance_name,
     runtime_archive_name,
     source_archive_name,
 )
+from scripts.lib.artifact import sha256, write_archive
+from scripts.release.combine import CombineError, combine
 
 VERSION = "0.9.0"
 

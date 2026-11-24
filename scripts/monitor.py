@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --locked --no-dev
 # SPDX-License-Identifier: MPL-2.0
 
 """Verify pinned runtime sources and summarize changed repository heads."""
@@ -16,12 +15,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlparse
 
-if __package__:
-    from .lib.console import error, success
-    from .runtime import LOCK_PATH, SourcePin, load_lock, monitored_sources
-else:
-    from lib.console import error, success
-    from runtime import LOCK_PATH, SourcePin, load_lock, monitored_sources
+from scripts.lib.console import error, success
+from scripts.lock.model import LOCK_PATH, SourcePin, monitored_sources
+from scripts.lock.parse import load_lock
 
 MAXIMUM_RESPONSE_BYTES = 1_048_576
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
@@ -189,11 +185,11 @@ def fetch_json(url: str) -> object:
     return json.loads(body)
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--summary", type=Path)
-    arguments = parser.parse_args()
+    arguments = parser.parse_args(argv)
     checked_at = (
         datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     )
@@ -218,7 +214,3 @@ def main() -> int:
         return 1
     success("Verified pinned runtime sources")
     return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --locked --no-dev
 # SPDX-License-Identifier: MPL-2.0
 
 """Build the pinned DXMT source for ARM64EC at the lock deployment target.
@@ -26,9 +25,9 @@ from scripts.build_common import (
     is_macho,
     logical_cpu_count,
 )
+from scripts.lanes import Target
+from scripts.lanes.dxmt import build_dxmt
 from scripts.lock.model import Lane
-from scripts.targets import Target
-from scripts.targets.dxmt import build_dxmt
 
 WINE_SOURCE_DIRECTORY = "wine-build-source"
 DXMT_SOURCE_DIRECTORY = "dxmt-source"

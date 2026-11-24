@@ -4,7 +4,6 @@
 
 import os
 import shutil
-import sys
 from pathlib import Path
 
 from scripts.build_common import (
@@ -12,7 +11,7 @@ from scripts.build_common import (
     NIX_PACKAGES,
     NIX_STORE,
     ROOT,
-    VALIDATE_CLI,
+    VALIDATE_COMMAND,
     WINE_CONFIGURE_FLAGS,
     WINE_PREFIX,
     Builder,
@@ -30,13 +29,14 @@ from scripts.build_common import (
     nix_package_outputs,
     references_in,
 )
+from scripts.lanes import ROSETTA_X86_64_TARGET, Target, inventory_name
+from scripts.lanes.dxmt import build_dxmt
+from scripts.lanes.inventory import write_inventory
+from scripts.lanes.package import package_runtime
 from scripts.lock.model import Lock
 from scripts.lock.parse import load_lock
 from scripts.lock.sources import BUILD_ROOT, fetch_base, prepare
 from scripts.release.licenses import generate
-from scripts.targets import ROSETTA_X86_64_TARGET, Target, inventory_name
-from scripts.targets.dxmt import build_dxmt
-from scripts.targets.package import package_runtime
 
 TARGET = Target(
     name=ROSETTA_X86_64_TARGET,
@@ -239,25 +239,6 @@ def build_dxmt_x86_64(
         clear_dos_stub(candidate / "DXMT/x64" / library)
 
 
-def write_inventory(path: Path, libraries: list[str], nixpkgs_revision: str) -> None:
-    """Write the component inventory: the shipped components and the Nix libraries."""
-
-    rows = [
-        "component\trole\tsource",
-        "WineCX/Wine\tWindows compatibility runtime\truntime.lock.json:sources.wine",
-        "DXMT\tDirect3D-to-Metal payload\truntime.lock.json:sources.dxmt",
-        (
-            "MoltenVK\tVulkan-to-Metal library\truntime.lock.json:baseArtifact "
-            "(SHA-256-pinned third-party base archive; not built from source)"
-        ),
-    ]
-    rows.extend(
-        f"{Path(output).name}\tBundled Nix library\t{output} (nixpkgs {nixpkgs_revision})"
-        for output in libraries
-    )
-    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
-
-
 def prepare_base(root: Path, *, clean_release: bool) -> Path:
     """Fetch the pinned base and lay out the candidate tree."""
 
@@ -401,24 +382,28 @@ def build_runtime(
 
     output.mkdir(parents=True, exist_ok=True)
     inventory = output / inventory_name(TARGET.arch)
-    write_inventory(inventory, libraries, lock.nixpkgs.commit)
+    write_inventory(
+        inventory,
+        lock.lane(TARGET.name),
+        nix_libraries=libraries,
+        nixpkgs_commit=lock.nixpkgs.commit,
+    )
     validation_report = root / "validation.json"
     if release:
         builder.run(
-            sys.executable,
-            VALIDATE_CLI,
+            *VALIDATE_COMMAND,
             candidate,
             "--target",
             TARGET.name,
             "--require-64-bit-only",
             "--report",
             validation_report,
+            cwd=ROOT,
         )
         generate(ROOT, candidate.parent, inventory=inventory, target=TARGET.name)
     else:
         builder.run(
-            sys.executable,
-            VALIDATE_CLI,
+            *VALIDATE_COMMAND,
             candidate,
             "--target",
             TARGET.name,
@@ -426,6 +411,7 @@ def build_runtime(
             root / "base" / "Libraries",
             "--report",
             validation_report,
+            cwd=ROOT,
         )
     return package_runtime(
         repository_root=ROOT,

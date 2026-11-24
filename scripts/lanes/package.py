@@ -10,6 +10,14 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from scripts.lanes import (
+    RUNTIME_ROOT,
+    Target,
+    notices_name,
+    provenance_name,
+    runtime_archive_name,
+    source_archive_name,
+)
 from scripts.lib.artifact import write_archive
 from scripts.release.licenses import third_party_notices
 from scripts.release.provenance import (
@@ -20,14 +28,6 @@ from scripts.release.provenance import (
 )
 from scripts.release.toolchain import collect_toolchain
 from scripts.release.verify import verify_release
-from scripts.targets import (
-    RUNTIME_ROOT,
-    Target,
-    notices_name,
-    provenance_name,
-    runtime_archive_name,
-    source_archive_name,
-)
 
 
 def install_entries(content_root: Path) -> list[tuple[Path, str]]:

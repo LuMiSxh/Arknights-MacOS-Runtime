@@ -9,6 +9,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from scripts.build_common import NATIVE_ARM64_TARGET
+from scripts.lanes import RUNTIME_ROOT
 from scripts.lib.artifact import ArtifactError, verify_checksum
 from scripts.release.licenses import (
     ARCHIVE_LICENSES_DIRECTORY,
@@ -23,7 +24,6 @@ from scripts.release.provenance import (
     runtime_lock_provenance,
     validation_provenance,
 )
-from scripts.targets import RUNTIME_ROOT
 
 SEMVER_CORE_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 IDENTIFIER_PATTERN = re.compile(r"^[0-9A-Za-z-]+$")

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MPL-2.0
 
-"""Commands of the pins package: `python -m scripts.pins update|check|export`.
+"""Commands of the pins package: `-m scripts pins update|check|export`.
 
 `update` resolves the newest upstream state, rewrites `runtime.lock.json`, and
 rewrites each mention of a pin. `check` verifies offline that every mention agrees
@@ -19,7 +19,9 @@ from pathlib import Path
 from scripts.lib.console import error, info, success, warning
 from scripts.lib.github import Fetch, GitHubError
 from scripts.lib.github import fetch as github_fetch
-from scripts.lock.__main__ import main as lock_main
+from scripts.lock.model import LockError
+from scripts.lock.parse import load_lock
+from scripts.lock.patches import export_wine_build_new
 from scripts.pins import LOCK_NAME, ROOT, SHORT_LENGTH, PinError, read_lock
 from scripts.pins.mentions import (
     ALLOWLIST,
@@ -136,8 +138,8 @@ FOLLOW_UPS = (
 
 def _post_checks(root: Path) -> bool:
     commands = (
-        [sys.executable, "-m", "scripts.lock", "validate"],
-        [sys.executable, "scripts/release/licenses.py", "generate", "--check"],
+        [sys.executable, "-m", "scripts", "lock", "validate"],
+        [sys.executable, "-m", "scripts", "release", "licenses", "generate", "--check"],
     )
     clean = True
     for command in commands:
@@ -150,9 +152,31 @@ def _post_checks(root: Path) -> bool:
     return clean
 
 
+EXPORT_PATH = ROOT / "wine-build-new" / "lock.json"
+
+
+def run_export(*, check: bool) -> int:
+    """Write `wine-build-new/lock.json`, or with `check` fail when it is stale."""
+
+    try:
+        text = export_wine_build_new(load_lock())
+    except (LockError, OSError) as failure:
+        error(str(failure))
+        return 1
+    if not check:
+        EXPORT_PATH.write_text(text, encoding="utf-8")
+        success("Wrote wine-build-new/lock.json")
+    elif EXPORT_PATH.read_text(encoding="utf-8") != text:
+        error("wine-build-new/lock.json is stale; run `just pins export`")
+        return 1
+    else:
+        success("wine-build-new/lock.json matches runtime.lock.json")
+    return 0
+
+
 def main(argv: list[str] | None = None, fetch: Fetch = github_fetch) -> int:
     parser = argparse.ArgumentParser(
-        prog="python -m scripts.pins", description=__doc__.split("\n\n")[0]
+        prog="-m scripts pins", description=__doc__.split("\n\n")[0]
     )
     commands = parser.add_subparsers(dest="command", required=True)
     update = commands.add_parser(
@@ -174,7 +198,7 @@ def main(argv: list[str] | None = None, fetch: Fetch = github_fetch) -> int:
     arguments = parser.parse_args(argv)
 
     if arguments.command == "export":
-        return lock_main(["export", *(["--check"] if arguments.check else [])])
+        return run_export(check=arguments.check)
     try:
         if arguments.command == "check":
             problems = run_check(ROOT)

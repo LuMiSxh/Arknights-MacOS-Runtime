@@ -288,13 +288,16 @@ class ReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("--latest=false", self.workflow)
         self.assertNotIn("git tag ", self.workflow)
         self.assertNotIn("git push ", self.workflow)
-        self.assertGreaterEqual(self.workflow.count("git ls-remote"), 1)
-        self.assertGreaterEqual(self.workflow.count("git/ref/tags/"), 2)
-        self.assertGreaterEqual(self.workflow.count("releases/tags/"), 2)
+
+    def test_absence_is_probed_before_the_build_and_before_publishing(self) -> None:
+        probe = 'release assert-absent --tag "$RELEASE_TAG"'
+        self.assertIn(probe, _job(self.workflow, "prepare"))
+        self.assertIn(probe, _job(self.workflow, "recheck"))
+        self.assertIn("recheck", _job(self.workflow, "publish"))
 
     def test_release_channel_uses_the_release_gated_build(self) -> None:
-        self.assertIn('just build-release rosetta-x86_64 "$VERSION"', self.workflow)
-        self.assertIn('just build-release native-arm64 "$VERSION"', self.workflow)
+        self.assertIn('just build rosetta-x86_64 "$VERSION" release', self.workflow)
+        self.assertIn('just build native-arm64 "$VERSION" release', self.workflow)
 
     def test_only_publish_writes_and_it_never_checks_out_code(self) -> None:
         publish = _job(self.workflow, "publish")

@@ -7,22 +7,22 @@ The build fetches exactly the catalog release that `runtime.lock.json` pins.
 """
 
 import shutil
-import sys
 from pathlib import Path
 
 from scripts.build_common import (
     NATIVE_ARM64_TARGET,
     ROOT,
-    VALIDATE_CLI,
+    VALIDATE_COMMAND,
     WINE_BUILD_NEW_REPOSITORY,
     Builder,
 )
+from scripts.lanes import Target, inventory_name
+from scripts.lanes.arm64_assemble import assemble, verify_interface
+from scripts.lanes.arm64_dxmt import build_dxmt_arm64
+from scripts.lanes.arm64_external import fetch_target, require_external_lock
+from scripts.lanes.inventory import write_inventory
+from scripts.lanes.package import package_runtime
 from scripts.lock.sources import BUILD_ROOT
-from scripts.targets import Target, inventory_name
-from scripts.targets.arm64_assemble import assemble, verify_interface
-from scripts.targets.arm64_dxmt import build_dxmt_arm64
-from scripts.targets.arm64_external import fetch_target, require_external_lock
-from scripts.targets.package import package_runtime
 
 TARGET = Target(
     name=NATIVE_ARM64_TARGET,
@@ -39,21 +39,6 @@ SOURCE_REPOSITORY_MEMBERS = (
     "runtime.lock.json",
     "docs/arm/README.md",
 )
-
-
-def write_inventory(path: Path, *, artifact_id: str, wine_revision: str) -> None:
-    """Write the component inventory of the components the runtime ships."""
-
-    rows = [
-        "component\trole\tsource",
-        (
-            "Wine\tWindows compatibility runtime\t"
-            f"external catalog artifact {artifact_id} (wine-build-new {wine_revision})"
-        ),
-        "DXMT\tDirect3D-to-Metal payload\truntime.lock.json:sources.dxmt",
-        f"FEX\tx86 emulation in the external Wine tree\texternal catalog artifact {artifact_id}",
-    ]
-    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
 
 def build_runtime(
@@ -82,20 +67,16 @@ def build_runtime(
 
     output.mkdir(parents=True, exist_ok=True)
     inventory = output / inventory_name(TARGET.arch)
-    write_inventory(
-        inventory,
-        artifact_id=str(artifact["id"]),
-        wine_revision=lane.sources["wine"].commit,
-    )
+    write_inventory(inventory, lane)
     validation_report = root / "validation.json"
     builder.run(
-        sys.executable,
-        VALIDATE_CLI,
+        *VALIDATE_COMMAND,
         libraries,
         "--target",
         TARGET.name,
         "--report",
         validation_report,
+        cwd=ROOT,
     )
     return package_runtime(
         repository_root=ROOT,

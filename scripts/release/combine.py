@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --locked --no-dev
 # SPDX-License-Identifier: MPL-2.0
 
 """Combine the lane outputs into one release.
@@ -12,26 +11,21 @@ standard library, so it runs on Linux.
 import argparse
 import json
 import shutil
-import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
+from scripts.lanes import (
+    REQUIRED_TARGETS,
+    inventory_name,
+    notices_name,
+    release_tag,
+)
 from scripts.lib.artifact import ArtifactError, verify_checksum
 from scripts.lib.console import error, success
 from scripts.release.verify import (
     ReleaseValidationError,
     normalize_version,
-)
-from scripts.targets import (
-    REQUIRED_TARGETS,
-    inventory_name,
-    notices_name,
-    release_tag,
 )
 
 SCHEMA_VERSION = 2
@@ -183,7 +177,3 @@ def main(arguments: list[str] | None = None) -> int:
         return 1
     success(f"combined release written to {parsed.output}")
     return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

@@ -17,7 +17,7 @@ from scripts.build_common import (
     write_compiler_launcher_cross_file,
     write_dxmt_native_file,
 )
-from scripts.targets import Target
+from scripts.lanes import Target
 
 DXMT_BUILD_DIRECTORY = "dxmt-build"
 DXMT_INSTALL_DIRECTORY = "dxmt-install"

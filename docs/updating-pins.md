@@ -48,11 +48,11 @@ A newer nixpkgs channel is a manual decision. Change the constant, then review t
 ## Update the pins
 
 1. Set `GITHUB_TOKEN` or `GH_TOKEN` to avoid the API rate limit. The command also works without a token.
-2. Run `just update-pins --dry-run`. The command resolves the new state and writes nothing.
+2. Run `just pins update --dry-run`. The command resolves the new state and writes nothing.
 3. Read the summary table. Each row shows the old pin, the new pin, and the status.
-4. Run `just update-pins`.
-5. To update one component, run `just update-pins --only wine`. The values of `--only` are `wine`, `dxmt`, `base`, `nixpkgs`, and `wine-arm64`.
-6. The default run skips `wine-arm64`. It needs the catalog URL in `ARM64_RUNTIME_CATALOG_URL`. Run `just update-pins --only wine-arm64` to pin the newest ARM64 catalog release.
+4. Run `just pins update`.
+5. To update one component, run `just pins update --only wine`. The values of `--only` are `wine`, `dxmt`, `base`, `nixpkgs`, and `wine-arm64`.
+6. The default run skips `wine-arm64`. It needs the catalog URL in `ARM64_RUNTIME_CATALOG_URL`. Run `just pins update --only wine-arm64` to pin the newest ARM64 catalog release.
 
 The command stops with no changes when it cannot resolve the base archive or its recipe commit. It also stops when the API gives no digest for the asset.
 
@@ -75,13 +75,13 @@ To move a kept pin, port the failed patch to the new commit. Then run the update
 
 ## Check the mentions
 
-Run `just check`. It runs `python -m scripts.pins check`, which works offline. The check fails when a marker or an allowlisted file disagrees with the lock. The CI check workflow runs the same command.
+Run `just check`. It runs `just pins check`, which works offline. The check fails when a marker or an allowlisted file disagrees with the lock. The CI check workflow runs the same command.
 
 ## Add a marker
 
 1. Choose a key from the list below.
 2. Write the marker around the value. Use `|code` to put the value in a code span. Put the marker outside the backticks of the text.
-3. Run `just update-pins --dry-run`. Then run `just check`.
+3. Run `just pins update --dry-run`. Then run `just check`.
 
 ```markdown
 Wine <!-- pin:wine.version -->11.17<!-- /pin -->

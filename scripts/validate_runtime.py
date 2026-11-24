@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --locked --no-dev
 # SPDX-License-Identifier: MPL-2.0
 
 """Read-only structural and Mach-O validation for an Arknights MacOS Runtime candidate."""
@@ -10,23 +9,13 @@ import os
 import re
 import struct
 import subprocess
-import sys
 from pathlib import Path
 from typing import Any
 
-if __package__:
-    from .lib.console import error, success, warning
-    from .lock.model import LOCK_PATH
-    from .lock.parse import load_lock
-    from .lock.sources import BUILD_ROOT
-else:
-    # Run as a script, the repository root is not on sys.path.
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from scripts.lib.console import error, success, warning
-    from scripts.lock.model import LOCK_PATH
-    from scripts.lock.parse import load_lock
-    from scripts.lock.sources import BUILD_ROOT
-
+from scripts.lib.console import error, success, warning
+from scripts.lock.model import LOCK_PATH
+from scripts.lock.parse import load_lock
+from scripts.lock.sources import BUILD_ROOT
 
 MINOS_PATTERN = re.compile(r"\bminos\s+([0-9]+(?:\.[0-9]+){1,2})")
 LEGACY_PAYLOADS = (
@@ -293,7 +282,7 @@ def validate_macho_targets(
     return checked, inherited
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("runtime", type=Path)
     parser.add_argument("--baseline", type=Path)
@@ -306,7 +295,7 @@ def main() -> int:
         action="store_true",
         help="reject i386, DXMT x32, GStreamer, and FFmpeg payloads (clean builds)",
     )
-    arguments = parser.parse_args()
+    arguments = parser.parse_args(argv)
     lane = load_lock(LOCK_PATH).lane(arguments.target)
     if arguments.require_64_bit_only and lane.build == "external":
         error(
@@ -363,7 +352,3 @@ def main() -> int:
     success(f"Validated {macho_count} Mach-O files")
     print(report)
     return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

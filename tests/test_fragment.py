@@ -5,12 +5,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from scripts.lanes import arm64
 from scripts.release.provenance import (
     ProvenanceInputError,
     runtime_lock_provenance,
     validation_provenance,
 )
-from scripts.targets import arm64
 
 ROOT = Path(__file__).resolve().parents[1]
 

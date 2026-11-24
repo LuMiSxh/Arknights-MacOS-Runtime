@@ -43,17 +43,17 @@ just build
 just verify
 ```
 
-`just prepare` clones the pinned sources and applies every patch in lock order. `just build` creates a candidate runtime for the `rosetta-x86_64` lane. `just build-release` creates the clean release artifact. `just combine` merges the lane outputs into `.build/release/`. Outputs stay below `.build/`. These commands never install or start Wine, create a prefix, launch a game, or modify an Arknights installation.
+`just prepare` clones the pinned sources and applies every patch in lock order. `just prepare` takes a lane name. `just build` creates a candidate runtime for the `rosetta-x86_64` lane. `just build rosetta-x86_64 VERSION release` creates the clean release artifact. `just combine` merges the lane outputs into `.build/release/`. Outputs stay below `.build/`. These commands never install or start Wine, create a prefix, launch a game, or modify an Arknights installation.
 
 ### Native ARM64 lane
 
 Requirements: macOS 26+, Homebrew `llvm@15`, Meson, Ninja, Bison, Flex, pkg-config, and a pinned llvm-mingw release.
 
 ```sh
-just build-release native-arm64 0.9.0
+just build native-arm64 0.9.0 release
 ```
 
-The build fetches the catalog release that `runtime.lock.json` pins. Run `just update-pins --only wine-arm64` to move it.
+The build fetches the catalog release that `runtime.lock.json` pins. Run `just pins update --only wine-arm64` to move it.
 
 The ARM64 Wine payload is built in [wine-build-new](https://github.com/riverfog7/wine-build-new). This repository builds DXMT for ARM64EC, repacks the external tree into the client contract, and validates the result. See the [native ARM64 lane](docs/arm/README.md) and the [patch export](wine-build-new/README.md).
 
@@ -78,6 +78,6 @@ Original build tooling and documentation use the [Mozilla Public License 2.0](LI
 
 DXMT is LGPL-2.1-or-later at the pinned x86_64 commit <!-- pin:dxmt.commit|code -->`0df86108348bab2aaa5c4610a5eb63a9de9047ac`<!-- /pin --> and at the ARM64 commit `647b0020ba5764e5593b12407afd76964fa11e20`. DXMT release v0.80 and older releases use the MIT License. The texts are in [`LICENSES/DXMT-LGPL-2.1.txt`](LICENSES/DXMT-LGPL-2.1.txt) and [`LICENSES/runtime/MIT-DXMT.txt`](LICENSES/runtime/MIT-DXMT.txt).
 
-[`LICENSES/`](LICENSES/) holds the license texts and notices of every component in the runtime archive. [`LICENSES/index.json`](LICENSES/index.json) lists them. Run `uv run --locked scripts/release/licenses.py generate --check` to validate it.
+[`LICENSES/`](LICENSES/) holds the license texts and notices of every component in the runtime archive. [`LICENSES/index.json`](LICENSES/index.json) lists them. Run `uv run --locked --no-dev -m scripts release licenses generate --check` to validate it.
 
 The release does not yet offer the corresponding source of the Nix libraries.

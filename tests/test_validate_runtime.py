@@ -1,7 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
 
-import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -28,20 +26,6 @@ def pe_payload(machine: int) -> bytes:
 
 
 class RuntimeStructureTests(unittest.TestCase):
-    def test_script_entrypoint_loads_its_runtime_module(self) -> None:
-        root = Path(__file__).resolve().parents[1]
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(root / "scripts" / "validate_runtime.py"),
-                "--help",
-            ],
-            capture_output=True,
-            check=False,
-            text=True,
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary_directory.name)

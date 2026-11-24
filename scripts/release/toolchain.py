@@ -1,14 +1,9 @@
-#!/usr/bin/env -S uv run --locked --no-dev
 # SPDX-License-Identifier: MPL-2.0
 
 """Record the unpinned host toolchain that a release build used."""
 
-import argparse
-import json
 import subprocess
-import sys
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any
 
 BREW_FORMULAE = ("ccache", "just", "mingw-w64", "meson", "ninja")
@@ -44,18 +39,3 @@ def collect_toolchain(run: Runner = run_command) -> dict[str, Any]:
         "sdkPath": run(["xcrun", "--show-sdk-path"]) or UNAVAILABLE,
         "macOS": run(["sw_vers", "-productVersion"]) or UNAVAILABLE,
     }
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("output", type=Path)
-    arguments = parser.parse_args()
-    arguments.output.write_text(
-        json.dumps(collect_toolchain(), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

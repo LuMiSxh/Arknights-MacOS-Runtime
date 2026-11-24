@@ -47,4 +47,4 @@ The launcher selects the remaining flags from the profile of the active client. 
 - `patches`: one registry of patches. Each patch names its component and number. `files` names each lane that carries it, with the file path and SHA-256.
 - `export`: the inputs of the `wine-build-new/lock.json` export.
 
-Interface paths are relative to the installed runtime root. The staged `Libraries/` paths are derived in code. `just lock-export` regenerates the export, and `just check` fails when it is stale.
+Interface paths are relative to the installed runtime root. The staged `Libraries/` paths are derived in code. `just pins export` regenerates the export, and `just check` fails when it is stale.

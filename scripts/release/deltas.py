@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --locked --no-dev --group deltas
 # SPDX-License-Identifier: MPL-2.0
 
 """Write delta archives from recent releases into a combined release directory.
@@ -17,7 +16,6 @@ import posixpath
 import shutil
 import struct
 import subprocess
-import sys
 import tarfile
 import tempfile
 from collections.abc import Mapping, Sequence
@@ -29,13 +27,7 @@ from typing import Any
 
 import bsdiff4.core
 
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-from scripts.lib.artifact import ArtifactError, sha256, verify_checksum, write_archive
-from scripts.lib.console import info, warning
-from scripts.targets import (
+from scripts.lanes import (
     ARCHIVE_SUFFIX,
     LEGACY_ARCHIVE_SUFFIX,
     RUNTIME_ROOT,
@@ -44,6 +36,8 @@ from scripts.targets import (
     runtime_archive_name,
     runtime_archive_stem,
 )
+from scripts.lib.artifact import ArtifactError, sha256, verify_checksum, write_archive
+from scripts.lib.console import info, warning
 
 ARCHITECTURES = ("x86_64", "arm64")
 SOURCE_COUNT = 3
@@ -559,7 +553,3 @@ def main(arguments: list[str] | None = None) -> int:
                 else:
                     info(f"wrote {delta.name}")
     return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

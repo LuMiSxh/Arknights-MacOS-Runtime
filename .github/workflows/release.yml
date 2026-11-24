@@ -101,29 +101,7 @@ jobs:
                   RELEASE_TAG: ${{ steps.plan.outputs.release_tag }}
               run: |
                   set -euo pipefail
-                  if git ls-remote --exit-code --refs origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
-                    echo "error: tag $RELEASE_TAG already exists; corrections require a new version" >&2
-                    exit 1
-                  else
-                    tag_status=$?
-                    if [[ "$tag_status" -ne 2 ]]; then
-                      echo "error: could not verify whether tag $RELEASE_TAG exists" >&2
-                      exit 1
-                    fi
-                  fi
-
-                  release_probe="$RUNNER_TEMP/runtime-release-probe"
-                  if gh api --method GET --include \
-                    "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
-                    > "$release_probe" 2>/dev/null; then
-                    echo "error: release $RELEASE_TAG already exists; corrections require a new version" >&2
-                    exit 1
-                  fi
-                  http_status="$(awk '$1 ~ /^HTTP\// { status=$2 } END { print status }' "$release_probe")"
-                  if [[ "$http_status" != 404 ]]; then
-                    echo "error: could not prove that release $RELEASE_TAG does not exist" >&2
-                    exit 1
-                  fi
+                  uv run --locked --no-dev -m scripts release assert-absent --tag "$RELEASE_TAG"
 
     # The two lanes are separate jobs so that the protected release-arm64 environment, with
     # its secret and variables, never reaches the x86_64 lane.
@@ -190,7 +168,7 @@ jobs:
               run: |
                   set -euo pipefail
                   if [[ "$CHANNEL" == release ]]; then
-                    just build-release rosetta-x86_64 "$VERSION"
+                    just build rosetta-x86_64 "$VERSION" release
                   else
                     just build rosetta-x86_64 "$VERSION"
                   fi
@@ -375,7 +353,7 @@ jobs:
                   LLVM_MINGW_SHA256: ${{ vars.LLVM_MINGW_SHA256 }}
               run: |
                   set -euo pipefail
-                  pin="$(uv run --locked --no-dev scripts/targets/llvm_mingw.py)"
+                  pin="$(uv run --locked --no-dev -m scripts lock llvm-mingw)"
                   url="${pin%%$'\n'*}"
                   sha="${pin#*$'\n'}"
                   if [ -z "$url" ]; then
@@ -418,7 +396,7 @@ jobs:
               run: |
                   set -euo pipefail
                   if [[ "$CHANNEL" == release ]]; then
-                    just build-release native-arm64 "$VERSION"
+                    just build native-arm64 "$VERSION" release
                   else
                     just build native-arm64 "$VERSION"
                   fi
@@ -481,7 +459,7 @@ jobs:
                   RELEASE_DIRECTORY: ${{ runner.temp }}/release
               run: |
                   set -euo pipefail
-                  uv run --locked --no-dev scripts/release/combine.py \
+                  uv run --locked --no-dev -m scripts release combine \
                     --version "$VERSION" \
                     --input "$LANES_DIRECTORY/rosetta-x86_64" \
                     --input "$LANES_DIRECTORY/native-arm64" \
@@ -532,7 +510,9 @@ jobs:
                   name: runtime-release
                   path: ${{ env.RELEASE_DIRECTORY }}
 
-            - name: Write the delta archives
+            # Delta generation is best effort inside the command. The same step then writes
+            # the manifests and SHA256SUMS, which must list the deltas that exist.
+            - name: Write the deltas, manifests, and checksums
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   GH_REPO: ${{ github.repository }}
@@ -540,19 +520,47 @@ jobs:
                   set -euo pipefail
                   just deltas "$VERSION" "$RELEASE_DIRECTORY"
 
-            - name: Upload the delta archives
-              if: ${{ always() }}
+            - name: Upload the deltas, manifests, and checksums
               uses: actions/upload-artifact@v7.0.1
               with:
                   name: runtime-deltas
-                  path: ${{ env.RELEASE_DIRECTORY }}/*.delta.tar.xz*
-                  if-no-files-found: ignore
+                  path: |
+                      ${{ env.RELEASE_DIRECTORY }}/*.delta.tar.xz
+                      ${{ env.RELEASE_DIRECTORY }}/runtime-*.json
+                      ${{ env.RELEASE_DIRECTORY }}/SHA256SUMS
+                  if-no-files-found: error
                   retention-days: 3
 
+    # A read-only job re-checks the tag right before publishing, so that publish never
+    # checks out code. The tag creation and `--verify-tag` still fail on an existing tag.
+    recheck:
+        needs: [prepare, combine]
+        if: ${{ inputs.channel == 'release' }}
+        runs-on: ubuntu-24.04
+        timeout-minutes: 10
+        permissions:
+            contents: read
+        steps:
+            - name: Check out the dispatched ref
+              uses: actions/checkout@v7.0.1
+              with:
+                  persist-credentials: false
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v10.0.1
+
+            - name: Re-check the tag and release
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+              run: |
+                  set -euo pipefail
+                  uv run --locked --no-dev -m scripts release assert-absent --tag "$RELEASE_TAG"
+
     publish:
-        needs: [prepare, combine, deltas]
-        # Deltas are best effort: a failed deltas job must not block the release.
-        if: ${{ always() && needs.combine.result == 'success' && (needs.deltas.result == 'success' || needs.deltas.result == 'failure') }}
+        needs: [prepare, combine, deltas, recheck]
+        if: ${{ inputs.channel == 'release' }}
         runs-on: ubuntu-24.04
         timeout-minutes: 15
         permissions:
@@ -569,44 +577,11 @@ jobs:
                   name: runtime-release
                   path: ${{ github.workspace }}/.build/release
 
-            - name: Download the delta archives
+            - name: Download the deltas, manifests, and checksums
               uses: actions/download-artifact@v8.0.2
-              continue-on-error: true
               with:
                   name: runtime-deltas
                   path: ${{ github.workspace }}/.build/release
-
-            - name: Re-check the tag and release before creation
-              shell: bash
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                  set -euo pipefail
-                  tag_probe="$RUNNER_TEMP/runtime-tag-probe-final"
-                  if gh api --method GET --include \
-                    "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
-                    > "$tag_probe" 2>/dev/null; then
-                    echo "error: tag $RELEASE_TAG appeared during the build; refusing to mutate it" >&2
-                    exit 1
-                  fi
-                  tag_http_status="$(awk '$1 ~ /^HTTP\// { status=$2 } END { print status }' "$tag_probe")"
-                  if [[ "$tag_http_status" != 404 ]]; then
-                    echo "error: could not prove that tag $RELEASE_TAG is still absent" >&2
-                    exit 1
-                  fi
-
-                  release_probe="$RUNNER_TEMP/runtime-release-probe-final"
-                  if gh api --method GET --include \
-                    "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
-                    > "$release_probe" 2>/dev/null; then
-                    echo "error: release $RELEASE_TAG appeared during the build; refusing to mutate it" >&2
-                    exit 1
-                  fi
-                  http_status="$(awk '$1 ~ /^HTTP\// { status=$2 } END { print status }' "$release_probe")"
-                  if [[ "$http_status" != 404 ]]; then
-                    echo "error: could not prove that release $RELEASE_TAG is still absent" >&2
-                    exit 1
-                  fi
 
             - name: Attest release assets
               uses: actions/attest-build-provenance@v4.2.2

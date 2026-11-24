@@ -5,8 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from scripts.lanes import runtime_archive_name, source_archive_name
 from scripts.lib.artifact import sha256, write_archive
-from scripts.targets import runtime_archive_name, source_archive_name
 
 
 class ArchiveNameTests(unittest.TestCase):

@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --locked --no-dev
 # SPDX-License-Identifier: MPL-2.0
 
 """Build one runtime lane and write its release outputs.
@@ -10,26 +9,22 @@ rosetta-x86_64, and llvm-mingw through `LLVM_MINGW_ROOT` for native-arm64.
 
 import argparse
 import subprocess
-import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-from scripts.build_common import Builder, BuildError
+from scripts.build_common import ROOT, Builder, BuildError
+from scripts.lanes import arm64, x86_64
+from scripts.lanes.arm64_assemble import AssemblyError
+from scripts.lanes.arm64_external import FetchError
 from scripts.lib.artifact import ArtifactError
 from scripts.lib.console import error, success
+from scripts.lock.model import LockError
+from scripts.lock.sources import BUILD_ROOT
 from scripts.release.licenses import LicenseError
 from scripts.release.provenance import ProvenanceInputError
 from scripts.release.verify import (
     ReleaseValidationError,
     normalize_version,
 )
-from scripts.runtime import BUILD_ROOT, LockError
-from scripts.targets import arm64, x86_64
-from scripts.targets.arm64_assemble import AssemblyError
-from scripts.targets.arm64_external import FetchError
 
 LANES = {lane.TARGET.name: lane for lane in (x86_64, arm64)}
 FAILURES = (
@@ -83,7 +78,3 @@ def main(arguments: list[str] | None = None) -> int:
         return 1
     success(f"wrote {output}")
     return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

@@ -10,14 +10,14 @@ from pathlib import Path
 import pytest
 
 from scripts.build_common import CLEARED_DOS_STUB
-from scripts.lock.model import Artifact, DxmtPayload, Interface, Lane, Launcher
-from scripts.targets import arm64_external as fetch_external
-from scripts.targets.arm64_assemble import AssemblyError, assemble
-from scripts.targets.arm64_external import (
+from scripts.lanes import arm64_external as fetch_external
+from scripts.lanes.arm64_assemble import AssemblyError, assemble
+from scripts.lanes.arm64_external import (
     FetchError,
     _extract_archive,
     fetch_selected_release,
 )
+from scripts.lock.model import Artifact, DxmtPayload, Interface, Lane, Launcher
 
 RELEASE_ID = "wine-11-18-arm64-v5"
 
@@ -180,7 +180,7 @@ def test_fetch_rejects_a_catalog_sha_mismatch(tmp_path, monkeypatch):
         }
     )
 
-    with pytest.raises(FetchError, match="update-pins --only wine-arm64"):
+    with pytest.raises(FetchError, match="pins update --only wine-arm64"):
         fetch_selected_release(
             "ARM64_RUNTIME_CATALOG_URL",
             RELEASE_ID,
@@ -308,7 +308,7 @@ def test_fetch_target_fails_when_the_catalog_rebuilt_the_locked_release(
     monkeypatch.setenv("ARM64_RUNTIME_CATALOG_URL", catalog_url)
     monkeypatch.setattr(fetch_external, "_urlopen_bytes", lambda url: _catalog(rebuilt))
 
-    with pytest.raises(FetchError, match="re-pin with `just update-pins"):
+    with pytest.raises(FetchError, match="re-pin with `just pins update"):
         fetch_external.fetch_target(_lane(), tmp_path / "incoming")
 
     assert not (tmp_path / "incoming" / "wine.tar.xz").exists()

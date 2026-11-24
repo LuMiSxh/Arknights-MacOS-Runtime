@@ -4,7 +4,7 @@
 
 `resolve` finds the newest upstream state and writes it into the lock. `mentions`
 checks and rewrites each mention of a pin. `cli` holds the commands:
-`python -m scripts.pins update|check|export`.
+`-m scripts pins update|check|export`.
 """
 
 import json
