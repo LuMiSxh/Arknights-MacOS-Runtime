@@ -104,7 +104,7 @@ COMMON_PROVENANCE = {
         (
             "arm64",
             "native-arm64",
-            "26.0",
+            "27.0",
             {"wine": "11.18", "dxmt": "0.80"},
             [
                 {

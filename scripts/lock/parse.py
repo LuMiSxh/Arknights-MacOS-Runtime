@@ -35,7 +35,7 @@ from scripts.lock.model import (
 
 SCHEMA_VERSION = 4
 # Each build mode fixes its minimum macOS. The lock states it and validation rejects drift.
-BUILD_MINIMUM_MACOS = {"build": "15.0", "external": "26.0"}
+BUILD_MINIMUM_MACOS = {"build": "15.0", "external": "27.0"}
 SOURCE_COMPONENTS = ("wine", "dxmt", "fex")
 BASE_PROVENANCE = ("moltenvk", "wineGecko")
 ALLOWED_REPOSITORY_HOSTS = frozenset({"github.com", "gitlab.winehq.org"})

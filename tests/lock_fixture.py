@@ -93,7 +93,7 @@ def synthetic_lock(patches: list[dict[str, Any]]) -> dict[str, Any]:
             EXTERNAL_LANE: {
                 "arch": "arm64",
                 "build": "external",
-                "minimumMacOS": "26.0",
+                "minimumMacOS": "27.0",
                 "sources": {
                     "wine": _source("wine", "2", "11.18"),
                     "fex": _source("fex", "3", "2610"),

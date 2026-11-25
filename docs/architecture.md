@@ -36,7 +36,13 @@ The launcher selects the remaining flags from the profile of the active client. 
 
 ## Native ARM64 target
 
-`runtime.lock.json` declares a second target, `native-arm64`. It runs a native ARM64 Wine runtime without Rosetta, with FEX for x86_64 programs and DXMT ARM64EC for Direct3D 10 and 11. The target is external: the Wine payload is built in [wine-build-new](https://github.com/riverfog7/wine-build-new), and this repository builds DXMT, repacks the tree, and validates it. The lane requires macOS 26.0 or newer. `rosetta-x86_64` stays the default. See [the ARM64 documentation](arm/README.md).
+`runtime.lock.json` declares a second target, `native-arm64`. It runs a native ARM64 Wine runtime
+without Rosetta, with FEX for x86_64 programs and DXMT ARM64EC for Direct3D 10 and 11. The target is
+external: the Wine payload is built in
+[wine-build-new](https://github.com/riverfog7/wine-build-new), and this repository builds DXMT,
+repacks the tree, and validates it. The lane requires macOS 27.0 or newer, because earlier releases
+lack the x18 register ABI that Wine needs. `rosetta-x86_64` stays the default. See
+[the ARM64 documentation](arm/README.md).
 
 ## Runtime lock
 

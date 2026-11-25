@@ -1,6 +1,8 @@
 # Native ARM64 runtime
 
-The ARM64 lane runs a native ARM64 Wine runtime on macOS 26.0 or newer. The x86_64 lane runs Wine under Rosetta 2 and remains the default. The Wine payload is built outside this repository; this repository builds DXMT, repacks the client tree, validates it, and creates a draft release.
+The ARM64 lane builds a native ARM64 Wine runtime for macOS 27.0 or newer. The x86_64 lane runs Wine
+under Rosetta 2 and remains the default. The Wine payload is built outside this repository; this
+repository builds DXMT, repacks the client tree, validates it, and creates a draft release.
 
 The x86_64 lane stays the default until the game passes the compatibility checks. ACE is untested on the ARM64 lane.
 
@@ -24,7 +26,7 @@ The lock declares `native-arm64` with `build: external`. `uv run --locked --no-d
 | Field         | Value                                                                  |
 | ------------- | ---------------------------------------------------------------------- |
 | Wine source   | Upstream Wine 11.22, commit `9f8c4ae4d35c7ff4153267aba9618c026f5f5583` |
-| Minimum macOS | 26.0                                                                   |
+| Minimum macOS | 27.0                                                                   |
 | Builder       | [wine-build-new](https://github.com/riverfog7/wine-build-new)          |
 
 The artifact layout is:
@@ -45,7 +47,7 @@ The archive has no DXMT, no `winemetal.so`, no `wine64`, no `Arknights` link, an
 
 ## DXMT
 
-The release workflow builds DXMT from `lanes.native-arm64.sources.dxmt` at commit `647b0020ba5764e5593b12407afd76964fa11e20` with `MACOSX_DEPLOYMENT_TARGET=26.0`. It also builds a minimal Wine tree from `lanes.native-arm64.sources.wine` for the import libraries. That build tree is a build dependency and is never shipped. The macOS driver `winemac.so` comes from the external tree. The old external `dxmt-experimental-v1` artifact is not used.
+The release workflow builds DXMT from `lanes.native-arm64.sources.dxmt` at commit `647b0020ba5764e5593b12407afd76964fa11e20` with `MACOSX_DEPLOYMENT_TARGET=27.0`. It also builds a minimal Wine tree from `lanes.native-arm64.sources.wine` for the import libraries. That build tree is a build dependency and is never shipped. The macOS driver `winemac.so` comes from the external tree. The old external `dxmt-experimental-v1` artifact is not used.
 
 ## Entitlements and window chrome
 
