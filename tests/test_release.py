@@ -381,7 +381,7 @@ def test_external_target_accepts_the_minimal_notice_set(tmp_path):
         json.dumps(
             {
                 "runtime": "/private/build/external/Libraries",
-                "deploymentTarget": "26.0",
+                "deploymentTarget": "27.0",
                 "inheritedMachOAboveTarget": 0,
                 "releaseEligible": True,
                 "status": "valid",
