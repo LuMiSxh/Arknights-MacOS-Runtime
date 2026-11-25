@@ -36,9 +36,9 @@ Every script runs through one command line: `uv run --locked --no-dev -m scripts
 - Run Python through the root `pyproject.toml` and `uv.lock` with `uv run --locked`; keep runtime orchestration standard-library-only.
 - Preserve upstream patch authorship, source links, trailers, and licenses in `docs/patch-registry.md`.
 - A patch number names one patch in both lanes. A shared patch keeps its number and file name in `patches/wine/` and `wine-build-new/patches/`. A lane-only patch takes the next unused number in both lanes and leaves a gap in the other lane. Never reuse a number. `just validate` enforces this.
-- Each patch has one documented gate, `LMISXH_AKMOCL_<NAME>`. A default-on gate is on when the
-  variable is unset or exactly `1`; any other value turns it off. A default-off gate is on only for
-  exactly `1`. The `_CN` and `_CURSOR` gates default off.
+- Each patch has one documented gate, `LMISXH_AKMOCL_<NAME>`, or is documented as always on. A
+  default-on gate is on when the variable is unset or exactly `1`; any other value turns it off. A
+  default-off gate is on only for exactly `1`. The `_CN` and `_CURSOR` gates default off.
 - Never infer patched behavior from a process name or path.
 - Exception: the Bilibili windowing (`0007`, `0008`) and fullscreen (`0009`) patches may check the
   process name to exclude or scope helper processes. Document each such check in

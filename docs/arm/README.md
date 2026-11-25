@@ -1,6 +1,9 @@
 # Native ARM64 runtime
 
-The ARM64 lane runs a native ARM64 Wine runtime on macOS 26.0 or newer. The x86_64 lane runs Wine under Rosetta 2 and remains the default. The Wine payload is built outside this repository; this repository builds DXMT, repacks the client tree, validates it, and creates a draft release.
+The ARM64 lane builds a native ARM64 Wine runtime with a macOS 26.0 deployment target. Arknights
+Client runs it on macOS 27.0 or newer. The x86_64 lane runs Wine under Rosetta 2 and remains the
+default. The Wine payload is built outside this repository; this repository builds DXMT, repacks the
+client tree, validates it, and creates a draft release.
 
 The x86_64 lane stays the default until the game passes the compatibility checks. ACE is untested on the ARM64 lane.
 
@@ -24,7 +27,7 @@ The lock declares `native-arm64` with `build: external`. `uv run --locked --no-d
 | Field         | Value                                                                  |
 | ------------- | ---------------------------------------------------------------------- |
 | Wine source   | Upstream Wine 11.22, commit `9f8c4ae4d35c7ff4153267aba9618c026f5f5583` |
-| Minimum macOS | 26.0                                                                   |
+| Deployment target | 26.0 (Arknights Client requires 27.0)                              |
 | Builder       | [wine-build-new](https://github.com/riverfog7/wine-build-new)          |
 
 The artifact layout is:

@@ -192,9 +192,15 @@ The patch turns the feature off for the whole process when the program is `Platf
 
 The `native-arm64` lane carries these patches. The release verifier checks that this page names each one:
 
-- `fex-arm64ec-restore-carried-eflags`
-- `wine-ntdll-carry-eflags-af-df`
-- `wine-ntdll-hybrid-thread-entry`
-- `wine-ntdll-name-the-macos-loader-link-after-the-application`
-- `wine-winemac-name-the-application-menu-after-the-program`
-- `wine-ntdll-promote-cx-unix-environment-variables`
+| Patch                                                    | Gate                | Default    |
+| -------------------------------------------------------- | ------------------- | ---------- |
+| `fex-arm64ec-restore-carried-eflags`                     | `_EFLAGS`           | on         |
+| `wine-ntdll-carry-eflags-af-df`                          | `_EFLAGS`           | on         |
+| `wine-ntdll-hybrid-thread-entry`                         | `_HYBRID_THREAD`    | on         |
+| `wine-ntdll-name-the-macos-loader-link-after-the-application` | `_LOADER_LINK`  | on         |
+| `wine-winemac-name-the-application-menu-after-the-program`    | `_LOADER_LINK`  | on         |
+| `wine-ntdll-promote-cx-unix-environment-variables`       | none                | always on  |
+
+The FEX patch shares `LMISXH_AKMOCL_EFLAGS` with Wine patch `0001`, and both use the same opt-out
+semantics. `0001` and `0002` default on: unset or exactly `1` keeps the patch on. `0016` and `0017`
+share the `LMISXH_AKMOCL_LOADER_LINK` gate. `0018` has no gate; it always runs.
