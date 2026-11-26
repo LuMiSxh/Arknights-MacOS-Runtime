@@ -84,7 +84,7 @@
     "native-arm64": {
       "arch": "arm64",
       "build": "external",
-      "minimumMacOS": "27.0",
+      "minimumMacOS": "26.5",
       "sources": {
         "wine": {
           "repository": "https://gitlab.winehq.org/wine/wine.git",

@@ -60,7 +60,7 @@ def _lane() -> Lane:
         name="native-arm64",
         arch="arm64",
         build="external",
-        minimum_macos="27.0",
+        minimum_macos="26.5",
         sources={},
         interface=_interface(),
         base=None,

@@ -1,10 +1,12 @@
 # Native ARM64 runtime
 
-The ARM64 lane builds a native ARM64 Wine runtime for macOS 27.0 or newer. The x86_64 lane runs Wine
+The ARM64 lane builds a native ARM64 Wine runtime for macOS 26.5 or newer. The x86_64 lane runs Wine
 under Rosetta 2 and remains the default. The Wine payload is built outside this repository; this
 repository builds DXMT, repacks the client tree, validates it, and creates a draft release.
 
 The x86_64 lane stays the default until the game passes the compatibility checks. ACE is untested on the ARM64 lane.
+
+Wine needs the custom `x18` register ABI that macOS 26.5 added (Brendan Shanks, CodeWeavers, wine-devel, 2026-08-07: [thread](https://list.winehq.org/hyperkitty/list/wine-devel@list.winehq.org/thread/CKG5CEN2BE5VRXZ7O7NX4YUSBH3247WH/)). Probe run 45790461426 ran runtime v1.0.2 on GitHub-hosted `macos-26` (26.7.2, VM): `wineboot --init` exited 0, `cmd /c ver` printed `Microsoft Windows 10.0.19045`, and the logs had no `custom x18 ABI not available`. On `macos-15` (15.8.2), Wine failed earlier with `failed to map the shared user data`. The `smoke-arm64` release job repeats this check.
 
 ## Catalog and pin generation
 
@@ -26,7 +28,7 @@ The lock declares `native-arm64` with `build: external`. `uv run --locked --no-d
 | Field         | Value                                                                  |
 | ------------- | ---------------------------------------------------------------------- |
 | Wine source   | Upstream Wine 11.22, commit `9f8c4ae4d35c7ff4153267aba9618c026f5f5583` |
-| Minimum macOS | 27.0                                                                   |
+| Minimum macOS | 26.5                                                                   |
 | Builder       | [wine-build-new](https://github.com/riverfog7/wine-build-new)          |
 
 The artifact layout is:
@@ -47,7 +49,7 @@ The archive has no DXMT, no `winemetal.so`, no `wine64`, no `Arknights` link, an
 
 ## DXMT
 
-The release workflow builds DXMT from `lanes.native-arm64.sources.dxmt` at commit `647b0020ba5764e5593b12407afd76964fa11e20` with `MACOSX_DEPLOYMENT_TARGET=27.0`. It also builds a minimal Wine tree from `lanes.native-arm64.sources.wine` for the import libraries. That build tree is a build dependency and is never shipped. The macOS driver `winemac.so` comes from the external tree. The old external `dxmt-experimental-v1` artifact is not used.
+The release workflow builds DXMT from `lanes.native-arm64.sources.dxmt` at commit `647b0020ba5764e5593b12407afd76964fa11e20` with `MACOSX_DEPLOYMENT_TARGET=26.5`. It also builds a minimal Wine tree from `lanes.native-arm64.sources.wine` for the import libraries. That build tree is a build dependency and is never shipped. The macOS driver `winemac.so` comes from the external tree. The old external `dxmt-experimental-v1` artifact is not used.
 
 ## Entitlements and window chrome
 
@@ -55,13 +57,12 @@ The `Arknights.app` loader, renamed from `wine.app`, is Developer ID signed by t
 
 | Entitlement                                                | Effect                                                                 |
 | ---------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `com.apple.developer.cross-architecture-support`           | Cross-architecture support. The loader can use the low 4 GB layout without relocating the shared page. |
+| `com.apple.developer.cross-architecture-support`           | Cross-architecture support, including the custom `x18` ABI on macOS 26.5 and newer. The loader can use the low 4 GB layout without relocating the shared page. |
 | `com.apple.developer.cross-architecture-support-unmanaged` | The free-account variant of the same capability.                       |
-| `com.apple.private.custom-x18-abi`                         | Custom `x18` ABI. The kernel keeps `x18` across exceptions.            |
 
 Apple grants these entitlements only to approved signing identities. A profile binds one team, one App ID, and the Macs in the profile.
 
-The window server selects the window design from the main executable's `LC_BUILD_VERSION`. The external loader keeps its signed build metadata. The current profile grants only the cross-architecture entitlement, so expect the legacy window chrome until it also carries `com.apple.private.custom-x18-abi`. In-process workarounds do not change the real frame: `UIDesignRequiresCompatibility=NO`, interposing `dyld_get_program_sdk_version`, and `_appearancePreferringSolarium` all leave the frame unchanged. The client has no chrome bridge. Do not add one.
+The window server selects the window design from the main executable's `LC_BUILD_VERSION`. The external loader keeps its signed build metadata. The loader's `com.apple.developer.cross-architecture-support` entitlement does not change the window design, so expect the legacy window chrome. In-process workarounds do not change the real frame: `UIDesignRequiresCompatibility=NO`, interposing `dyld_get_program_sdk_version`, and `_appearancePreferringSolarium` all leave the frame unchanged. The client has no chrome bridge. Do not add one.
 
 ## Patch export
 

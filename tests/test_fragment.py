@@ -25,7 +25,7 @@ class ValidationProvenanceTests(unittest.TestCase):
 
     def _write(self, **fields: object) -> None:
         report = {
-            "deploymentTarget": "27.0",
+            "deploymentTarget": "26.5",
             "inheritedMachOAboveTarget": 0,
             "releaseEligible": True,
             "status": "valid",
@@ -37,12 +37,12 @@ class ValidationProvenanceTests(unittest.TestCase):
         self._write(releaseEligible=False, status="valid-canary")
 
         with self.assertRaisesRegex(ProvenanceInputError, "not release eligible"):
-            validation_provenance(self.report, "27.0")
+            validation_provenance(self.report, "26.5")
 
     def test_external_lane_is_recorded_as_built_externally(self) -> None:
         self._write(releaseEligible=True)
 
-        record = validation_provenance(self.report, "27.0", external=True)
+        record = validation_provenance(self.report, "26.5", external=True)
 
         self.assertFalse(record["releaseEligible"])
         self.assertTrue(record["builtExternally"])

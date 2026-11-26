@@ -223,9 +223,9 @@ Do not send the matching Arknights patches. The Hadron and Endfield queues alrea
 
 ## Entitlements
 
-The workspace profile currently grants `com.apple.developer.cross-architecture-support`.
-It does not yet grant `com.apple.private.custom-x18-abi`. Confirm the final profile before judging
-the window chrome. See [entitlements and window chrome](../docs/arm/README.md#entitlements-and-window-chrome).
+The workspace profile grants `com.apple.developer.cross-architecture-support`, which supplies the
+custom `x18` ABI on macOS 26.5 and newer. Confirm the final profile before judging the window
+chrome. See [entitlements and window chrome](../docs/arm/README.md#entitlements-and-window-chrome).
 
 ## Yaagl
 
