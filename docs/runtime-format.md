@@ -33,7 +33,7 @@ The release tag and `name` give the download URL: `https://github.com/LuMiSxh/Ar
   "schemaVersion": 1,
   "arch": "arm64",
   "version": "1.0.2",
-  "minimumMacOS": "27.0",
+  "minimumMacOS": "26.5",
   "archive": { "name": "runtime-arm64.tar.xz", "sha256": "…", "sizeBytes": 241874082 },
   "deltas": [
     { "from": "1.0.1", "name": "runtime-arm64-from-1.0.1.delta.tar.xz", "sha256": "…", "sizeBytes": 1234567 }

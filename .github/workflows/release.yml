@@ -437,10 +437,97 @@ jobs:
                   if-no-files-found: error
                   retention-days: 3
 
+    smoke-arm64:
+        name: smoke (native ARM64)
+        needs: build-arm64
+        runs-on: macos-26
+        timeout-minutes: 30
+        permissions:
+            contents: read
+        env:
+            RUNNER_LABEL: macos-26
+        steps:
+            - name: Print host details
+              run: |
+                  sw_vers
+                  uname -m
+                  sysctl -n kern.hv_vmm_present
+
+            - name: Download the runtime artifact
+              uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+              with:
+                  name: runtime-native-arm64
+                  path: ${{ runner.temp }}/artifact
+
+            - name: Extract the runtime and print the loader entitlements
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  log_dir="$RUNNER_TEMP/logs"
+                  runtime_dir="$RUNNER_TEMP/rt"
+                  mkdir -p "$log_dir" "$runtime_dir"
+                  archive="$(find "$RUNNER_TEMP/artifact" -name '*.tar.xz' ! -name '*source*' -print -quit)"
+                  tar -xJf "$archive" -C "$runtime_dir"
+                  xattr -dr com.apple.quarantine "$runtime_dir" || true
+                  wine="$(find "$runtime_dir" -path '*/bin/wine64' -print -quit)"
+                  if [ -z "$wine" ]; then
+                      echo "::error::the ARM64 runtime has no bin/wine64"
+                      exit 1
+                  fi
+                  ls -l "$wine"
+                  codesign -d --entitlements :- "$wine" > "$log_dir/entitlements.txt" 2>&1 || true
+                  echo "entitlements:"
+                  cat "$log_dir/entitlements.txt"
+
+            - name: Boot a prefix and run cmd /c ver
+              shell: bash
+              run: |
+                  set +e
+                  log_dir="$RUNNER_TEMP/logs"
+                  runtime_dir="$RUNNER_TEMP/rt"
+                  wine="$(find "$runtime_dir" -path '*/bin/wine64' -print -quit)"
+                  export WINEPREFIX="$RUNNER_TEMP/prefix"
+                  export WINEDEBUG="err+all"
+                  export WINEDLLOVERRIDES="winemenubuilder.exe=d;mscoree,mshtml=d"
+                  run_limited() {
+                      seconds="$1"
+                      shift
+                      perl -e 'alarm shift; exec @ARGV or die "exec failed: $!\n"' "$seconds" "$@"
+                  }
+                  run_limited 600 "$wine" wineboot --init > "$log_dir/wineboot.log" 2>&1
+                  wineboot_rc=$?
+                  run_limited 120 "$wine" cmd /c ver > "$log_dir/ver.log" 2>&1
+                  ver_rc=$?
+                  x18_unavailable="$(grep -h -c 'custom x18 ABI not available' "$log_dir"/*.log 2>/dev/null | awk '{sum += $1} END {print sum + 0}')"
+                  stack_overflow="$(grep -h -c 'stack overflow' "$log_dir"/*.log 2>/dev/null | awk '{sum += $1} END {print sum + 0}')"
+                  entitlement="$(grep -c 'com.apple.developer.cross-architecture-support' "$log_dir/entitlements.txt" 2>/dev/null)"
+                  entitlement="${entitlement:-0}"
+                  ver_line="$(grep -m 1 'Microsoft Windows' "$log_dir/ver.log" 2>/dev/null)"
+                  result="RESULT runner=$RUNNER_LABEL wineboot=$wineboot_rc ver=$ver_rc x18_unavailable=$x18_unavailable stack_overflow=$stack_overflow entitlement=$entitlement ver=[$ver_line]"
+                  echo "$result" | tee -a "$log_dir/result.txt" >> "$GITHUB_STEP_SUMMARY"
+                  # A runtime that cannot boot a prefix, report its version, or keep x18 must not ship.
+                  if [ "$wineboot_rc" -ne 0 ] || [ "$ver_rc" -ne 0 ] || [ "$x18_unavailable" -ne 0 ] || [ "$stack_overflow" -ne 0 ]; then
+                      echo "::error::ARM64 smoke failed on $RUNNER_LABEL: $result"
+                      exit 1
+                  fi
+                  if [ "$entitlement" -eq 0 ]; then
+                      echo "::error::the ARM64 loader lacks com.apple.developer.cross-architecture-support"
+                      exit 1
+                  fi
+
+            - name: Upload the smoke logs
+              if: ${{ always() }}
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+              with:
+                  name: smoke-arm64
+                  path: ${{ runner.temp }}/logs
+                  retention-days: 3
+                  if-no-files-found: warn
+
     # Combining runs repository code, so it gets read-only permissions. The publish job
     # downloads its output and never checks out the repository.
     combine:
-        needs: [prepare, build-x86_64, smoke-x86_64, build-arm64]
+        needs: [prepare, build-x86_64, smoke-x86_64, build-arm64, smoke-arm64]
         if: ${{ inputs.channel == 'release' }}
         runs-on: ubuntu-24.04
         timeout-minutes: 15
